@@ -5,3 +5,7 @@ package-lock.json
 
 # tests
 test
+
+# VSCode
+.vscode
+sftp.json
