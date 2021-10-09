@@ -4,6 +4,7 @@ const { SlashCreator, GatewayServer } = require('slash-create')
 const { Client } = require('discord.js')
 const { Player } = require('discord-player')
 const { registerPlayerEvents } = require('./events')
+const { writeUserVoiceStatus } = require('./db/influx')
 
 dotenv.config()
 
@@ -26,8 +27,21 @@ client.on('ready', () => {
   console.log(`Logged in as ${client.user.tag}!`)
 
   console.log('Generating docs...')
-  generateDocs(creator.commands)
 })
+
+// Log voice connections in InfluxDB
+client.on('voiceStateUpdate', (oldState, newState) => {
+  if (!newState.channel || newState.channel.id === null) {
+    // User left voice channel
+    writeUserVoiceStatus(oldState, 'left')
+  } else if (!oldState.channel || oldState.channel.id === null) {
+    // User joined voice channel
+    writeUserVoiceStatus(newState, 'joined')
+  } else {
+    // User changed voice channel
+    writeUserVoiceStatus(newState, 'moved')
+  }
+});
 
 creator
   .withServer(

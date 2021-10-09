@@ -1,3 +1,5 @@
+const { writeSongState } = require('./db/influx')
+
 module.exports.registerPlayerEvents = (player) => {
 
   player.on('error', (queue, error) => {
@@ -9,6 +11,7 @@ module.exports.registerPlayerEvents = (player) => {
 
   player.on('trackStart', (queue, track) => {
     queue.metadata.send(`🎶 | Started playing: **${track.title}** in **${queue.connection.channel.name}**!`)
+    writeSongState(true, track)
   })
 
   player.on('trackAdd', (queue, track) => {
@@ -25,6 +28,7 @@ module.exports.registerPlayerEvents = (player) => {
 
   player.on('queueEnd', (queue) => {
     queue.metadata.send('✅ | Queue finished!')
+    writeSongState(false)
   })
 
 }
