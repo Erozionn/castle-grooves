@@ -18,6 +18,10 @@ const creator = new SlashCreator({
 
 client.on('ready', () => {
   console.log(`Logged in as ${client.user.tag}!`)
+  client.user.setActivity({
+    name: '🎶 | Music Time',
+    type: 'LISTENING'
+  })
 })
 
 // Log voice connections in InfluxDB
