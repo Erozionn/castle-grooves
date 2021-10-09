@@ -1,3 +1,4 @@
+require('dotenv').config()
 const { InfluxDB, Point } = require('@influxdata/influxdb-client')
 // const { influxUrl, influxBucket, influxOrg, influxToken } = require('../config.json')
 
@@ -8,7 +9,7 @@ const influxBucket = process.env.INFLUX_BUCKET
 
 const client = new InfluxDB({ url: influxUrl, token: influxToken })
 
-function writeSongState(playing, track) {
+function writeSongState(playing, track, queue) {
   const writeApi = client.getWriteApi(influxOrg, influxBucket)
 
   const point = new Point('song')
@@ -17,12 +18,12 @@ function writeSongState(playing, track) {
       .booleanField('playing', false)
   }
   else if (playing === true) {
-    if (track == undefined) {
+    if (track == undefined || queue == undefined) {
       return
     }
     point
-      .tag('requestedById', track.requestedBy.id)
-      .tag('requestedByUsername', track.requestedBy.username)
+      .tag('requestedById', queue.ctx.member.user.id)
+      .tag('requestedByUsername', queue.ctx.member.user.username)
       .tag('songTitle', track.title)
       .booleanField('playing', true)
       .stringField('songUrl', track.url)

@@ -1,19 +1,12 @@
-const dotenv = require('dotenv')
+require('dotenv').config()
 const path = require('path')
 const { SlashCreator, GatewayServer } = require('slash-create')
-const { Client } = require('discord.js')
+const Client = require('./client/Client')
 const { Player } = require('discord-player')
 const { registerPlayerEvents } = require('./events')
 const { writeUserVoiceStatus } = require('./db/influx')
 
-dotenv.config()
-
-const client = new Client({
-  intents: [
-    'GUILDS',
-    'GUILD_VOICE_STATES'
-  ]
-})
+const client = new Client()
 
 client.player = new Player(client)
 registerPlayerEvents(client.player)
@@ -25,8 +18,6 @@ const creator = new SlashCreator({
 
 client.on('ready', () => {
   console.log(`Logged in as ${client.user.tag}!`)
-
-  console.log('Generating docs...')
 })
 
 // Log voice connections in InfluxDB
@@ -41,7 +32,7 @@ client.on('voiceStateUpdate', (oldState, newState) => {
     // User changed voice channel
     writeUserVoiceStatus(newState, 'moved')
   }
-});
+})
 
 creator
   .withServer(
