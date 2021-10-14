@@ -3,12 +3,14 @@ const path = require('path')
 const { SlashCreator, GatewayServer } = require('slash-create')
 const Client = require('./client/Client')
 const { Player } = require('discord-player')
+const { Downloader } = require('@discord-player/downloader')
 const { registerPlayerEvents } = require('./events')
 const { writeUserVoiceStatus } = require('./db/influx')
 
 const client = new Client()
 
 client.player = new Player(client)
+client.player.use('YOUTUBE_DL', Downloader)
 registerPlayerEvents(client.player)
 
 const creator = new SlashCreator({

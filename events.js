@@ -9,6 +9,10 @@ module.exports.registerPlayerEvents = (player) => {
     console.log(`[${queue.guild.name}] Error emitted from the connection: ${error.message}`)
   })
 
+  player.on('debug', (queue, debug) => {
+    console.log(debug)
+  })
+
   player.on('trackStart', async (queue, track) => {
     queue.metadata.channel.send(`🎶 | Started playing: **${track.title}** in **${queue.connection.channel.name}**!`)
     console.log(await track)

@@ -27,6 +27,7 @@ module.exports = class extends SlashCommand {
     const guild = client.guilds.cache.get(ctx.guildID)
     const channel = guild.channels.cache.get(ctx.channelID)
     const query = ctx.options.query
+    console.log(await client.player)
     const searchResult = await client.player
       .search(query, {
         requestedBy: ctx.user,
