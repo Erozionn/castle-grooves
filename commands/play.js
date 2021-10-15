@@ -1,5 +1,4 @@
 const { SlashCommand, CommandOptionType } = require('slash-create')
-const { QueryType } = require('discord-player')
 
 module.exports = class extends SlashCommand {
   constructor(creator) {
@@ -27,31 +26,14 @@ module.exports = class extends SlashCommand {
     const guild = client.guilds.cache.get(ctx.guildID)
     const channel = guild.channels.cache.get(ctx.channelID)
     const query = ctx.options.query
-    console.log(await client.player)
-    const searchResult = await client.player
-      .search(query, {
-        requestedBy: ctx.user,
-        searchEngine: QueryType.AUTO
-      })
-      .catch(() => {
-        console.log('he')
-      })
-    if (!searchResult || !searchResult.tracks.length) return void ctx.sendFollowUp({ content: 'No results were found!' })
-
-    const queue = await client.player.createQueue(guild, {
-      metadata: { channel, ctx}
-    })
-
     const member = guild.members.cache.get(ctx.user.id) ?? await guild.members.fetch(ctx.user.id)
+
     try {
-      if (!queue.connection) await queue.connect(member.voice.channel)
-    } catch {
-      void client.player.deleteQueue(ctx.guildID)
-      return void ctx.sendFollowUp({ content: 'Could not join your voice channel!' })
+      client.player.playVoiceChannel(member.voice.channel, query, {textChannel: channel})
+    } catch (e) {
+      ctx.sendFollowUp({ content: 'Error joining your channel.' })
     }
 
-    await ctx.sendFollowUp({ content: `⏱ | Loading your ${searchResult.playlist ? 'playlist' : 'track'}...` })
-    searchResult.playlist ? queue.addTracks(searchResult.tracks) : queue.addTrack(searchResult.tracks[0])
-    if (!queue.playing) await queue.play()
+    await ctx.sendFollowUp({ content: '⏱ | Loading...' })
   }
 }

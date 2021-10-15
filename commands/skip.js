@@ -15,9 +15,9 @@ module.exports = class extends SlashCommand {
     const { client } = require('..')
         
     await ctx.defer()
-    const queue = client.player.getQueue(ctx.guildID)
+    const queue = client.player.queues.get(ctx.guildID)
     if (!queue || !queue.playing) return void ctx.sendFollowUp({ content: '❌ | No music is being played!' })
-    const currentTrack = queue.current
+    const currentTrack = queue.songs[0].name
     const success = queue.skip()
     return void ctx.sendFollowUp({
       content: success ? `✅ | Skipped **${currentTrack}**!` : '❌ | Something went wrong!'

@@ -16,9 +16,9 @@ module.exports = class extends SlashCommand {
 
     await ctx.defer()
 
-    const queue = client.player.getQueue(ctx.guildID)
+    const queue = client.player.queues.get(ctx.guildID)
     if (!queue || !queue.playing) return void ctx.sendFollowUp({ content: '❌ | No music is being played!' })
-    const paused = queue.setPaused(true)
+    const paused = queue.pause()
     return void ctx.sendFollowUp({ content: paused ? '⏸ | Paused!' : '❌ | Something went wrong!' })
   }
 }

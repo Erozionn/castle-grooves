@@ -1,16 +1,14 @@
 require('dotenv').config()
 const path = require('path')
 const { SlashCreator, GatewayServer } = require('slash-create')
+const DisTube = require('distube').DisTube
 const Client = require('./client/Client')
-const { Player } = require('discord-player')
-const { Downloader } = require('@discord-player/downloader')
 const { registerPlayerEvents } = require('./events')
 const { writeUserVoiceStatus } = require('./db/influx')
 
 const client = new Client()
 
-client.player = new Player(client)
-client.player.use('YOUTUBE_DL', Downloader)
+client.player = new DisTube(client, { emptyCooldown: 300, nsfw: true, searchSongs: 1 })
 registerPlayerEvents(client.player)
 
 const creator = new SlashCreator({

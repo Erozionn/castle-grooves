@@ -9,7 +9,7 @@ const influxBucket = process.env.INFLUX_BUCKET
 
 const client = new InfluxDB({ url: influxUrl, token: influxToken })
 
-function writeSongState(playing, track, queue) {
+function writeSongState(playing, song) {
   const writeApi = client.getWriteApi(influxOrg, influxBucket)
 
   const point = new Point('song')
@@ -18,16 +18,16 @@ function writeSongState(playing, track, queue) {
       .booleanField('playing', false)
   }
   else if (playing === true) {
-    if (track == undefined || queue == undefined) {
+    if (song == undefined) {
       return
     }
     point
-      .tag('requestedById', queue.ctx.member.user.id)
-      .tag('requestedByUsername', queue.ctx.member.user.username)
-      .tag('songTitle', track.title)
+      .tag('requestedById', song.user.id)
+      .tag('requestedByUsername', song.user.username)
+      .tag('songTitle', song.name)
       .booleanField('playing', true)
-      .stringField('songUrl', track.url)
-      .stringField('source', track.source)
+      .stringField('songUrl', song.url)
+      .stringField('source', song.source)
   }
   else {
     console.log('Error: playing undefined.')
@@ -53,14 +53,11 @@ function writeUserVoiceStatus(voiceState, state) {
     return
   }
 
-  const from = new Date().toISOString()
   point
     .intField('state', state === 'joined' ? 1 : 0)
     .tag('memberId', voiceState.member.id)
     .tag('channelId', voiceState.channel.id)
     .stringField('memberUsername', voiceState.member.user.username)
-    .stringField('to', '')
-    .stringField('from', from)
 
   writeApi.writePoint(point)
   writeApi.close()
