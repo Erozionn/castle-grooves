@@ -56,8 +56,8 @@ function writeUserVoiceStatus(voiceState, state) {
   point
     .intField('state', state === 'joined' ? 1 : 0)
     .tag('memberId', voiceState.member.id)
-    .tag('channelId', voiceState.channel.id)
-    .stringField('memberUsername', voiceState.member.user.username)
+    .tag('memberUsername', voiceState.member.user.username)
+    .stringField('channelId', voiceState.channel.id)
 
   writeApi.writePoint(point)
   writeApi.close()
