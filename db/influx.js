@@ -27,7 +27,9 @@ function writeSongState(playing, song) {
       .tag('songTitle', song.name)
       .booleanField('playing', true)
       .stringField('songUrl', song.url)
+      .stringField('songThumbnail', song.thumbnail)
       .stringField('source', song.source)
+      .stringField('requestedByAvatar', song.member.avatarURL())
   }
   else {
     console.log('Error: playing undefined.')
@@ -58,6 +60,7 @@ function writeUserVoiceStatus(voiceState, state) {
     .tag('memberId', voiceState.member.id)
     .tag('memberUsername', voiceState.member.user.username)
     .stringField('channelId', voiceState.channel.id)
+    .stringField('memberAvatar', voiceState.member.avatarURL())
 
   writeApi.writePoint(point)
   writeApi.close()
