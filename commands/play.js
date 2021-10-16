@@ -29,7 +29,7 @@ module.exports = class extends SlashCommand {
     const member = guild.members.cache.get(ctx.user.id) ?? await guild.members.fetch(ctx.user.id)
 
     try {
-      client.player.playVoiceChannel(member.voice.channel, query, {textChannel: channel})
+      client.player.playVoiceChannel(member.voice.channel, query, {textChannel: channel, member})
     } catch (e) {
       ctx.sendFollowUp({ content: 'Error joining your channel.' })
     }
