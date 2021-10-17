@@ -1,3 +1,4 @@
+require('dotenv').config()
 const express = require('express')
 const app = express()
 
@@ -5,12 +6,12 @@ function initApi (client) {
   app.get('/play/:query', async (req, res) => {
     
 
-    const guild = await client.guilds.fetch('312422049295368193')
+    const guild = await client.guilds.fetch(process.env.DISCORD_GUILD_ID)
     
-    const channel = await guild.channels.fetch('368784258908815370')
+    const channel = await guild.channels.fetch(process.env.DEFAULT_TEXT_CHANNEL)
     const query = req.params.query
     // Get Alex Member ID
-    const member = await guild.members.fetch('506144977118822422')
+    const member = await guild.members.fetch(process.env.YOUR_DISCORD_USER_ID)
 
     try {
       client.player.playVoiceChannel(member.voice.channel, query, {textChannel: channel, member})
