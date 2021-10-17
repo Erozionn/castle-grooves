@@ -5,6 +5,7 @@ const DisTube = require('distube').DisTube
 const Client = require('./client/Client')
 const { registerPlayerEvents } = require('./events')
 const { writeUserVoiceStatus } = require('./db/influx')
+const { initApi } = require('./api/api')
 
 const client = new Client()
 
@@ -17,6 +18,7 @@ const creator = new SlashCreator({
 })
 
 client.on('ready', () => {
+  initApi(client)
   console.log(`Logged in as ${client.user.tag}!`)
   client.user.setActivity({
     name: '🎶 | Music Time',
