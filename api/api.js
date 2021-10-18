@@ -5,6 +5,7 @@ const app = express()
 function initApi (client) {
   app.get('/play/:query', async (req, res) => {
     
+    console.log(process.env)
 
     const guild = await client.guilds.fetch(process.env.DISCORD_GUILD_ID)
     
@@ -25,7 +26,7 @@ function initApi (client) {
     return res.send('<script>window.close();</script>')
   })
   
-  app.listen(1337, () =>
+  app.listen(process.env.WEBSERVER_PORT, () =>
     console.log('Castle Grooves API listening on port 1337!'),
   )
 }

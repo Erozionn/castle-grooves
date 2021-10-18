@@ -3,14 +3,14 @@ const path = require('path')
 const { SlashCreator, GatewayServer } = require('slash-create')
 const DisTube = require('distube').DisTube
 const Client = require('./client/Client')
-const { registerPlayerEvents } = require('./events')
+const { registerEvents } = require('./events')
 const { writeUserVoiceStatus } = require('./db/influx')
 const { initApi } = require('./api/api')
 
 const client = new Client()
 
 client.player = new DisTube(client, { emptyCooldown: 300, nsfw: true, searchSongs: 1 })
-registerPlayerEvents(client.player)
+registerEvents(client)
 
 const creator = new SlashCreator({
   applicationID: process.env.DISCORD_CLIENT_ID,

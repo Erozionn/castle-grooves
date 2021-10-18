@@ -16,7 +16,7 @@ module.exports = class extends SlashCommand {
 
     await ctx.defer()
 
-    const queue = client.player.getQueue(ctx.guildID)
+    const queue = client.player.queues.get(ctx.guildID)
     if (!queue) return void ctx.sendFollowUp({ content: '❌ | No music in the queue!' })
         
     queue.clear()

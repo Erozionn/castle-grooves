@@ -19,7 +19,7 @@ module.exports = class extends SlashCommand {
     const queue = client.player.getQueue(ctx.guildID)
     if (!queue || !queue.playing) return void ctx.sendFollowUp({ content: '❌ | No music is being played!' })
         
-    await queue.back()
+    await queue.previous()
 
     ctx.sendFollowUp({ content: '✅ | Playing the previous track!' })
   }
