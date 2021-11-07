@@ -35,5 +35,6 @@ module.exports = class extends SlashCommand {
     }
 
     await ctx.sendFollowUp({ content: '⏱ | Loading...' })
+    setTimeout(() => ctx.delete(), 4000)
   }
 }
