@@ -1,6 +1,9 @@
 require('dotenv').config()
 const express = require('express')
 const app = express()
+const path = require('path')
+
+app.use('/static', express.static(path.resolve('public')))
 
 function initApi (client) {
   app.get('/play/:query', async (req, res) => {

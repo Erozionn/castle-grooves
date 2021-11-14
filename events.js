@@ -1,15 +1,17 @@
 const { writeSongState } = require('./db/influx')
 const { MessageActionRow, MessageButton, MessageSelectMenu } = require('discord.js')
+const { nowPlayingCavas } = require('./utils/canvas.js')
 var msgArr = []
 var mainMsg
 var msgResetCount = 0
 let repeatButtonState = 0
 
 // Initialize song history Selection Menu Component
-const row3 = new MessageActionRow()
+const historyMenu = new MessageActionRow()
   .addComponents(
     new MessageSelectMenu()
       .setCustomId('history')
+      .setPlaceholder('-- Song History --')
   )
 
 //Main message send function. Keeps one message as the primary bot message point and updates it if it already exists.
@@ -145,7 +147,7 @@ module.exports.registerEvents = (client) => {
     case 'play_pause_button':
       if (!queue) return void interaction.message.edit('❌ | No music is being played!')
       queue.paused ? queue.resume() : queue.pause()
-      await interaction.message.edit({ content: queue.paused ? '⏸ | Paused!' : '🎶 | Now Playing:' })
+      await interaction.message.edit({ content: queue.paused ? '⏸ | Paused!' : 'https://grooves.665verdure.com/static/musicplayer.png?v=' + Math.random() * 10 })
       break
     case 'skip_button':
       if (!queue) return void interaction.message.edit('❌ | No music is being played!')
@@ -193,7 +195,7 @@ module.exports.registerEvents = (client) => {
           .setDisabled(false)
         break
       }
-      interaction.message.edit({ components: [row3, row] })
+      interaction.message.edit({ components: [row, historyMenu] })
 
       console.log(row.components[3])
       break
@@ -213,25 +215,24 @@ module.exports.registerEvents = (client) => {
   player.on('playSong', async (queue, song) => {
 
     // Add previous songs to the Selection Menu
-    for (let i = 0; i < Math.min(queue.previousSongs.length, 8); i++) {
+    for (let i = 0; i < Math.min(queue.previousSongs.length, 16); i++) {
       const s = queue.previousSongs[i]
-      row3.components[0].addOptions({
-        label: s.name,
+      historyMenu.components[0].addOptions({
+        label: `🎶 | ${song.name.split(' (')[0]}`,
         value: `${s.id} -${Math.random() * 10}`
       }) 
     }
 
     // Add currently playing song if currently playing
     if (queue.playing) {
-      row3.components[0].addOptions({
-        label: song.name,
+      historyMenu.components[0].addOptions({
+        label: `🎶 | ${song.name.split(' (')[0]}`,
         value: `${song.id} -${Math.random() * 10}`,
       })
-      row3.components[0].setPlaceholder(song.name)
     }
 
-    if (row3.components[0].options.length >= 10) {
-      row3.components[0].spliceOptions(0, row3.components[0].options.length - 10)
+    if (historyMenu.components[0].options.length >= 10) {
+      historyMenu.components[0].spliceOptions(0, historyMenu.components[0].options.length - 10)
     }
 
     // Enable player buttons
@@ -240,43 +241,46 @@ module.exports.registerEvents = (client) => {
     }
     
     // Send playing message
-    await mainMessage(queue.textChannel, { content: '🎶 | **Now Playing:**', components: [row3, row] })
+    // await mainMessage(queue.textChannel, { content: '🎶 | **Now Playing:**', components: [row, historyMenu], files: [{ attachment: await nowPlayingCavas(queue.songs), name: 'requested-movie.png' }] })
+    await nowPlayingCavas(queue.songs)
+    await mainMessage(queue.textChannel, { content: 'https://grooves.665verdure.com/static/musicplayer.png?v=' + Math.random() * 10, components: [row, historyMenu] })
     
     // write song info into DB (playing [true:false], song)
     writeSongState(true, song)
   })
 
   // On add song event
-  player.on('addSong', async (queue, song) => {
+  player.on('addSong', async (queue) => {
     // Set queue volume to 100%
     queue.setVolume(100)
 
     // If there is more than one song in the queue, send a message saying the song was added to the queue
     if(msgResetCount > 0 && queue.songs.length > 1) {
-      await mainMessage(queue.textChannel, { content: `🎶 | **${song.name}** queued!` })
+      await nowPlayingCavas(queue.songs)
+      await mainMessage(queue.textChannel, { content: 'https://grooves.665verdure.com/static/musicplayer.png?v=' + Math.random() * 10, components: [row, historyMenu] })
     }
     // setTimeout(() => message.delete(), 10000)
   })
 
   // On bot disconnected from voice channel
   player.on('disconnect', async (queue) => {
-    row3.components[0].setPlaceholder('-- Song History --')
-    await mainMessage(queue.textChannel, { content: '🎶 | Previously Played:', components: [row3]  })
+    historyMenu.components[0].setPlaceholder('-- Song History --')
+    await mainMessage(queue.textChannel, { content: '🎶 | Previously Played:', components: [historyMenu]  })
   })
 
   // On voice channel empty
   player.on('empty', async (queue) => {
-    row3.components[0].setPlaceholder('-- Song History --')
-    await mainMessage(queue.textChannel, { content: '🎶 | Previously Played:', components: [row3]  })
+    historyMenu.components[0].setPlaceholder('-- Song History --')
+    await mainMessage(queue.textChannel, { content: '🎶 | Previously Played:', components: [historyMenu]  })
   })
 
   // On queue/song finish
   player.on('finish', async (queue) => {
-    row3.components[0].setPlaceholder('-- Song History --')
+    historyMenu.components[0].setPlaceholder('-- Song History --')
     for (let i = 0; i < 4; i++) {
       row.components[i].setDisabled()
     }
-    await mainMessage(queue.textChannel, { content: '✅ | Queue finished!', components: [row3, row] })
+    await mainMessage(queue.textChannel, { content: '✅ | Queue finished!', components: [row, historyMenu] })
     writeSongState(false)
   })
 
