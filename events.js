@@ -236,7 +236,7 @@ module.exports.registerEvents = (client) => {
 
     // Enable player buttons
     for (let i = 0; i < 4; i++) {
-      row.components[i].setDisabled()
+      row.components[i].setDisabled(false)
     }
     
     // Send playing message
