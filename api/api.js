@@ -20,7 +20,8 @@ function initApi (client) {
       channel.send({ content: 'Error joining your channel.' })
     }
 
-    await channel.send({ content: '⏱ | Loading...' })
+    // const message = await channel.send({ content: '⏱ | Loading...' })
+    // setTimeout(() => message.delete(), 1500)
 
     res.set('Content-Type', 'text/html')
     return res.send('<script>window.close();</script>')

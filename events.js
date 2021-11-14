@@ -233,6 +233,11 @@ module.exports.registerEvents = (client) => {
     if (row3.components[0].options.length >= 10) {
       row3.components[0].spliceOptions(0, row3.components[0].options.length - 10)
     }
+
+    // Enable player buttons
+    for (let i = 0; i < 4; i++) {
+      row.components[i].setDisabled()
+    }
     
     // Send playing message
     await mainMessage(queue.textChannel, { content: '🎶 | **Now Playing:**', components: [row3, row] })
