@@ -34,7 +34,7 @@ module.exports = class extends SlashCommand {
       ctx.sendFollowUp({ content: 'Error joining your channel.' })
     }
 
-    await ctx.sendFollowUp({ content: '⏱ | Loading...' })
-    setTimeout(() => ctx.delete(), 4000)
+    const loadingMsg = await ctx.sendFollowUp({ content: '⏱ | Loading...' })
+    setTimeout(() => loadingMsg.delete(), 1500)
   }
 }

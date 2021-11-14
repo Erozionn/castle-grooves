@@ -69,4 +69,27 @@ function writeUserVoiceStatus(voiceState, state) {
     })
 }
 
-module.exports = { writeSongState, writeUserVoiceStatus }
+function writeChannelConnections(members) {
+  const writeApi = client.getWriteApi(influxOrg, influxBucket)
+  const points = []
+  members.forEach(member => {
+    const point = new Point('channelConnections')
+    point
+      .tag('channelId', member.voiceChannelId)
+      .tag('channelName', member.voiceChannelName)
+      .booleanField('bot', member.bot)
+      .stringField('memberId', member.id)
+      .stringField('memberUsername', member.nickname)
+      .stringField('memberAvatar', member.avatar)
+
+    points.push(point)
+  })
+
+  writeApi.writePoints(points)
+  writeApi.close()
+    .catch(e => {
+      console.log(e)
+    })
+}
+
+module.exports = { writeSongState, writeUserVoiceStatus, writeChannelConnections }

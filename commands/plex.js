@@ -405,7 +405,7 @@ async function generateRequestedMsg(response, chosenMedia) {
     canv.fillStyle = 'rgba(74, 207, 116, 0.75)'
     canv.fillRect(183, 98, canv.measureText(`${chosenMedia.mediaType}`).width + 25, 30)
     canv.fillStyle = '#ffffff'
-    canv.fillText(`${chosenMedia.mediaType}`, 195, 120)
+    canv.fillText(`/${chosenMedia.mediaType}`, 195, 120)
 
     if (chosenMedia.poster) {
       const avatar = await Canvas.loadImage('https://image.tmdb.org/t/p/w300' + chosenMedia.poster)

@@ -4,7 +4,7 @@ const { SlashCreator, GatewayServer } = require('slash-create')
 const DisTube = require('distube').DisTube
 const Client = require('./client/Client')
 const { registerEvents } = require('./events')
-const { writeUserVoiceStatus } = require('./db/influx')
+const { writeUserVoiceStatus, writeChannelConnections } = require('./db/influx')
 const { initApi } = require('./api/api')
 
 const client = new Client()
@@ -24,6 +24,28 @@ client.on('ready', () => {
     name: '🎶 | Music Time',
     type: 'LISTENING'
   })
+
+  setInterval(async () => {
+    const guild = client.guilds.cache.get('312422049295368193')
+    const voiceChannels = guild.channels.cache.filter(c => c.type === 'GUILD_VOICE')
+    const members =  []
+    voiceChannels
+      .filter(c => c.members && c.members.size > 0 ? true : false)
+      .forEach(c => {
+        const channelMembers = c.members.map(m => {
+          return {
+            nickname: m.nickname ? m.nickname : m.user.username,
+            id: m.id,
+            voiceChannelId: m.voice ? m.voice.channel.id : c.id,
+            voiceChannelName: m.voice ? m.voice.channel.name : c.name,
+            avatar: m.user.displayAvatarURL({format: 'jpg'}),
+            bot: m.user.bot
+          }
+        })
+        members.push(...channelMembers)
+      })
+    writeChannelConnections(members)
+  }, 2000)
 })
 
 // Log voice connections in InfluxDB
