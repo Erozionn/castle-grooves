@@ -16,7 +16,6 @@ const historyMenu = new MessageActionRow()
 
 //Main message send function. Keeps one message as the primary bot message point and updates it if it already exists.
 async function mainMessage(channel, options) {
-  console.log(options, msgArr)
   if (!channel) throw Error('Error: Missing queue in function.')
   if (!options.content) throw Error('Error: Message content cannot be empty')
 
@@ -40,7 +39,6 @@ async function mainMessage(channel, options) {
 
     // Move old messages up and append the new message on the bottom line
     for (let i = 0; i < Math.min(msgArr.length, 1); i++) {
-      console.log(msgArr.length, i, ( msgArr.length - 1 ) - i)
 
       let line = msgArr[i]
       if((msgArr.length - 1 ) - i > 0) {
@@ -49,7 +47,6 @@ async function mainMessage(channel, options) {
 
       content += `${line}\n`
     }
-    console.log(options.components)
 
     // Edit main message
     mainMsg = await mainMsg.edit({ content, components: options.components })
@@ -147,7 +144,7 @@ module.exports.registerEvents = (client) => {
     case 'play_pause_button':
       if (!queue) return void interaction.message.edit('❌ | No music is being played!')
       queue.paused ? queue.resume() : queue.pause()
-      await interaction.message.edit({ content: queue.paused ? '⏸ | Paused!' : 'https://grooves.665verdure.com/static/musicplayer.png?v=' + Math.random() * 10 })
+      await interaction.message.edit({ content: queue.paused ? '⏸ | Paused!' : process.env.WEB_URL + '/static/musicplayer.png?v=' + Math.random() * 10 })
       break
     case 'skip_button':
       if (!queue) return void interaction.message.edit('❌ | No music is being played!')
@@ -196,13 +193,9 @@ module.exports.registerEvents = (client) => {
         break
       }
       interaction.message.edit({ components: [row, historyMenu] })
-
-      console.log(row.components[3])
       break
     case 'history':
       if (!interaction.member.voice) return void interaction.message.edit('❌ | You need to be in a voice channel!')
-
-      console.log(interaction.values[0])
 
       client.player.playVoiceChannel(interaction.member.voice.channel, interaction.values[0], {textChannel: interaction.channel, member: interaction.member})
       break
@@ -243,7 +236,7 @@ module.exports.registerEvents = (client) => {
     // Send playing message
     // await mainMessage(queue.textChannel, { content: '🎶 | **Now Playing:**', components: [row, historyMenu], files: [{ attachment: await nowPlayingCavas(queue.songs), name: 'requested-movie.png' }] })
     await nowPlayingCavas(queue.songs)
-    await mainMessage(queue.textChannel, { content: 'https://grooves.665verdure.com/static/musicplayer.png?v=' + Math.random() * 10, components: [row, historyMenu] })
+    await mainMessage(queue.textChannel, { content: process.env.WEB_URL + '/static/musicplayer.png?v=' + Math.random() * 10, components: [row, historyMenu] })
     
     // write song info into DB (playing [true:false], song)
     writeSongState(true, song)
@@ -254,10 +247,10 @@ module.exports.registerEvents = (client) => {
     // Set queue volume to 100%
     queue.setVolume(100)
 
-    // If there is more than one song in the queue, send a message saying the song was added to the queue
-    if(msgResetCount > 0 && queue.songs.length > 1) {
+    // If the mainMsg has already been sent, send a message saying the song was added to the queue
+    if(mainMsg) {
       await nowPlayingCavas(queue.songs)
-      await mainMessage(queue.textChannel, { content: 'https://grooves.665verdure.com/static/musicplayer.png?v=' + Math.random() * 10, components: [row, historyMenu] })
+      await mainMessage(queue.textChannel, { content: process.env.WEB_URL + '/static/musicplayer.png?v=' + Math.random() * 10, components: [row, historyMenu] })
     }
     // setTimeout(() => message.delete(), 10000)
   })
