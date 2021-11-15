@@ -9,3 +9,6 @@ test
 # VSCode
 .vscode
 sftp.json
+
+# Temp
+public
