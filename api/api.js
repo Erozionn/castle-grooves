@@ -7,8 +7,6 @@ app.use('/static', express.static(path.resolve('public')))
 
 function initApi (client) {
   app.get('/play/:query', async (req, res) => {
-    
-    console.log(process.env)
 
     const guild = await client.guilds.fetch(process.env.DISCORD_GUILD_ID)
     
@@ -31,7 +29,7 @@ function initApi (client) {
   })
   
   app.listen(process.env.WEBSERVER_PORT, () =>
-    console.log('Castle Grooves API listening on port 1337!'),
+    console.log(`Castle Grooves API listening on port ${process.env.WEBSERVER_PORT}!`),
   )
 }
 

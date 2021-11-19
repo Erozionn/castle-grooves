@@ -5,6 +5,7 @@ package-lock.json
 
 # tests
 test
+logs
 
 # VSCode
 .vscode

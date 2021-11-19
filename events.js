@@ -15,7 +15,7 @@ const historyMenu = new MessageActionRow()
   )
 
 //Main message send function. Keeps one message as the primary bot message point and updates it if it already exists.
-async function mainMessage(channel, options) {
+async function mainMessage(channel, options, callback) {
   if (!channel) throw Error('Error: Missing queue in function.')
   if (!options.content) throw Error('Error: Message content cannot be empty')
 
@@ -50,6 +50,9 @@ async function mainMessage(channel, options) {
 
     // Edit main message
     mainMsg = await mainMsg.edit({ content, components: options.components })
+  }
+  if (callback && typeof callback === 'function') {
+    callback(mainMsg)
   }
   return
 }
@@ -132,33 +135,35 @@ module.exports.registerEvents = (client) => {
   // On interaction
   client.on('interactionCreate', async (interaction) => {
 
+    // If mainMsg undefined then delete the message from which this interaction came from. A new one will be sent.
+    if (!mainMsg && interaction.message) {
+      interaction.message.delete()
+    }
+
     const queue = client.player.queues.get(interaction.guildId)
+    const channel = interaction.channel
 
     switch (interaction.customId) {
     case 'back_button':
-      // await interaction.message.edit(queue.previous() ? '⏮ | Playing previous song!' : '❌ | Something went wrong!')
-      if (!queue) return void interaction.message.edit('❌ | No music is being played!')
+      if (!queue) return void mainMessage(channel, { content: '❌ | No music is being played!' })
       queue.previous().catch(e => console.log(e))
-      // await interaction.message.delete()
       break
     case 'play_pause_button':
-      if (!queue) return void interaction.message.edit('❌ | No music is being played!')
+      if (!queue) return void mainMessage(channel, { content: '❌ | No music is being played!' })
       queue.paused ? queue.resume() : queue.pause()
-      await interaction.message.edit({ content: queue.paused ? '⏸ | Paused!' : process.env.WEB_URL + '/static/musicplayer.png?v=' + Math.random() * 10 })
+      await mainMessage(channel, { content: queue.paused ? '⏸ | Paused!' : process.env.WEB_URL + '/static/musicplayer.png?v=' + Math.random() * 10 })
       break
     case 'skip_button':
-      if (!queue) return void interaction.message.edit('❌ | No music is being played!')
+      if (!queue) return void mainMessage(channel, { content: '❌ | No music is being played!' })
       queue.songs.length > 1 ? queue.skip() : queue.stop()
-      // await interaction.message.delete()
-      // await interaction.message.edit('⏭ | Skipped!')
       break
     case 'stop_button':
-      if (!queue) return void interaction.message.edit('❌ | No music is being played!')
+      if (!queue) return void mainMessage(channel, { content: '❌ | No music is being played!' })
       queue.stop()
-      await interaction.message.edit({ content: queue.playing ? '🛑 | Disconnected!' : '❌ | Something went wrong!' })
+      await mainMessage(channel, { content: queue.playing ? '🛑 | Disconnected!' : '❌ | Something went wrong!' })
       break
     case 'repeat_button':
-      if (!queue) return void interaction.message.edit('❌ | No music is being played!')
+      if (!queue) return void mainMessage(channel, { content: '❌ | No music is being played!' })
 
       if (repeatButtonState < 2) {
         repeatButtonState++
@@ -208,21 +213,10 @@ module.exports.registerEvents = (client) => {
   player.on('playSong', async (queue, song) => {
 
     // Add previous songs to the Selection Menu
-    for (let i = 0; i < Math.min(queue.previousSongs.length, 16); i++) {
-      const s = queue.previousSongs[i]
-      historyMenu.components[0].addOptions({
-        label: `🎶 | ${song.name.split(' (')[0]}`,
-        value: `${s.id} -${Math.random() * 10}`
-      }) 
-    }
-
-    // Add currently playing song if currently playing
-    if (queue.playing) {
-      historyMenu.components[0].addOptions({
-        label: `🎶 | ${song.name.split(' (')[0]}`,
-        value: `${song.id} -${Math.random() * 10}`,
-      })
-    }
+    historyMenu.components[0].addOptions({
+      label: `🎶 | ${song.name.split(' (')[0]}`,
+      value: `${song.id} -${Math.random() * 10}`
+    })
 
     if (historyMenu.components[0].options.length >= 10) {
       historyMenu.components[0].spliceOptions(0, historyMenu.components[0].options.length - 10)
@@ -234,7 +228,6 @@ module.exports.registerEvents = (client) => {
     }
     
     // Send playing message
-    // await mainMessage(queue.textChannel, { content: '🎶 | **Now Playing:**', components: [row, historyMenu], files: [{ attachment: await nowPlayingCavas(queue.songs), name: 'requested-movie.png' }] })
     await nowPlayingCavas(queue.songs)
     await mainMessage(queue.textChannel, { content: process.env.WEB_URL + '/static/musicplayer.png?v=' + Math.random() * 10, components: [row, historyMenu] })
     
@@ -258,7 +251,7 @@ module.exports.registerEvents = (client) => {
   // On bot disconnected from voice channel
   player.on('disconnect', async (queue) => {
     historyMenu.components[0].setPlaceholder('-- Song History --')
-    await mainMessage(queue.textChannel, { content: '🎶 | Previously Played:', components: [historyMenu]  })
+    await mainMessage(queue.textChannel, { content: '🎶 | Previously Played:', components: [historyMenu]  }, () => mainMsg = undefined)
   })
 
   // On voice channel empty
