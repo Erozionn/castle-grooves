@@ -3,6 +3,7 @@ const { MessageActionRow, MessageButton, MessageSelectMenu } = require('discord.
 const { nowPlayingCavas } = require('./utils/canvas.js')
 var msgArr = []
 var mainMsg
+let mainMsgActive = false
 var msgResetCount = 0
 let repeatButtonState = 0
 
@@ -20,10 +21,21 @@ async function mainMessage(channel, options, callback) {
   if (!options.content) throw Error('Error: Message content cannot be empty')
 
   // If main message doesnt already exist
-  if (msgArr.length === 0 || !mainMsg) {
+  if (msgArr.length === 0 || !mainMsg || !mainMsgActive) {
+
+    // If Main Message still exists but is no longer active, delete it.
+    if (mainMsg && !mainMsgActive) {
+
+      try {
+        mainMsg.delete()
+      } catch (error) {
+        console.log(error)
+      }
+    }
 
     msgArr.push(options.content)
     mainMsg = await channel.send({ content: msgArr[msgArr.length - 1], components: options.components })
+    mainMsgActive = true
   } else {
 
     if (!options.content && options.components) return await mainMsg.edit({ components: options.components })
@@ -49,7 +61,14 @@ async function mainMessage(channel, options, callback) {
     }
 
     // Edit main message
-    mainMsg = await mainMsg.edit({ content, components: options.components })
+
+    try {
+      mainMsg = await mainMsg.edit({ content, components: options.components })
+      mainMsgActive = true
+    } catch (error) {
+      console.error(error)
+    }
+    
   }
   if (callback && typeof callback === 'function') {
     callback(mainMsg)
@@ -218,8 +237,8 @@ module.exports.registerEvents = (client) => {
       value: `${song.id} -${Math.random() * 10}`
     })
 
-    if (historyMenu.components[0].options.length >= 10) {
-      historyMenu.components[0].spliceOptions(0, historyMenu.components[0].options.length - 10)
+    if (historyMenu.components[0].options.length >= 24) {
+      historyMenu.components[0].spliceOptions(0, historyMenu.components[0].options.length - 24)
     }
 
     // Enable player buttons
@@ -241,7 +260,7 @@ module.exports.registerEvents = (client) => {
     queue.setVolume(100)
 
     // If the mainMsg has already been sent, send a message saying the song was added to the queue
-    if(mainMsg) {
+    if(mainMsg && mainMsgActive) {
       await nowPlayingCavas(queue.songs)
       await mainMessage(queue.textChannel, { content: process.env.WEB_URL + '/static/musicplayer.png?v=' + Math.random() * 10, components: [row, historyMenu] })
     }
@@ -251,7 +270,9 @@ module.exports.registerEvents = (client) => {
   // On bot disconnected from voice channel
   player.on('disconnect', async (queue) => {
     historyMenu.components[0].setPlaceholder('-- Song History --')
-    await mainMessage(queue.textChannel, { content: '🎶 | Previously Played:', components: [historyMenu]  }, () => mainMsg = undefined)
+    await mainMessage(queue.textChannel, { content: '🎶 | Previously Played:', components: [historyMenu]  }, () => {
+      mainMsgActive = false
+    })
   })
 
   // On voice channel empty
