@@ -92,4 +92,26 @@ function writeChannelConnections(members) {
     })
 }
 
-module.exports = { writeSongState, writeUserVoiceStatus, writeChannelConnections }
+async function readSongHistory() {
+  const queryApi = client.getQueryApi(influxOrg)
+  const fluxQuery = `
+  from(bucket:"${ influxBucket }")
+    |> range(
+      start: -30d,
+      stop: now()
+    )
+    |> filter(fn: (r) => r["_measurement"] == "song")
+    |> filter(fn: (r) => r["_field"] =~/.*/)
+    |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
+    |> filter(fn: (r) => r["playing"] == true)
+    |> group()
+    |> sort(columns: ["_time"], desc: true)
+    |>limit(n: 23)
+  `
+  console.log('*** QUERY ROWS ***')
+  // Execute query and receive table metadata and rows.
+  const results = await queryApi.collectRows(fluxQuery)
+  return results
+}
+
+module.exports = { writeSongState, writeUserVoiceStatus, writeChannelConnections, readSongHistory }

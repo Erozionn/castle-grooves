@@ -1,4 +1,4 @@
-const { writeSongState } = require('./db/influx')
+const { writeSongState, readSongHistory } = require('./db/influx')
 const { MessageActionRow, MessageButton, MessageSelectMenu } = require('discord.js')
 const { nowPlayingCavas } = require('./utils/canvas.js')
 var msgArr = []
@@ -28,6 +28,7 @@ async function mainMessage(channel, options, callback) {
 
       try {
         mainMsg.delete()
+        mainMsg = null
       } catch (error) {
         console.log(error)
       }
@@ -140,7 +141,7 @@ module.exports.registerEvents = (client) => {
       msgResetCount++
     }
 
-    if(msgResetCount > 4) {
+    if(msgResetCount > 2) {
       msgResetCount = 0
       msgArr = []
 
@@ -231,27 +232,42 @@ module.exports.registerEvents = (client) => {
   // On song playing
   player.on('playSong', async (queue, song) => {
 
-    // Add previous songs to the Selection Menu
-    historyMenu.components[0].addOptions({
-      label: `🎶 | ${song.name.split(' (')[0]}`,
-      value: `${song.id} -${Math.random() * 10}`
+    // // Add previous songs to the Selection Menu
+    // historyMenu.components[0].addOptions({
+    //   label: `🎶 | ${song.name.split(' (')[0]}`,
+    //   value: `${song.id} -${Math.random() * 10}`
+    // })
+
+    // Enable player buttons
+    for (let i = 0; i < 4; i++) {
+      row.components[i].setDisabled(false)
+    }
+
+    // Write song info into DB (playing [true:false], song)
+    await writeSongState(true, song)
+
+    // Read song play history
+    const history = await readSongHistory()
+    const youtubeIdRegex = /(?:youtube\.com\/(?:[^/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?/\s]{11})/
+
+    const options = history.map(s => {
+
+      console.log(s.songTitle.length)
+      return {
+        label: `🎶 | ${s.songTitle.substring(0, 95)}`,
+        value: `${s.songUrl.match(youtubeIdRegex)[1]} -${Math.random() * 10}`
+      }
     })
 
     if (historyMenu.components[0].options.length >= 24) {
       historyMenu.components[0].spliceOptions(0, historyMenu.components[0].options.length - 24)
     }
 
-    // Enable player buttons
-    for (let i = 0; i < 4; i++) {
-      row.components[i].setDisabled(false)
-    }
+    historyMenu.components[0].addOptions(options)
     
     // Send playing message
     await nowPlayingCavas(queue.songs)
     await mainMessage(queue.textChannel, { content: process.env.WEB_URL + '/static/musicplayer.png?v=' + Math.random() * 10, components: [row, historyMenu] })
-    
-    // write song info into DB (playing [true:false], song)
-    writeSongState(true, song)
   })
 
   // On add song event
