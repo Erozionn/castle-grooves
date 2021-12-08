@@ -259,11 +259,11 @@ module.exports.registerEvents = (client) => {
       }
     })
 
+    historyMenu.components[0].addOptions(options.reverse())
+    
     if (historyMenu.components[0].options.length >= 24) {
       historyMenu.components[0].spliceOptions(0, historyMenu.components[0].options.length - 24)
     }
-
-    historyMenu.components[0].addOptions(options)
     
     // Send playing message
     await nowPlayingCavas(queue.songs)
