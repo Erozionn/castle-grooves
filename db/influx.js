@@ -108,7 +108,6 @@ async function readSongHistory() {
     |> sort(columns: ["_time"], desc: true)
     |>limit(n: 23)
   `
-  console.log('*** QUERY ROWS ***')
   // Execute query and receive table metadata and rows.
   const results = await queryApi.collectRows(fluxQuery)
   return results

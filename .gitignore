@@ -10,6 +10,7 @@ logs
 # VSCode
 .vscode
 sftp.json
+.vs
 
 # Temp
 public

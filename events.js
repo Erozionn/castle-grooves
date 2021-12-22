@@ -221,7 +221,7 @@ module.exports.registerEvents = (client) => {
       break
     case 'history':
       if (!interaction.member.voice) return void interaction.message.edit('❌ | You need to be in a voice channel!')
-
+      console.log(interaction.values[0])
       client.player.playVoiceChannel(interaction.member.voice.channel, interaction.values[0], {textChannel: interaction.channel, member: interaction.member})
       break
     default:
@@ -248,14 +248,15 @@ module.exports.registerEvents = (client) => {
 
     // Read song play history
     const history = await readSongHistory()
-    const youtubeIdRegex = /(?:youtube\.com\/(?:[^/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?/\s]{11})/
+    // const youtubeIdRegex = /(?:youtube\.com\/(?:[^/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?/\s]{11})/
 
     const options = history.map(s => {
 
       console.log(s.songTitle.length)
       return {
         label: `🎶 | ${s.songTitle.substring(0, 95)}`,
-        value: `${s.songUrl.match(youtubeIdRegex)[1]} -${Math.random() * 10}`
+        value: `${s.songTitle.substring(0, 90)} -${Math.floor(Math.random() * 999)}`
+        // ${s.songUrl.match(youtubeIdRegex)[1]}
       }
     })
 
