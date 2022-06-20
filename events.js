@@ -102,7 +102,7 @@ module.exports.registerEvents = (client) => {
         break
       case 'history':
         if (!interaction.member.voice)
-          return void interaction.message.edit('❌ | You need to be in a voice channel!')
+          return interaction.message.edit('❌ | You need to be in a voice channel!')
         console.log(interaction.values[0])
         client.player.playVoiceChannel(interaction.member.voice.channel, interaction.values[0], {
           textChannel: interaction.channel,
