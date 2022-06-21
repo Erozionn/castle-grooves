@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Castle Grooves music bot.",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "start": "node -r dotenv/config index.js dotenv_config_path=.env",
     "start:dev": "nodemon -r dotenv/config index.js dotenv_config_path=.env.dev dotenv_config_debug=true",
@@ -26,6 +27,7 @@
     "@distube/soundcloud": "^1.1.0",
     "@distube/spotify": "^1.2.1",
     "@distube/yt-dlp": "^0.0.2",
+    "canvas": "^2.9.1",
     "discord-api-types": "^0.34.0",
     "discord.js": "^13.6.0",
     "distube": "^3.3.4",
@@ -37,6 +39,7 @@
     "eslint-plugin-compat": "^4.0.2",
     "eslint-plugin-jsx-a11y": "^6.5.1",
     "eslint-plugin-prettier": "^4.0.0",
+    "fast-average-color-node": "^2.2.0",
     "ffmpeg": "^0.0.4",
     "ffmpeg-static": "^4.4.1",
     "libsodium-wrappers": "^0.7.9"

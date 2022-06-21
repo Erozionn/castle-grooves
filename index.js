@@ -1,10 +1,10 @@
-const fs = require('node:fs')
-const path = require('node:path')
+import fs from 'node:fs'
+import path from 'node:path'
 
-const { Client, Collection, Intents } = require('discord.js')
-const { DisTube } = require('distube')
+import { Client, Collection, Intents } from 'discord.js'
+import { DisTube } from 'distube'
 
-const { registerEvents } = require('./events')
+import { registerEvents } from './events.js'
 
 const { BOT_TOKEN } = process.env
 
@@ -18,14 +18,14 @@ client.player = new DisTube(client, { emptyCooldown: 300, nsfw: true, searchSong
 // Initialize the events file.
 registerEvents(client)
 
-const commandsPath = path.join(__dirname, 'commands')
-const commandFiles = fs.readdirSync(commandsPath).filter((file) => file.endsWith('.js'))
+// Import commands.
+const commandFiles = fs.readdirSync('./commands').filter((file) => file.endsWith('.js'))
 
-commandFiles.forEach((file) => {
-  const filePath = path.join(commandsPath, file)
-  // eslint-disable-next-line global-require, import/no-dynamic-require
-  const command = require(filePath)
-  client.commands.set(command.data.name, command)
+commandFiles.forEach(async (file) => {
+  const filePath = `./commands/${file}`
+  console.log(filePath)
+  const command = await import(filePath)
+  client.commands.set(command.default.data.name, command.default)
 })
 
 client.once('ready', () => {
