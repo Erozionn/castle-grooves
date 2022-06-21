@@ -1,52 +1,65 @@
-import { ActionRowBuilder, ButtonBuilder, ComponentBuilder, SelectMenuBuilder } from '@discordjs/builders'
+import { MessageActionRow, MessageSelectMenu, MessageButton } from 'discord.js'
 
-import { getSongsPlayed } from './utils/songHistory.js'
-import { sendMessage } from './utils/mainMessage.js'
+import { getSongsPlayed, addSong } from './utils/songHistory.js'
+import sendMessage from './utils/mainMessage.js'
 import { generateNowPlayingCanvas } from './utils/nowPlayingCanvas.js'
 
-let repeatButtonState = 0
+const { WEB_URL } = process.env
 
-const buttons = new ComponentBuilder(
-  new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('back_button')
-      .setStyle('Primary')
-      .setDisabled(false)
-      .setEmoji({ name: 'skipprevious' }),
-    new ButtonBuilder()
-      .setCustomId('play_pause_button')
-      .setStyle('Primary')
-      .setDisabled(false)
-      .setEmoji({ name: 'playpause' }),
-    new ButtonBuilder()
-      .setCustomId('skip_button')
-      .setStyle('Primary')
-      .setDisabled(false)
-      .setEmoji({ name: 'skipnext' }),
-    new ButtonBuilder()
-      .setCustomId('repeat_button')
-      .setStyle('Primary')
-      .setDisabled(false)
-      .setEmoji({ name: 'repeatoff' }),
-    new ButtonBuilder()
-      .setCustomId('stop_button')
-      .setStyle('Danger')
-      .setDisabled(false)
-      .setEmoji({ name: 'musicoff' })
-  )
+const buttons = new MessageActionRow().addComponents(
+  new MessageButton()
+    .setCustomId('back_button')
+    .setStyle('PRIMARY')
+    .setDisabled(false)
+    .setEmoji('skipprevious:909248269236981761'),
+  new MessageButton()
+    .setCustomId('play_pause_button')
+    .setStyle('PRIMARY')
+    .setDisabled(false)
+    .setEmoji('playpause:909248294406987806'),
+  new MessageButton()
+    .setCustomId('skip_button')
+    .setStyle('PRIMARY')
+    .setDisabled(false)
+    .setEmoji('skipnext:909248255915868160'),
+  new MessageButton()
+    .setCustomId('repeat_button')
+    .setStyle('PRIMARY')
+    .setDisabled(false)
+    .setEmoji('repeatoff:909248201427681290'),
+  new MessageButton()
+    .setCustomId('stop_button')
+    .setStyle('DANGER')
+    .setDisabled(false)
+    .setEmoji('musicoff:909248235623825439')
 )
 
-const historyMenu = new ComponentBuilder(
-  new ActionRowBuilder().addComponents(
-    new SelectMenuBuilder()
-      .setCustomId('history')
-      .setPlaceholder('-- Song History --')
-  )
+const historyMenu = new MessageActionRow().addComponents(
+  new MessageSelectMenu().setCustomId('history').setPlaceholder('-- Song History --')
 )
 
 const components = [buttons, historyMenu]
 
+const generateHistoryOptions = async () => {
+  // Read song play history
+  const history = await getSongsPlayed()
+
+  // Prepare song history for the history component
+  const options = history
+    .map((s) => {
+      return {
+        label: `🎶 | ${s.songTitle.substring(0, 95)}`,
+        value: `${s.songUrl.substring(0, 90)}?discord=${Math.floor(Math.random() * 999)}`,
+      }
+    })
+    .reverse()
+
+  return options
+}
+
 const registerEvents = (client) => {
+  let repeatButtonState = 0
+
   client.on('interactionCreate', (interaction) => {
     // if (!mainMessage && interaction.message) {
     //   interaction.message.delete()
@@ -67,7 +80,11 @@ const registerEvents = (client) => {
         break
       case 'skip_button':
         if (!queue) return sendMessage(channel, { content: '❌ | No music is being played!' })
-        queue.skip()
+        if (queue.songs.length > 1) {
+          queue.skip()
+        } else {
+          queue.stop()
+        }
         break
       case 'stop_button':
         if (!queue) return sendMessage(channel, { content: '❌ | No music is being played!' })
@@ -77,7 +94,7 @@ const registerEvents = (client) => {
         if (!queue) return sendMessage(channel, { content: '❌ | No music is being played!' })
 
         if (repeatButtonState < 2) {
-          repeatButtonState + 1
+          repeatButtonState += 1
         } else {
           repeatButtonState = 0
         }
@@ -88,7 +105,7 @@ const registerEvents = (client) => {
             queue.setRepeatMode(2)
             components[1].components[3]
               .setEmoji('repeat:909248218972422154')
-              .setStyle('Success')
+              .setStyle('SUCCESS')
               .setDisabled(false)
             break
           case 2:
@@ -96,7 +113,7 @@ const registerEvents = (client) => {
             queue.setRepeatMode(1)
             components[1].components[3]
               .setEmoji('repeatonce:909248177268477982')
-              .setStyle('Success')
+              .setStyle('SUCCESS')
               .setDisabled(false)
             break
           default:
@@ -104,7 +121,7 @@ const registerEvents = (client) => {
             queue.setRepeatMode(0)
             components[1].components[3]
               .setEmoji('repeatoff:909248201427681290')
-              .setStyle('Primary')
+              .setStyle('PRIMARY')
               .setDisabled(false)
             break
         }
@@ -122,75 +139,74 @@ const registerEvents = (client) => {
       default:
         break
     }
+    return interaction
   })
 
   client.player.on('playSong', async (queue, song) => {
     // Write song info into DB (playing [true:false], song)
-    // await writeSongState(true, song)
-
-    // Read song play history
-    const history = await getSongsPlayed()
-
-    // Prepare song history for the history component
-    const options = history.map(s => {
-      return {
-        label: `🎶 | ${s.songTitle.substring(0, 95)}`,
-        value: `${s.songTitle.substring(0, 90)} -${Math.floor(Math.random() * 999)}`
-      }
-    }).reverse()
+    await addSong(queue.playing, song)
 
     // Add songs to history component
-    historyMenu.data.components[0].addOptions(options)
-
-    // Remove old songs from history component (Anything more than 24 songs)
-    if (historyMenu.data.components[0].options.length >= 24) {
-      historyMenu.data.components[0].spliceOptions(0, historyMenu.components[0].options.length - 24)
-    }
+    historyMenu.components[0].setOptions(await generateHistoryOptions())
 
     // Enable player buttons
     for (let i = 0; i < 4; i++) {
-      buttons.data.components[i].setDisabled(false)
+      buttons.components[i].setDisabled(false)
     }
-
-    console.log(queue.songs[0].name)
 
     // sendMessage()
     generateNowPlayingCanvas(queue.songs)
+    await sendMessage(queue.textChannel, {
+      content: `${WEB_URL}/static/musicplayer.png?v=${Math.random() * 10}`,
+      components,
+    })
   })
 
   // On add song event
-  player.on('addSong', async (queue) => {
+  client.player.on('addSong', async (queue) => {
     // Set queue volume to 100%
     queue.setVolume(100)
 
-    await nowPlayingCavas(queue.songs)
-    await mainMessage(queue.textChannel, { content: process.env.WEB_URL + '/static/musicplayer.png?v=' + Math.random() * 10, components })
+    // Add songs to history component
+    historyMenu.components[0].setOptions(await generateHistoryOptions())
+
+    await generateNowPlayingCanvas(queue.songs)
+    await sendMessage(queue.textChannel, {
+      content: `${WEB_URL}/static/musicplayer.png?v=${Math.random() * 10}`,
+      components,
+    })
   })
 
   // On bot disconnected from voice channel
-  player.on('disconnect', async (queue) => {
+  client.player.on('disconnect', async (queue) => {
     historyMenu.components[0].setPlaceholder('-- Song History --')
-    await mainMessage(queue.textChannel, { content: '🎶 | Previously Played:', components: [historyMenu]  }, () => {
-      mainMsgActive = false
+    await sendMessage(queue.textChannel, {
+      content: '🎶 | Previously Played:',
+      components: [historyMenu],
     })
   })
 
   // On voice channel empty
-  player.on('empty', async (queue) => {
+  client.player.on('empty', async (queue) => {
     historyMenu.components[0].setPlaceholder('-- Song History --')
-    await mainMessage(queue.textChannel, { content: '🎶 | Previously Played:', components: [historyMenu]  })
+    await sendMessage(queue.textChannel, {
+      content: '🎶 | Previously Played:',
+      components: [historyMenu],
+    })
   })
 
   // On queue/song finish
-  player.on('finish', async (queue) => {
+  client.player.on('finish', async (queue) => {
     historyMenu.components[0].setPlaceholder('-- Song History --')
     for (let i = 0; i < 4; i++) {
-      row.components[i].setDisabled()
+      buttons.components[i].setDisabled()
     }
-    await mainMessage(queue.textChannel, { content: '✅ | Queue finished!', components: [row, historyMenu] })
-    writeSongState(false)
+    await sendMessage(queue.textChannel, {
+      content: '✅ | Queue finished!',
+      components,
+    })
+    addSong(false)
   })
-
 }
 
-export { registerEvents }
+export default registerEvents

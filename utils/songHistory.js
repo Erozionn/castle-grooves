@@ -1,13 +1,13 @@
-const { InfluxDB, Point } = require('@influxdata/influxdb-client')
+import { InfluxDB, Point } from '@influxdata/influxdb-client'
 
-const { INFLUX_URL, INFLUX_TOKEN, INFLUX_ORG, INFLUX_BUCKET } = process.env;
+const { INFLUX_URL, INFLUX_TOKEN, INFLUX_ORG, INFLUX_BUCKET } = process.env
 
 const client = new InfluxDB({ url: INFLUX_URL, token: INFLUX_TOKEN })
 
 const getSongsPlayed = async () => {
   const queryApi = client.getQueryApi(INFLUX_ORG)
   const fluxQuery = `
-  from(bucket:"${ influxBucket }")
+  from(bucket:"${INFLUX_BUCKET}")
     |> range(
       start: -30d,
       stop: now()
@@ -25,18 +25,13 @@ const getSongsPlayed = async () => {
   return results
 }
 
-const addSong = (song) => {
+const addSong = (playing, song) => {
   const writeApi = client.getWriteApi(INFLUX_ORG, INFLUX_BUCKET)
 
   const point = new Point('song')
   if (playing === false) {
-    point
-      .booleanField('playing', false)
-  }
-  else if (playing === true) {
-    if (song == undefined) {
-      return
-    }
+    point.booleanField('playing', false)
+  } else if (song && playing === true) {
     point
       .tag('requestedById', song.user.id)
       .tag('requestedByUsername', song.user.username)
@@ -46,18 +41,15 @@ const addSong = (song) => {
       .stringField('songThumbnail', song.thumbnail)
       .stringField('source', song.source)
       .stringField('requestedByAvatar', song.user.displayAvatarURL())
-  }
-  else {
+  } else {
     console.log('Error: playing undefined.')
     return
   }
 
   writeApi.writePoint(point)
-  writeApi.close()
-    .catch(e => {
-      console.log(e)
-    })
+  writeApi.close().catch((e) => {
+    console.log(e)
+  })
 }
 
-
-export default { getSongsPlayed, addSong }
+export { getSongsPlayed, addSong }

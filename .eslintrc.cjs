@@ -10,7 +10,7 @@ module.exports = {
   },
   plugins: ['compat', 'prettier'],
   rules: {
-    'allowForLoopAfterthoughts': true,
+    'no-plusplus': ['error', { allowForLoopAfterthoughts: true }],
     'arrow-parens': ['warn', 'always'],
     'function-paren-newline': 'off',
     'keyword-spacing': [
@@ -44,14 +44,7 @@ module.exports = {
     'no-debugger': ['warn'],
     'no-param-reassign': ['error', { props: true, ignorePropertyModificationsFor: ['state'] }],
     'no-unused-vars': ['warn'],
-    'import/extensions': [
-      'error',
-      'always',
-      {
-        js: 'never',
-        jsx: 'never',
-      },
-    ],
+    'import/extensions': 0,
     'import/order': [
       'warn',
       {

@@ -4,7 +4,7 @@ import path from 'node:path'
 import { Client, Collection, Intents } from 'discord.js'
 import { DisTube } from 'distube'
 
-import { registerEvents } from './events.js'
+import registerEvents from './events.js'
 
 const { BOT_TOKEN } = process.env
 

@@ -10,7 +10,7 @@ Canvas.registerFont('./assets/fonts/Montserrat-SemiBold.ttf', { family: 'Montser
 Canvas.registerFont('./assets/fonts/Montserrat-Bold.ttf', { family: 'Montserrat-Bold' })
 
 const generateNowPlayingCanvas = async (songs) => {
-  if (!songs) throw Error('Error: queue is undefined.')
+  if (!songs || songs.length < 1) throw Error('Error: queue is undefined.')
 
   const canvas = Canvas.createCanvas(700, 145)
   const canv = canvas.getContext('2d')
