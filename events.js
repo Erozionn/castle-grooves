@@ -68,6 +68,8 @@ const registerEvents = (client) => {
     const queue = client.player.queues.get(interaction.guildId)
     const { channel } = interaction
 
+    interaction.deferUpdate()
+
     switch (interaction.customId) {
       case 'back_button':
         if (!queue) return sendMessage(channel, { content: '❌ | No music is being played!' })
@@ -75,8 +77,15 @@ const registerEvents = (client) => {
         break
       case 'play_pause_button':
         if (!queue) return sendMessage(channel, { content: '❌ | No music is being played!' })
-        if (queue.playing) queue.pause()
-        if (queue.paused) queue.resume()
+        if (queue.playing) {
+          queue.pause()
+          buttons.components[1].setStyle('SUCCESS')
+        } else {
+          queue.resume()
+          buttons.components[1].setStyle('PRIMARY')
+        }
+
+        interaction.message.edit({ components })
         break
       case 'skip_button':
         if (!queue) return sendMessage(channel, { content: '❌ | No music is being played!' })
@@ -103,7 +112,7 @@ const registerEvents = (client) => {
           case 1:
             // Repeat Queue
             queue.setRepeatMode(2)
-            components[1].components[3]
+            buttons.components[3]
               .setEmoji('repeat:909248218972422154')
               .setStyle('SUCCESS')
               .setDisabled(false)
@@ -111,7 +120,7 @@ const registerEvents = (client) => {
           case 2:
             // Repeat Song
             queue.setRepeatMode(1)
-            components[1].components[3]
+            buttons.components[3]
               .setEmoji('repeatonce:909248177268477982')
               .setStyle('SUCCESS')
               .setDisabled(false)
@@ -119,7 +128,7 @@ const registerEvents = (client) => {
           default:
             // Repeat Off
             queue.setRepeatMode(0)
-            components[1].components[3]
+            buttons.components[3]
               .setEmoji('repeatoff:909248201427681290')
               .setStyle('PRIMARY')
               .setDisabled(false)
@@ -130,8 +139,7 @@ const registerEvents = (client) => {
       case 'history':
         if (!interaction.member.voice)
           return interaction.message.edit('❌ | You need to be in a voice channel!')
-        console.log(interaction.values[0])
-        client.player.playVoiceChannel(interaction.member.voice.channel, interaction.values[0], {
+        client.player.play(interaction.member.voice.channel, interaction.values[0], {
           textChannel: interaction.channel,
           member: interaction.member,
         })
@@ -170,11 +178,13 @@ const registerEvents = (client) => {
     // Add songs to history component
     historyMenu.components[0].setOptions(await generateHistoryOptions())
 
-    await generateNowPlayingCanvas(queue.songs)
-    await sendMessage(queue.textChannel, {
-      content: `${WEB_URL}/static/musicplayer.png?v=${Math.random() * 10}`,
-      components,
-    })
+    if (queue.songs.length > 1) {
+      await generateNowPlayingCanvas(queue.songs)
+      await sendMessage(queue.textChannel, {
+        content: `${WEB_URL}/static/musicplayer.png?v=${Math.random() * 10}`,
+        components,
+      })
+    }
   })
 
   // On bot disconnected from voice channel

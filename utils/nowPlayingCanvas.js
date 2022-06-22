@@ -14,7 +14,6 @@ const generateNowPlayingCanvas = async (songs) => {
 
   const canvas = Canvas.createCanvas(700, 145)
   const canv = canvas.getContext('2d')
-
   const imageCanvas = Canvas.createCanvas(222, 125)
   const imageCtx = imageCanvas.getContext('2d')
 
@@ -29,7 +28,7 @@ const generateNowPlayingCanvas = async (songs) => {
     ignoredColor: [0, 0, 0, 255],
   })
 
-  const boxGradient = canv.createLinearGradient(0, 0, 600, 0)
+  const boxGradient = canv.createLinearGradient(0, 0, 700, 0)
   boxGradient.addColorStop(
     0,
     `rgba(${averageColor.value[0]}, ${averageColor.value[1]}, ${averageColor.value[2]}, 1)`
@@ -43,7 +42,7 @@ const generateNowPlayingCanvas = async (songs) => {
     `rgba(${averageColor.value[0]}, ${averageColor.value[1]}, ${averageColor.value[2]}, 0)`
   )
 
-  canv.fillStyle = boxGradient
+  canv.fillStyle = `rgba(${averageColor.value[0]}, ${averageColor.value[1]}, ${averageColor.value[2]}, 1)`
   canv.fillRect(0, 0, 700, 145)
 
   canv.drawImage(thumbnail, 10, 10, 222, 125)

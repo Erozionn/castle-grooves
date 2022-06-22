@@ -4,6 +4,7 @@ import path from 'node:path'
 import { Client, Collection, Intents } from 'discord.js'
 import { DisTube } from 'distube'
 
+import initApi from './api/index.js'
 import registerEvents from './events.js'
 
 const { BOT_TOKEN } = process.env
@@ -15,6 +16,8 @@ const client = new Client({
 client.commands = new Collection()
 client.player = new DisTube(client, { emptyCooldown: 300, nsfw: true, searchSongs: 1 })
 
+// Initialize the API and webserver.
+initApi()
 // Initialize the events file.
 registerEvents(client)
 

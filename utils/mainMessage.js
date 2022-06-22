@@ -1,8 +1,13 @@
 let mainMessage
 
-const sendMessage = (channel, options) => {
-  console.log(options)
-  mainMessage = channel.send(options)
+const sendMessage = async (channel, options) => {
+  console.log(mainMessage)
+
+  if (channel.id === mainMessage?.channel.id) {
+    mainMessage = await mainMessage.edit(options)
+  } else {
+    mainMessage = await channel.send(options)
+  }
   return mainMessage
 }
 
