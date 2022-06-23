@@ -1,8 +1,8 @@
 import fs from 'node:fs'
-import path from 'node:path'
 
 import { Client, Collection, Intents } from 'discord.js'
 import { DisTube } from 'distube'
+import { YtDlpPlugin } from '@distube/yt-dlp'
 
 import initApi from './api/index.js'
 import registerEvents from './events.js'
@@ -14,7 +14,31 @@ const client = new Client({
 })
 
 client.commands = new Collection()
-client.player = new DisTube(client, { emptyCooldown: 300, nsfw: true, searchSongs: 1 })
+
+// client.player = new DisTube(client, {
+//   leaveOnStop: false,
+//   emitNewSongOnly: true,
+//   emitAddSongWhenCreatingQueue: false,
+//   emitAddListWhenCreatingQueue: false,
+//   plugins: [
+//     new SpotifyPlugin({
+//       emitEventsAfterFetching: true,
+//     }),
+//     new SoundCloudPlugin(),
+//     new YtDlpPlugin(),
+//   ],
+//   youtubeDL: false,
+//   nsfw: true,
+//   searchCooldown: 0,
+// })
+
+client.player = new DisTube(client, {
+  emptyCooldown: 300,
+  nsfw: true,
+  searchSongs: 1,
+  youtubeDL: false,
+  plugins: [new YtDlpPlugin()],
+})
 
 // Initialize the API and webserver.
 initApi()
@@ -26,7 +50,6 @@ const commandFiles = fs.readdirSync('./commands').filter((file) => file.endsWith
 
 commandFiles.forEach(async (file) => {
   const filePath = `./commands/${file}`
-  console.log(filePath)
   const command = await import(filePath)
   client.commands.set(command.default.data.name, command.default)
 })

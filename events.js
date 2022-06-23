@@ -49,7 +49,7 @@ const generateHistoryOptions = async () => {
     .map((s) => {
       return {
         label: `🎶 | ${s.songTitle.substring(0, 95)}`,
-        value: `${s.songUrl.substring(0, 90)}?discord=${Math.floor(Math.random() * 999)}`,
+        value: `${s.songUrl.substring(0, 90)}?discord=${Math.floor(Math.random() * 99999)}`,
       }
     })
     .reverse()
@@ -61,22 +61,25 @@ const registerEvents = (client) => {
   let repeatButtonState = 0
 
   client.on('interactionCreate', (interaction) => {
-    // if (!mainMessage && interaction.message) {
-    //   interaction.message.delete()
-    // }
+    if (!interaction.isButton() && !interaction.isSelectMenu()) return
+    interaction.deferUpdate()
 
     const queue = client.player.queues.get(interaction.guildId)
     const { channel } = interaction
 
-    interaction.deferUpdate()
-
     switch (interaction.customId) {
       case 'back_button':
-        if (!queue) return sendMessage(channel, { content: '❌ | No music is being played!' })
+        if (!queue) {
+          sendMessage(channel, { content: '❌ | No music is being played!' })
+          return
+        }
         queue.previous().catch((e) => console.log(e))
         break
       case 'play_pause_button':
-        if (!queue) return sendMessage(channel, { content: '❌ | No music is being played!' })
+        if (!queue) {
+          sendMessage(channel, { content: '❌ | No music is being played!' })
+          return
+        }
         if (queue.playing) {
           queue.pause()
           buttons.components[1].setStyle('SUCCESS')
@@ -88,7 +91,10 @@ const registerEvents = (client) => {
         interaction.message.edit({ components })
         break
       case 'skip_button':
-        if (!queue) return sendMessage(channel, { content: '❌ | No music is being played!' })
+        if (!queue) {
+          sendMessage(channel, { content: '❌ | No music is being played!' })
+          return
+        }
         if (queue.songs.length > 1) {
           queue.skip()
         } else {
@@ -96,11 +102,17 @@ const registerEvents = (client) => {
         }
         break
       case 'stop_button':
-        if (!queue) return sendMessage(channel, { content: '❌ | No music is being played!' })
+        if (!queue) {
+          sendMessage(channel, { content: '❌ | No music is being played!' })
+          return
+        }
         queue.stop()
         break
       case 'repeat_button':
-        if (!queue) return sendMessage(channel, { content: '❌ | No music is being played!' })
+        if (!queue) {
+          sendMessage(channel, { content: '❌ | No music is being played!' })
+          return
+        }
 
         if (repeatButtonState < 2) {
           repeatButtonState += 1
@@ -137,8 +149,10 @@ const registerEvents = (client) => {
         interaction.message.edit({ components })
         break
       case 'history':
-        if (!interaction.member.voice)
-          return interaction.message.edit('❌ | You need to be in a voice channel!')
+        if (!interaction.member.voice) {
+          interaction.message.edit('❌ | You need to be in a voice channel!')
+          return
+        }
         client.player.play(interaction.member.voice.channel, interaction.values[0], {
           textChannel: interaction.channel,
           member: interaction.member,
@@ -147,7 +161,6 @@ const registerEvents = (client) => {
       default:
         break
     }
-    return interaction
   })
 
   client.player.on('playSong', async (queue, song) => {
@@ -163,7 +176,7 @@ const registerEvents = (client) => {
     }
 
     // sendMessage()
-    generateNowPlayingCanvas(queue.songs)
+    await generateNowPlayingCanvas(queue.songs)
     await sendMessage(queue.textChannel, {
       content: `${WEB_URL}/static/musicplayer.png?v=${Math.random() * 10}`,
       components,
