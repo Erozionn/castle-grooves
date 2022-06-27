@@ -1,5 +1,5 @@
 module.exports = {
-  extends: ['airbnb', 'prettier'],
+  extends: ['airbnb', 'prettier', 'plugin:import/recommended'],
   parserOptions: {
     ecmaVersion: 11,
     sourceType: 'module',
@@ -8,7 +8,7 @@ module.exports = {
     es6: true,
     node: true,
   },
-  plugins: ['compat', 'prettier'],
+  plugins: ['compat', 'prettier', 'import'],
   rules: {
     'no-plusplus': ['error', { allowForLoopAfterthoughts: true }],
     'arrow-parens': ['warn', 'always'],
@@ -66,5 +66,13 @@ module.exports = {
     ],
     'arrow-body-style': 'off',
     'prefer-arrow-callback': 'off',
+  },
+  settings: {
+    'import/resolver': {
+      alias: [
+        ['#utils', './utils'],
+        ['#api', './api/index.js'],
+      ],
+    },
   },
 }

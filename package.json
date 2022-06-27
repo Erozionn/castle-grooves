@@ -1,6 +1,6 @@
 {
   "name": "crastle-grooves",
-  "version": "1.0.0",
+  "version": "0.1.0-dev",
   "description": "Castle Grooves music bot.",
   "main": "index.js",
   "type": "module",
@@ -53,5 +53,9 @@
     "eslint-plugin-prettier": "^4.0.0",
     "eslint-plugin-promise": "^6.0.0",
     "prettier": "^2.5.1"
+  },
+  "imports": {
+    "#utils/*": "./utils/*",
+    "#api": "./api/index.js"
   }
 }
