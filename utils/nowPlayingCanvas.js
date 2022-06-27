@@ -61,32 +61,40 @@ const generateNowPlayingCanvas = async (songs) => {
   })
   const [r, g, b] = averageColor.value
 
-  // // Generate gradient background
-  // const boxGradient = canv.createLinearGradient(0, 0, 700, 0)
-  // boxGradient.addColorStop(0, 'rgba(32, 34, 37, 0.7)')
-  // boxGradient.addColorStop(0.4, 'rgba(32, 34, 37, 0.7)')
-  // boxGradient.addColorStop(1, 'rgba(32, 34, 37, 0)')
-  // canv.fillStyle = boxGradient
-  // canv.fillRect(300, 0, 400, 394)
+  // Generate gradient background
+  const boxGradient = canv.createLinearGradient(0, 0, 700, 0)
+  boxGradient.addColorStop(0, 'rgba(32, 34, 37, 0.7)')
+  boxGradient.addColorStop(0.4, 'rgba(32, 34, 37, 0.7)')
+  boxGradient.addColorStop(1, 'rgba(32, 34, 37, 0)')
+  canv.fillStyle = boxGradient
+  canv.fillRect(300, 0, 400, 394)
 
   // Drop shadow
-  canv.filter = 'blur(16px)'
-  canv.fillStyle = 'rgba(32, 34, 37, 0.8)'
-  canv.fillRect(285, -30, 20, 334)
+  // canv.filter = 'blur(16px)'
+  // canv.fillStyle = 'rgba(32, 34, 37, 0.8)'
+  // canv.fillRect(285, -30, 20, 334)
 
   // Blur thumbnail for background
-  canv.filter = 'blur(6px)'
-  canv.drawImage(thumbnail, 100, 0, 100, 145, -10, 0, 300, 394)
+  canv.filter = 'blur(24px)'
+  canv.drawImage(thumbnail, -10, -10, 720, 405)
   canv.filter = 'none'
 
   // Darken blurred thumbnail
-  canv.fillStyle = `rgba(${r}, ${g}, ${b}, 0.8)`
-  canv.fillRect(0, 0, 300, 394)
-  canv.fillStyle = `rgba(32, 34, 37, 0.4)`
-  canv.fillRect(0, 0, 300, 394)
+  canv.fillStyle = `rgba(
+    ${Math.max(r - 50, 0)},
+    ${Math.max(g - 50, 0)},
+    ${Math.max(b - 50, 0)},
+    0.4)`
+  canv.fillRect(0, 0, 700, 394)
+  // canv.fillStyle = `rgba(32, 34, 37, 0.2)`
+  // canv.fillRect(0, 0, 700, 394)
+
+  // Render vertical divider
+  canv.fillStyle = averageColor.isDark ? `rgba(0, 0, 0, 0.2)` : 'rgba(255, 255, 255, 0.2)'
+  canv.fillRect(320, 0, 380, 394)
 
   // Render Thumbnail
-  canv.drawImage(thumbnail, 0, 0, 300, 169)
+  canv.drawImage(thumbnail, 10, 10, 300, 169)
 
   // Split artist and title
   const songInfo = song.name.split(' (')[0].split(/\s*-+\s*/)
@@ -95,8 +103,8 @@ const generateNowPlayingCanvas = async (songs) => {
   // Render title
   const songTitleHeight = renderMultiLineTitle(canvas, title || artist, {
     fillStyle: '#ffffff',
-    y: 240,
-    x: 0,
+    y: 250,
+    x: 10,
     font: 'bold 24px Montserrat',
   })
 
@@ -104,8 +112,8 @@ const generateNowPlayingCanvas = async (songs) => {
   if (title) {
     renderMultiLineTitle(canvas, artist, {
       fillStyle: '#ffffff',
-      y: 240 + songTitleHeight,
-      x: 0,
+      y: 250 + songTitleHeight,
+      x: 10,
       font: '24px Montserrat',
     })
   }
@@ -114,25 +122,26 @@ const generateNowPlayingCanvas = async (songs) => {
   canv.save()
 
   canv.beginPath()
-  canv.arc(37, 357, 32, 0, Math.PI * 2)
+  canv.arc(42, 352, 32, 0, Math.PI * 2)
   canv.closePath()
   canv.clip()
 
   const avatar = await loadImage(song.user.displayAvatarURL({ format: 'png', size: 64 }))
-  canv.drawImage(avatar, 5, 325, 64, 64)
+  canv.drawImage(avatar, 10, 320, 64, 64)
 
   canv.restore()
 
   // Render "Up Next"
   canv.textAlign = 'left'
-  canv.fillStyle = averageColor.isLight ? shadeColor(averageColor.hex, -20) : '#ffffff'
+  canv.fillStyle = averageColor.isDark ? `#ffffff` : shadeColor(averageColor.hex, -200)
   canv.font = 'bold 28px Montserrat'
-  canv.fillText('Up Next:', 330, 50)
+  canv.fillText('Up Next:', 330, 35)
 
+  // Render queued songs
   for (let i = 1; i < Math.min(songs.length, 9); i++) {
     canv.font = '22px Montserrat'
     const [a, s] = songs[i].name.split(/\s*-+\s*/) // [artist, song]
-    canv.fillText(`${i}. ${a}${s ? ` - ${s}` : ''}`, 330, 50 + 40 * i)
+    canv.fillText(`${i}. ${s ? `${s.split(' (')[0]} - ` : ''}${a}`, 330, 50 + 40 * i)
   }
 
   // Buffer canvas
