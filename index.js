@@ -4,7 +4,8 @@ import { Client, Collection, Intents } from 'discord.js'
 import { DisTube } from 'distube'
 import { YtDlpPlugin } from '@distube/yt-dlp'
 
-import initApi from './api/index.js'
+import initApi from '#api'
+
 import registerEvents from './events.js'
 
 const { BOT_TOKEN } = process.env
