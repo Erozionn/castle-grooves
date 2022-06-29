@@ -149,7 +149,7 @@ const registerEvents = (client) => {
         interaction.message.edit({ components })
         break
       case 'history':
-        if (!interaction.member.voice) {
+        if (!interaction.member.voice.channelId) {
           interaction.message.edit('❌ | You need to be in a voice channel!')
           return
         }
