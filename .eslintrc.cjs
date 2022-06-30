@@ -72,6 +72,7 @@ module.exports = {
       alias: [
         ['#utils', './utils'],
         ['#api', './api/index.js'],
+        ['#commands', './commands'],
       ],
     },
   },

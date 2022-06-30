@@ -4,6 +4,7 @@
     "paths": {
       "#utils": ["./utils"],
       "#api": ["./api/index.js"],
+      "#commands": ["./commands"],
     }
   }
 }

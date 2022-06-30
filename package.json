@@ -56,6 +56,7 @@
   },
   "imports": {
     "#utils/*": "./utils/*",
-    "#api": "./api/index.js"
+    "#api": "./api/index.js",
+    "#commands/*": "./commands/*"
   }
 }

@@ -1,8 +1,10 @@
 import { MessageActionRow, MessageSelectMenu, MessageButton } from 'discord.js'
 
+import { generateNowPlayingCanvas } from '#utils/nowPlayingCanvas.js'
+import { parseSongName } from '#utils/utilities.js'
+
 import { getSongsPlayed, addSong } from './utils/songHistory.js'
 import sendMessage from './utils/mainMessage.js'
-import { generateNowPlayingCanvas } from './utils/nowPlayingCanvas.js'
 
 const { WEB_URL } = process.env
 
@@ -35,7 +37,10 @@ const buttons = new MessageActionRow().addComponents(
 )
 
 const historyMenu = new MessageActionRow().addComponents(
-  new MessageSelectMenu().setCustomId('history').setPlaceholder('-- Song History --')
+  new MessageSelectMenu()
+    .setCustomId('history')
+    .setMaxValues(20)
+    .setPlaceholder('-- Song History --')
 )
 
 const components = [buttons, historyMenu]
@@ -47,8 +52,11 @@ const generateHistoryOptions = async () => {
   // Prepare song history for the history component
   const options = history
     .map((s) => {
+      const { artist, title } = parseSongName(s.songTitle)
       return {
-        label: `🎶 | ${s.songTitle.substring(0, 95)}`,
+        label: title.substring(0, 95),
+        description: artist.substring(0, 95),
+        emoji: '🎶',
         value: `${s.songUrl.substring(0, 90)}?discord=${Math.floor(Math.random() * 99999)}`,
       }
     })
@@ -153,10 +161,16 @@ const registerEvents = (client) => {
           interaction.message.edit('❌ | You need to be in a voice channel!')
           return
         }
-        client.player.play(interaction.member.voice.channel, interaction.values[0], {
-          textChannel: interaction.channel,
-          member: interaction.member,
+        interaction.values.forEach((song) => {
+          client.player.play(interaction.member.voice.channel, song, {
+            textChannel: interaction.channel,
+            member: interaction.member,
+          })
         })
+        // client.player.play(interaction.member.voice.channel, interaction.values[0], {
+        //   textChannel: interaction.channel,
+        //   member: interaction.member,
+        // })
         break
       default:
         break

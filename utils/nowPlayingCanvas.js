@@ -4,7 +4,7 @@ import fs from 'fs'
 import { Canvas, FontLibrary, loadImage } from 'skia-canvas'
 import { getAverageColor } from 'fast-average-color-node'
 
-import { shadeColor, splitAtClosestSpace } from '#utils/utilities.js'
+import { shadeColor, splitAtClosestSpace, parseSongName } from '#utils/utilities.js'
 
 FontLibrary.use([
   './assets/fonts/Montserrat-Light.ttf',
@@ -101,8 +101,7 @@ const nowPlayingCanvasWithUpNext = async (songs) => {
   canv.drawImage(thumbnail, 10, 10, 300, 169)
 
   // Split artist and title
-  const songInfo = song.name.split(/(\(+|\[+)/)[0].split(/\s*-+\s*/)
-  const [artist, title] = songInfo
+  const { artist, title } = parseSongName(song.name)
 
   // Render title
   const songTitleHeight = renderMultiLineTitle(canvas, title || artist, {
@@ -150,9 +149,11 @@ const nowPlayingCanvasWithUpNext = async (songs) => {
   // Render queued songs
   for (let i = 1; i < Math.min(songs.length, 6); i++) {
     canv.font = 'bold 22px Montserrat'
-    const [a, s] = songs[i].name.split(/\s*-+\s*/) // [artist, song]
-    if (s) {
-      canv.fillText(`${i}. ${s.split(/(\(+|\[+)/)[0]}`, 330, 30 + 60 * i)
+    const parsedSong = parseSongName(songs[i].name)
+    const a = parsedSong.artist
+    const s = parsedSong.title
+    if (title !== null) {
+      canv.fillText(`${i}. ${s}`, 330, 30 + 60 * i)
       canv.font = '22px Montserrat'
       canv.fillText(`${a}`, 358, 55 + 60 * i)
     } else {
@@ -216,8 +217,7 @@ const nowPlayingCanvas = async (song) => {
   canv.drawImage(thumbnail, 0, 0, 300, 169)
 
   // Split artist and title
-  const songInfo = song.name.split(/(\(+|\[+)/)[0].split(/\s*-+\s*/)
-  const [artist, title] = songInfo
+  const { artist, title } = parseSongName(song.name)
 
   // Render title
   const songTitleHeight = renderMultiLineTitle(canvas, title || artist, {
