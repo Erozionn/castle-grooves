@@ -1,5 +1,4 @@
 import fs from 'node:fs'
-import path from 'node:path'
 
 import { REST } from '@discordjs/rest'
 import { Routes } from 'discord-api-types/v9'
@@ -20,11 +19,12 @@ const registerCommands = async () => {
     const command = await import(filePath)
     commands.push(command.default.data.toJSON())
   }
-  console.log(commands)
+
   rest
     .put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: commands })
-    .then(() => console.log('Successfully registered application commands.'))
     .catch(console.error)
 }
 
-registerCommands()
+// registerCommands()
+
+export default registerCommands

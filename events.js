@@ -54,8 +54,8 @@ const generateHistoryOptions = async () => {
     .map((s) => {
       const { artist, title } = parseSongName(s.songTitle)
       return {
-        label: title.substring(0, 95),
-        description: artist.substring(0, 95),
+        label: title ? title.substring(0, 95) : artist.substring(0, 95),
+        description: title ? artist.substring(0, 95) : '',
         emoji: '🎶',
         value: `${s.songUrl.substring(0, 90)}?discord=${Math.floor(Math.random() * 99999)}`,
       }
@@ -81,7 +81,7 @@ const registerEvents = (client) => {
           sendMessage(channel, { content: '❌ | No music is being played!' })
           return
         }
-        queue.previous().catch((e) => console.log(e))
+        queue.previous()
         break
       case 'play_pause_button':
         if (!queue) {
@@ -162,6 +162,7 @@ const registerEvents = (client) => {
           return
         }
         interaction.values.forEach((song) => {
+          // TODO: Add support for custom playlists if values.length > 1
           client.player.play(interaction.member.voice.channel, song, {
             textChannel: interaction.channel,
             member: interaction.member,
@@ -216,6 +217,8 @@ const registerEvents = (client) => {
 
   // On bot disconnected from voice channel
   client.player.on('disconnect', async (queue) => {
+    // Add songs to history component
+    historyMenu.components[0].setOptions(await generateHistoryOptions())
     historyMenu.components[0].setPlaceholder('-- Song History --')
     await sendMessage(queue.textChannel, {
       content: '🎶 | Previously Played:',
