@@ -1,25 +1,30 @@
-const fs = require('node:fs')
-const path = require('node:path')
+import fs from 'node:fs'
 
-const { REST } = require('@discordjs/rest')
-const { Routes } = require('discord-api-types/v9')
+import { REST } from '@discordjs/rest'
+import { Routes } from 'discord-api-types/v9'
 
 const { CLIENT_ID, GUILD_ID, BOT_TOKEN } = process.env
 
 const rest = new REST({ version: '9' }).setToken(BOT_TOKEN)
 
-const commands = []
-const commandsPath = path.join(__dirname, 'commands')
+const commandsPath = './commands'
 const commandFiles = fs.readdirSync(commandsPath).filter((file) => file.endsWith('.js'))
 
-commandFiles.forEach((file) => {
-  const filePath = path.join(commandsPath, file)
-  // eslint-disable-next-line global-require, import/no-dynamic-require
-  const command = require(filePath)
-  commands.push(command.data.toJSON())
-})
+const commands = []
 
-rest
-  .put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: commands })
-  .then(() => console.log('Successfully registered application commands.'))
-  .catch(console.error)
+const registerCommands = async () => {
+  for (let i = 0; i < commandFiles.length; i++) {
+    const filePath = `./commands/${commandFiles[i]}`
+    // eslint-disable-next-line no-await-in-loop
+    const command = await import(filePath)
+    commands.push(command.default.data.toJSON())
+  }
+
+  rest
+    .put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: commands })
+    .catch(console.error)
+}
+
+// registerCommands()
+
+export default registerCommands

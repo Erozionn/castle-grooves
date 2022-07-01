@@ -6,6 +6,7 @@ import { YtDlpPlugin } from '@distube/yt-dlp'
 
 import initApi from '#api'
 
+import registerCommands from './deploy-commands.js'
 import registerEvents from './events.js'
 
 const { BOT_TOKEN } = process.env
@@ -43,6 +44,8 @@ client.player = new DisTube(client, {
 
 // Initialize the API and webserver.
 initApi()
+// Register commands.
+registerCommands()
 // Initialize the events file.
 registerEvents(client)
 
@@ -56,12 +59,13 @@ commandFiles.forEach(async (file) => {
 })
 
 client.once('ready', () => {
-  console.log('Ready!')
-
   client.user.setActivity({
-    name: '🎶 | Music Time',
+    name: '🎶 Music 🎶',
     type: 'LISTENING',
   })
+
+  // eslint-disable-next-line no-console
+  console.log('Ready!')
 })
 
 client.on('interactionCreate', async (interaction) => {

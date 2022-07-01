@@ -24,4 +24,12 @@ const shadeColor = (color, percent) => {
   return `#${RR}${GG}${BB}`
 }
 
-export { splitAtClosestSpace, shadeColor }
+const parseSongName = (name) => {
+  const split = name.split(/(\(+|\[+)/)[0].split(/\s*-+\s*/)
+  return {
+    artist: split[0],
+    title: split[1] ? split[1] : null,
+  }
+}
+
+export { splitAtClosestSpace, shadeColor, parseSongName }
