@@ -9,4 +9,6 @@ const sendMessage = async (channel, options) => {
   return mainMessage
 }
 
-export default sendMessage
+const getMainMessage = () => mainMessage
+
+export { sendMessage, getMainMessage }

@@ -25,9 +25,9 @@ const shadeColor = (color, percent) => {
 }
 
 const parseSongName = (name) => {
-  const split = name.split(/(\(+|\[+)/)[0].split(/\s*-+\s*/)
+  const split = name.split(/(\(+|\s\[+)/)[0].split(/\s*-+\s*/)
   return {
-    artist: split[0],
+    artist: split[0] || name,
     title: split[1] ? split[1] : null,
   }
 }

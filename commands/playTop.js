@@ -139,21 +139,7 @@ export default {
           option.setName('user').setDescription("User's top songs. Optional.")
         )
     ),
-
-  // .addSubcommand((subCommand) => {
-  //   subCommand
-  //     .setName('plays')
-  //     .setDescription('Play top songs.')
-  //     .addNumberOption((option) =>
-  //       option.setName('number').setDescription('Top number of songs. Default: 10')
-  //     )
-  //     .addUserOption((option) =>
-  //       option.setName('user').setDescription("User's top songs. Optional.")
-  //     )
-  // }),
   async execute(interaction) {
-    const { client, channel, member } = interaction
-    const { voice } = member
     await interaction.deferReply()
 
     const subCommand = interaction.options.getSubcommand()
@@ -163,14 +149,5 @@ export default {
     } else if (subCommand === 'list') {
       list(interaction)
     }
-    // const songName = interaction.options.getString('song')
-    // try {
-    //   client.player.play(voice.channel, songName, { textChannel: channel, member })
-    // } catch (e) {
-    //   await interaction.editReply({ content: 'Error joining your channel.' })
-    // }
-
-    // const loadingMsg = await interaction.editReply({ content: '⏱ | Loading...' })
-    // setTimeout(() => loadingMsg.delete(), 1500)
   },
 }
