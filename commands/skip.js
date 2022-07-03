@@ -13,9 +13,13 @@ export default {
       return
     }
 
-    const currentTrack = queue.songs[0].name
-    queue.skip()
+    if (queue.songs.length > 1) {
+      queue.skip()
+    } else {
+      queue.stop()
+    }
 
+    const currentTrack = queue.songs[0].name
     const loadingMsg = await interaction.editReply({ content: `✅ | Skipped **${currentTrack}**!` })
     setTimeout(() => loadingMsg.delete(), 1500)
   },

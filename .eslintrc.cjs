@@ -73,6 +73,7 @@ module.exports = {
         ['#utils', './utils'],
         ['#api', './api/index.js'],
         ['#commands', './commands'],
+        ['#constants', './constants'],
       ],
     },
   },
