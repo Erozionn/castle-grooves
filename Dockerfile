@@ -2,7 +2,7 @@
 FROM node:16
 
 # Set ARG and ENV variable defaults
-ARG port=1338
+ARG port=1337
 ENV port=$port
 
 # Create a directory for the app
@@ -15,7 +15,7 @@ RUN npm ci --only=production
 # Bundle app source
 COPY . .
 
-# Expose port 1338
-EXPOSE 1338
+# Expose port $port
+EXPOSE $port
 
 CMD [ "node", "index.js" ]
