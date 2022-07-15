@@ -1,30 +1,63 @@
 {
-  "name": "castle-grooves",
-  "version": "1.0.0",
-  "description": "The perfect music bot for your Discord server! 🤘",
+  "name": "crastle-grooves",
+  "version": "0.1.0-dev",
+  "description": "Castle Grooves music bot.",
   "main": "index.js",
-  "repository": "https://github.com/erozionn/castle-grooves",
+  "type": "module",
+  "scripts": {
+    "start": "node -r dotenv/config index.js dotenv_config_path=.env",
+    "start:dev": "nodemon -r dotenv/config index.js dotenv_config_path=.env.dev dotenv_config_debug=true",
+    "deploy-commands": "node -r dotenv/config deploy-commands.js dotenv_config_path=.env.dev dotenv_config_debug=true",
+    "lint": "eslint ./",
+    "lint:fix": "eslint --fix ./",
+    "p": "prettier . --write"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com:Erozionn/castle-grooves.git"
+  },
   "author": "Alexander Tasciyan",
   "license": "MIT",
-  "scripts": {
-    "start": "node index.js"
-  },
+  "homepage": "https://github.com/Erozionn/castle-grooves#readme",
   "dependencies": {
-    "@discord-player/downloader": "^3.0.1",
-    "@discord-player/extractor": "^3.0.2",
-    "@discordjs/opus": "^0.6.0",
-    "@influxdata/influxdb-client": "^1.18.0",
-    "axios": "^0.24.0",
-    "discord-player": "^5.1.0",
-    "discord.js": "^13.1.0",
-    "distube": "^3.0.0-beta.40",
-    "dotenv": "^10.0.0",
-    "express": "^4.17.1",
-    "fast-average-color-node": "^2.1.0",
-    "slash-create": "^4.0.1"
+    "@discordjs/builders": "^0.15.0",
+    "@discordjs/opus": "^0.7.0",
+    "@discordjs/rest": "^0.5.0",
+    "@discordjs/voice": "^0.8.0",
+    "@distube/soundcloud": "^1.1.0",
+    "@distube/spotify": "^1.2.1",
+    "@distube/yt-dlp": "^0.0.2",
+    "@influxdata/influxdb-client": "^1.26.0",
+    "discord-api-types": "^0.34.0",
+    "discord.js": "^13.8.0",
+    "distube": "^3.3.4",
+    "dotenv": "^16.0.1",
+    "express": "^4.18.1",
+    "fast-average-color-node": "^2.2.0",
+    "ffmpeg": "^0.0.4",
+    "ffmpeg-static": "^4.4.1",
+    "libsodium-wrappers": "^0.7.9",
+    "skia-canvas": "^0.9.30"
   },
   "devDependencies": {
-    "eslint": "^7.32.0",
-    "mdtable": "^0.3.1"
+    "eslint": "^8.8.0",
+    "eslint-config-airbnb": "^19.0.4",
+    "eslint-config-prettier": "^8.5.0",
+    "eslint-config-standard": "^17.0.0-0",
+    "eslint-import-resolver-alias": "^1.1.2",
+    "eslint-import-resolver-babel-module": "^5.3.1",
+    "eslint-plugin-compat": "^4.0.2",
+    "eslint-plugin-import": "^2.26.0",
+    "eslint-plugin-jsx-a11y": "^6.5.1",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-prettier": "^4.0.0",
+    "eslint-plugin-promise": "^6.0.0",
+    "prettier": "^2.5.1"
+  },
+  "imports": {
+    "#utils/*": "./utils/*",
+    "#api": "./api/index.js",
+    "#commands/*": "./commands/*",
+    "#constants/*": "./constants/*"
   }
 }

@@ -1,26 +1,32 @@
-const { SlashCommand } = require('slash-create')
+import { SlashCommandBuilder } from '@discordjs/builders'
 
-module.exports = class extends SlashCommand {
-  constructor(creator) {
-    super(creator, {
-      name: 'shuffle',
-      description: 'Shuffle the queue',
+import { getMainMessage, sendMessage } from '#utils/mainMessage.js'
+import { generateNowPlayingCanvas } from '#utils/nowPlayingCanvas.js'
 
-      guildIDs: process.env.DISCORD_GUILD_ID ? [ process.env.DISCORD_GUILD_ID ] : undefined
-    })
-  }
+const { WEB_URL } = process.env
 
-  async run (ctx) {
+export default {
+  data: new SlashCommandBuilder().setName('shuffle').setDescription('Shuffles the queue.'),
+  async execute(interaction) {
+    const { client } = interaction
+    await interaction.deferReply()
+    const queue = client.player.getQueue(interaction)
 
-    const { client } = require('..')
+    if (!queue || !queue.playing) {
+      const errorMsg = interaction.editReply({ content: '❌ | No music is being played!' })
+      setTimeout(() => errorMsg.delete(), 1500)
+      return
+    }
 
-    await ctx.defer()
-
-    const queue = client.player.queues.get(ctx.guildID)
-    if (!queue || !queue.playing) return void ctx.sendFollowUp({ content: '❌ | No music is being played!' })
-        
     await queue.shuffle()
-        
-    ctx.sendFollowUp({ content: '✅ | Queue has been shuffled!' })
-  }
+
+    await generateNowPlayingCanvas(queue.songs)
+    await sendMessage(queue.textChannel, {
+      content: `${WEB_URL}/static/musicplayer.png?v=${Math.random() * 10}`,
+      components: getMainMessage.components,
+    })
+
+    const loadingMsg = await interaction.editReply({ content: '⏱ | Loading...' })
+    setTimeout(() => loadingMsg.delete(), 1500)
+  },
 }

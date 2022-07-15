@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "baseUrl": "./",
+    "paths": {
+      "#utils": ["./utils"],
+      "#api": ["./api/index.js"],
+      "#commands": ["./commands"],
+      "#constants": ["./constants"],
+    }
+  }
+}

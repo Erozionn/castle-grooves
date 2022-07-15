@@ -1,24 +1,19 @@
-const { SlashCommand } = require('slash-create')
+import { SlashCommandBuilder } from '@discordjs/builders'
 
-module.exports = class extends SlashCommand {
-  constructor(creator) {
-    super(creator, {
-      name: 'pause',
-      description: 'Pause the current song',
+export default {
+  data: new SlashCommandBuilder().setName('pause').setDescription('Pauses current song.'),
+  async execute(interaction) {
+    const { client } = interaction
+    await interaction.deferReply()
+    const queue = client.player.getQueue(interaction)
 
-      guildIDs: process.env.DISCORD_GUILD_ID ? [ process.env.DISCORD_GUILD_ID ] : undefined
-    })
-  }
-
-  async run (ctx) {
-
-    const { client } = require('..')
-
-    await ctx.defer()
-
-    const queue = client.player.queues.get(ctx.guildID)
-    if (!queue || !queue.playing) return void ctx.sendFollowUp({ content: '❌ | No music is being played!' })
-    const paused = queue.pause()
-    return void ctx.sendFollowUp({ content: paused ? '⏸ | Paused!' : '❌ | Something went wrong!' })
-  }
+    if (!queue || !queue.playing) {
+      const errorMsg = await interaction.editReply({ content: '❌ | No music is being played!' })
+      setTimeout(() => errorMsg.delete(), 1500)
+      return
+    }
+    queue.pause()
+    const msg = await interaction.editReply({ content: '⏸ | Paused' })
+    setTimeout(() => msg.delete(), 1500)
+  },
 }
