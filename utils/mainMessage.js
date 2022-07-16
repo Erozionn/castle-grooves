@@ -11,4 +11,9 @@ const sendMessage = async (channel, options) => {
 
 const getMainMessage = () => mainMessage
 
-export { sendMessage, getMainMessage }
+const deleteMessage = () => {
+  mainMessage?.delete()
+  mainMessage = null
+}
+
+export { sendMessage, getMainMessage, deleteMessage }

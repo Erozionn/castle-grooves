@@ -21,7 +21,7 @@
   "homepage": "https://github.com/Erozionn/castle-grooves#readme",
   "dependencies": {
     "@discordjs/builders": "^0.15.0",
-    "@discordjs/opus": "^0.7.0",
+    "@discordjs/opus": "^0.8.0",
     "@discordjs/rest": "^0.5.0",
     "@discordjs/voice": "^0.8.0",
     "@distube/soundcloud": "^1.1.0",
