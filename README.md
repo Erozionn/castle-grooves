@@ -1,7 +1,7 @@
 # Castle Grooves
-A modern self-hosted alternative to the late Groovy Bot.
+#### A modern self-hosted alternative to the late Groovy Bot.
 
-[![Docker Image](https://github.com/Erozionn/castle-grooves/actions/workflows/docker-image.yml/badge.svg)](https://github.com/Erozionn/castle-grooves/actions/workflows/docker-image.yml)
+![GitHub last commit](https://img.shields.io/github/last-commit/erozionn/castle-grooves) ![GitHub last commit (branch)](https://img.shields.io/github/last-commit/erozionn/castle-grooves/develop?label=last%20dev%20commit) ![GitHub Workflow Status](https://img.shields.io/github/workflow/status/erozionn/castle-grooves/Docker%20Image%20CI?label=docker%20build)
 ## Features
 
 * Intuitive Slash Commands
