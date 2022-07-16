@@ -4,6 +4,7 @@ import { Client, Collection, Intents } from 'discord.js'
 import { DisTube } from 'distube'
 import { YtDlpPlugin } from '@distube/yt-dlp'
 
+import { getMainMessage, sendMessage, deleteMessage } from '#utils/mainMessage.js'
 import initApi from '#api'
 
 import registerCommands from './deploy-commands.js'
@@ -81,6 +82,26 @@ client.on('interactionCreate', async (interaction) => {
       content: 'There was an error while executing this command!',
       ephemeral: true,
     })
+  }
+})
+
+// Resets main message if many messages have since been sent in the channel
+let msgResetCount = 0
+client.on('messageCreate', (msg) => {
+  const botMsg = getMainMessage()
+
+  if (!botMsg) return
+
+  const { channel, content, components } = botMsg
+
+  if (msg.channel.id === botMsg.channel.id && msg.author.id !== botMsg.author.id) {
+    msgResetCount += 1
+  }
+
+  if (msgResetCount > 2) {
+    deleteMessage()
+    sendMessage(channel, { content, components })
+    msgResetCount = 0
   }
 })
 
