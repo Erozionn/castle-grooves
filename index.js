@@ -5,12 +5,14 @@ import { DisTube } from 'distube'
 import { YtDlpPlugin } from '@distube/yt-dlp'
 
 import { getMainMessage, sendMessage, deleteMessage } from '#utils/mainMessage.js'
+import { historyMenu } from '#constants/messageComponents.js'
 import initApi from '#api'
 
+import { generateHistoryOptions } from './utils/songHistory.js'
 import registerCommands from './deploy-commands.js'
 import registerEvents from './events.js'
 
-const { BOT_TOKEN } = process.env
+const { BOT_TOKEN, GUILD_ID, DEFAULT_TEXT_CHANNEL } = process.env
 
 const client = new Client({
   intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_VOICE_STATES, Intents.FLAGS.GUILD_MESSAGES],
@@ -59,7 +61,7 @@ commandFiles.forEach(async (file) => {
   client.commands.set(command.default.data.name, command.default)
 })
 
-client.once('ready', () => {
+client.once('ready', async () => {
   client.user.setActivity({
     name: '🎶 Music 🎶',
     type: 'LISTENING',
@@ -67,6 +69,31 @@ client.once('ready', () => {
 
   // eslint-disable-next-line no-console
   console.log('Ready!')
+
+  const mainGuild = await client.guilds.fetch(GUILD_ID)
+
+  if (!mainGuild.available) return
+
+  const channels = await mainGuild.channels.fetch()
+  const defaultTextChannel = channels.get(DEFAULT_TEXT_CHANNEL)
+  const textChannels = channels.filter((channel) => channel.type === 'GUILD_TEXT')
+
+  // Delete all previous messages from the bot.
+  textChannels.forEach(async (channel) => {
+    const messages = await channel.messages.fetch()
+    const botMessages = messages.filter((message) => message.author.id === client.user.id)
+    botMessages.forEach((message) => {
+      message.delete()
+    })
+  })
+
+  // Generate song history and send it to the main channel.
+  historyMenu.components[0].setOptions(await generateHistoryOptions())
+  historyMenu.components[0].setPlaceholder('-- Song History --')
+  await sendMessage(defaultTextChannel, {
+    content: '🎶 | Pick a song below or use **/play**',
+    components: [historyMenu],
+  })
 })
 
 client.on('interactionCreate', async (interaction) => {
