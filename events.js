@@ -1,31 +1,10 @@
 import { generateNowPlayingCanvas } from '#utils/nowPlayingCanvas.js'
-import { parseSongName } from '#utils/utilities.js'
 import { historyMenu, buttons, components } from '#constants/messageComponents.js'
 import { sendMessage } from '#utils/mainMessage.js'
 
-import { getSongsPlayed, addSong } from './utils/songHistory.js'
+import { addSong, generateHistoryOptions } from './utils/songHistory.js'
 
 const { WEB_URL } = process.env
-
-const generateHistoryOptions = async () => {
-  // Read song play history
-  const history = await getSongsPlayed()
-
-  // Prepare song history for the history component
-  const options = history
-    .map((s) => {
-      const { artist, title } = parseSongName(s.songTitle)
-      return {
-        label: title ? title.substring(0, 95) : artist.substring(0, 95),
-        description: title ? artist.substring(0, 95) : '',
-        emoji: '🎶',
-        value: `${s.songUrl.substring(0, 90)}?discord=${Math.floor(Math.random() * 99999)}`,
-      }
-    })
-    .reverse()
-
-  return options
-}
 
 const registerEvents = (client) => {
   let repeatButtonState = 0

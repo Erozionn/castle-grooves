@@ -1,5 +1,7 @@
 import { InfluxDB, Point } from '@influxdata/influxdb-client'
 
+import { parseSongName } from '#utils/utilities.js'
+
 const { INFLUX_URL, INFLUX_TOKEN, INFLUX_ORG, INFLUX_BUCKET } = process.env
 
 const client = new InfluxDB({ url: INFLUX_URL, token: INFLUX_TOKEN, timeout: 30000 })
@@ -133,4 +135,24 @@ const addSong = (playing, song) => {
   })
 }
 
-export { getSongsPlayed, getTopSongs, getUserTopSongs, addSong }
+const generateHistoryOptions = async () => {
+  // Read song play history
+  const history = await getSongsPlayed()
+
+  // Prepare song history for the history component
+  const options = history
+    .map((s) => {
+      const { artist, title } = parseSongName(s.songTitle)
+      return {
+        label: title ? title.substring(0, 95) : artist.substring(0, 95),
+        description: title ? artist.substring(0, 95) : '',
+        emoji: '🎶',
+        value: `${s.songUrl.substring(0, 90)}?discord=${Math.floor(Math.random() * 99999)}`,
+      }
+    })
+    .reverse()
+
+  return options
+}
+
+export { getSongsPlayed, getTopSongs, getUserTopSongs, addSong, generateHistoryOptions }
