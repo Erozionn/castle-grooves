@@ -1,7 +1,10 @@
 # Castle Grooves
 #### A modern self-hosted alternative to the late Groovy Bot.
 
-![GitHub last commit](https://img.shields.io/github/last-commit/erozionn/castle-grooves) ![GitHub last commit (branch)](https://img.shields.io/github/last-commit/erozionn/castle-grooves/develop?label=last%20dev%20commit) ![GitHub Workflow Status](https://img.shields.io/github/workflow/status/erozionn/castle-grooves/Docker%20Image%20CI?label=docker%20build)
+![GitHub last commit](https://img.shields.io/github/last-commit/erozionn/castle-grooves/develop) ![GitHub last commit (branch)](https://img.shields.io/github/last-commit/erozionn/castle-grooves/develop?label=last%20dev%20commit) ![GitHub Workflow Status](https://img.shields.io/github/workflow/status/erozionn/castle-grooves/Docker%20Image%20CI?label=docker%20build)
+
+![Music UI](./assets/images/music-ui-demo.png)
+
 ## Features
 
 * Intuitive Slash Commands
@@ -31,13 +34,15 @@
 
 1. Install FFMPEG and InfluxDB.
 2. Clone the repository. `git clone https://github.com/Erozionn/castle-grooves`
-3. Install the dependencies. `yarn install` or `npm install`
-4. Copy the `.env.example` file as `.env` and fill it.
-5. run using `yarn start` or `npm run start`
-### Docker
+3. `cd castle-grooves`
+4. Install the dependencies. `yarn install` or `npm install`
+5. Copy the `.env.example` file as `.env` and fill it.
+6. run using `yarn start` or `npm run start`
+### Build Docker Image
 
-1. Install FFMPEG and InfluxDB.
-2. Build the image `docker build . -t erozionn/castle-grooves`
+1. Clone the repository. `git clone https://github.com/Erozionn/castle-grooves`
+2. `cd castle-grooves`
+3. Build the image `docker build . -t erozionn/castle-grooves`
    Your image will now be listed by Docker:
    ```
     $ docker images
@@ -47,7 +52,7 @@
     node                            16         3b66eb585643    5 days ago
     erozionn/castle-grooves         latest     d64d3505b0d2    1 minute ago
    ```
-3. Run the image `docker run -p 8080:1338 -d erozionn/castle-grooves`
+4. Run the image `docker run --env-file .env -p 8080:1338 -d erozionn/castle-grooves`
 ## Environment Variables
 
 * `CLIENT_ID` is the ID of your Discord Bot
