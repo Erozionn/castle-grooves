@@ -46,7 +46,7 @@ client.player = new DisTube(client, {
 })
 
 // Initialize the API and webserver.
-initApi()
+initApi(client)
 // Register commands.
 registerCommands()
 // Initialize the events file.
