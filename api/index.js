@@ -9,13 +9,14 @@ const app = express()
 app.use('/static', express.static(path.resolve('public')))
 
 function initApi(client) {
-  app.get('/play/:query', async (req, res) => {
+  app.get('/play/:query/:userId', async (req, res) => {
+    const { query, userId } = req.params
+
     const guild = await client.guilds.fetch(GUILD_ID)
 
     const channel = await guild.channels.fetch(DEFAULT_TEXT_CHANNEL)
-    const { query } = req.params
-    // Get Alex Member ID
-    const member = await guild.members.fetch(ADMIN_USER_ID)
+    // Get Member from userId
+    const member = await guild.members.fetch(userId || ADMIN_USER_ID)
 
     try {
       client.player.play(member.voice.channel, query, { textChannel: channel, member })
