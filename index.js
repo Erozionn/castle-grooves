@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 
-import { Client, Collection, Intents } from 'discord.js'
+import { Client, Collection, GatewayIntentBits, Partials, ChannelType } from 'discord.js'
 import { DisTube } from 'distube'
 import { YtDlpPlugin } from '@distube/yt-dlp'
 
@@ -15,7 +15,12 @@ import registerEvents from './events.js'
 const { BOT_TOKEN, GUILD_ID, DEFAULT_TEXT_CHANNEL } = process.env
 
 const client = new Client({
-  intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_VOICE_STATES, Intents.FLAGS.GUILD_MESSAGES],
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.GuildMessages,
+  ],
+  partials: [Partials.Channel],
 })
 
 client.commands = new Collection()
@@ -41,7 +46,6 @@ client.player = new DisTube(client, {
   emptyCooldown: 300,
   nsfw: true,
   searchSongs: 1,
-  youtubeDL: false,
   plugins: [new YtDlpPlugin()],
 })
 
@@ -67,21 +71,22 @@ client.once('ready', async () => {
     type: 'LISTENING',
   })
 
-  // eslint-disable-next-line no-console
-  console.log('Ready!')
-
   const mainGuild = await client.guilds.fetch(GUILD_ID)
 
   if (!mainGuild.available) return
 
   const channels = await mainGuild.channels.fetch()
   const defaultTextChannel = channels.get(DEFAULT_TEXT_CHANNEL)
-  const textChannels = channels.filter((channel) => channel.type === 'GUILD_TEXT')
+  const textChannels = channels.filter((channel) => channel.type === ChannelType.GuildText)
 
   // Delete all previous messages from the bot.
   textChannels.forEach(async (channel) => {
     const messages = await channel.messages.fetch()
     const botMessages = messages.filter((message) => message.author.id === client.user.id)
+
+    if (botMessages.size > 0)
+      console.log(`Deleting ${botMessages.size} old bot message(s) from ${channel.name}`)
+
     botMessages.forEach((message) => {
       message.delete()
     })
@@ -94,6 +99,9 @@ client.once('ready', async () => {
     content: '🎶 | Pick a song below or use **/play**',
     components: [historyMenu],
   })
+
+  // eslint-disable-next-line no-console
+  console.log('Ready!')
 })
 
 client.on('interactionCreate', async (interaction) => {

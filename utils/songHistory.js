@@ -145,7 +145,7 @@ const generateHistoryOptions = async () => {
       const { artist, title } = parseSongName(s.songTitle)
       return {
         label: title ? title.substring(0, 95) : artist.substring(0, 95),
-        description: title ? artist.substring(0, 95) : '',
+        description: title ? artist.substring(0, 95) : ' ',
         emoji: '🎶',
         value: `${s.songUrl.substring(0, 90)}?discord=${Math.floor(Math.random() * 99999)}`,
       }

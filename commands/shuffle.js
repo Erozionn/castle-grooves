@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from '@discordjs/builders'
+import { SlashCommandBuilder } from 'discord.js'
 
 import { getMainMessage, sendMessage } from '#utils/mainMessage.js'
 import { generateNowPlayingCanvas } from '#utils/nowPlayingCanvas.js'
