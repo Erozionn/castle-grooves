@@ -1,8 +1,8 @@
 import { generateNowPlayingCanvas } from '#utils/nowPlayingCanvas.js'
 import { historyMenu, buttons, components } from '#constants/messageComponents.js'
 import { sendMessage } from '#utils/mainMessage.js'
-
-import { addSong, generateHistoryOptions } from './utils/songHistory.js'
+import { addSong, generateHistoryOptions } from '#utils/songHistory.js'
+import { recordVoiceStateChange } from '#utils/recordActivity.js'
 
 const { WEB_URL } = process.env
 
@@ -187,6 +187,11 @@ const registerEvents = (client) => {
       components,
     })
     addSong(false)
+  })
+
+  // On user join voice channel event
+  client.on('voiceStateUpdate', (oldState, newState) => {
+    recordVoiceStateChange(oldState, newState)
   })
 }
 
