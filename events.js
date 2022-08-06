@@ -1,3 +1,5 @@
+import { ButtonStyle } from 'discord.js'
+
 import { generateNowPlayingCanvas } from '#utils/nowPlayingCanvas.js'
 import { historyMenu, buttons, components } from '#constants/messageComponents.js'
 import { sendMessage } from '#utils/mainMessage.js'
@@ -31,10 +33,10 @@ const registerEvents = (client) => {
         }
         if (queue.playing) {
           queue.pause()
-          buttons.components[1].setStyle('SUCCESS')
+          buttons.components[1].setStyle(ButtonStyle.Success)
         } else {
           queue.resume()
-          buttons.components[1].setStyle('PRIMARY')
+          buttons.components[1].setStyle(ButtonStyle.Primary)
         }
 
         interaction.message.edit({ components })
@@ -75,7 +77,7 @@ const registerEvents = (client) => {
             queue.setRepeatMode(2)
             buttons.components[3]
               .setEmoji('repeat:909248218972422154')
-              .setStyle('SUCCESS')
+              .setStyle(ButtonStyle.Success)
               .setDisabled(false)
             break
           case 2:
@@ -83,7 +85,7 @@ const registerEvents = (client) => {
             queue.setRepeatMode(1)
             buttons.components[3]
               .setEmoji('repeatonce:909248177268477982')
-              .setStyle('SUCCESS')
+              .setStyle(ButtonStyle.Success)
               .setDisabled(false)
             break
           default:
@@ -91,7 +93,7 @@ const registerEvents = (client) => {
             queue.setRepeatMode(0)
             buttons.components[3]
               .setEmoji('repeatoff:909248201427681290')
-              .setStyle('PRIMARY')
+              .setStyle(ButtonStyle.Primary)
               .setDisabled(false)
             break
         }
