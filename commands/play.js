@@ -23,6 +23,7 @@ export default {
     try {
       client.player.play(voice.channel, songName, { textChannel: channel, member })
     } catch (e) {
+      console.log(e)
       await interaction.editReply({ content: 'Error joining your channel.' })
     }
 

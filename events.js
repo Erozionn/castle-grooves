@@ -106,10 +106,14 @@ const registerEvents = (client) => {
         }
         interaction.values.forEach((song) => {
           // TODO: Add support for custom playlists if values.length > 1
-          client.player.play(interaction.member.voice.channel, song, {
-            textChannel: interaction.channel,
-            member: interaction.member,
-          })
+          client.player
+            .play(interaction.member.voice.channel, song, {
+              textChannel: interaction.channel,
+              member: interaction.member,
+            })
+            .catch((err) => {
+              console.log(err)
+            })
         })
         // client.player.play(interaction.member.voice.channel, interaction.values[0], {
         //   textChannel: interaction.channel,
@@ -189,6 +193,11 @@ const registerEvents = (client) => {
       components,
     })
     addSong(false)
+  })
+
+  // On error
+  client.player.on('error', async (channel, e) => {
+    console.log(e)
   })
 
   // On user join voice channel event
