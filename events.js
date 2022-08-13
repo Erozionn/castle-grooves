@@ -11,7 +11,7 @@ const { WEB_URL } = process.env
 const registerEvents = (client) => {
   let repeatButtonState = 0
 
-  client.on('interactionCreate', (interaction) => {
+  client.on('interactionCreate', async (interaction) => {
     if (!interaction.isButton() && !interaction.isSelectMenu()) return
     interaction.deferUpdate()
 
@@ -104,17 +104,44 @@ const registerEvents = (client) => {
           interaction.message.edit('❌ | You need to be in a voice channel!')
           return
         }
-        interaction.values.forEach((song) => {
-          // TODO: Add support for custom playlists if values.length > 1
-          client.player
-            .play(interaction.member.voice.channel, song, {
-              textChannel: interaction.channel,
-              member: interaction.member,
-            })
-            .catch((err) => {
-              console.log(err)
-            })
-        })
+        if (interaction.values.length === 0) {
+          interaction.message.edit('❌ | You need to select at least one song!')
+          return
+        }
+
+        if (interaction.values.length === 1) {
+          const song = interaction.values[0]
+          client.player.play(interaction.member.voice.channel, song, {
+            textChannel: interaction.channel,
+            member: interaction.member,
+          })
+          return
+        }
+
+        if (interaction.values.length > 1) {
+          const songs = interaction.values
+          console.log('Adding songs to queue...', songs)
+          const playlist = await client.player.createCustomPlaylist(songs, {
+            textChannel: interaction.channel,
+            member: interaction.member,
+            parallel: true,
+          })
+          client.player.play(interaction.member.voice.channel, playlist, {
+            textChannel: interaction.channel,
+            member: interaction.member,
+          })
+        }
+        // interaction.values.forEach((song) => {
+        //   // TODO: Add support for custom playlists if values.length > 1
+        //   client.player
+        //     .play(interaction.member.voice.channel, song, {
+        //       textChannel: interaction.channel,
+        //       member: interaction.member,
+        //     })
+        //     .catch((err) => {
+        //       console.log(err)
+        //     })
+        // })
         // client.player.play(interaction.member.voice.channel, interaction.values[0], {
         //   textChannel: interaction.channel,
         //   member: interaction.member,
