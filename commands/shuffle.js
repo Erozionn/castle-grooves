@@ -20,9 +20,10 @@ export default {
 
     await queue.shuffle()
 
-    await generateNowPlayingCanvas(queue.songs)
+    const buffer = await generateNowPlayingCanvas(queue.songs)
     await sendMessage(queue.textChannel, {
-      content: `${WEB_URL}/static/musicplayer.png?v=${Math.random() * 10}`,
+      // content: `${WEB_URL}/static/musicplayer.png?v=${Math.random() * 10}`,
+      files: [buffer],
       components: getMainMessage.components,
     })
 

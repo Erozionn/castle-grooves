@@ -165,7 +165,7 @@ const nowPlayingCanvasWithUpNext = async (songs) => {
   const buffer = await canvas.toBuffer()
 
   // fs.writeFileSync('./public/test.png', imageBuffer)
-  fs.writeFileSync('./public/musicplayer.png', buffer)
+  // fs.writeFileSync('./public/musicplayer.png', buffer)
 
   return buffer
 }
@@ -264,7 +264,7 @@ const nowPlayingCanvas = async (song) => {
   const buffer = await canvas.toBuffer()
 
   // fs.writeFileSync('./public/test.png', imageBuffer)
-  fs.writeFileSync('./public/musicplayer.png', buffer)
+  // fs.writeFileSync('./public/musicplayer.png', buffer)
 
   return buffer
 }

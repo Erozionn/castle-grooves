@@ -10,12 +10,16 @@ module.exports = {
   },
   plugins: ['compat', 'prettier', 'import'],
   rules: {
-    'no-plusplus': ['error', { allowForLoopAfterthoughts: true }],
+    'no-plusplus': [
+      'error',
+      {
+        allowForLoopAfterthoughts: true,
+      },
+    ],
     'arrow-parens': ['warn', 'always'],
     'function-paren-newline': 'off',
     'keyword-spacing': [
       'error',
-
       {
         before: true,
         after: true,
@@ -29,9 +33,7 @@ module.exports = {
           case: {
             after: true,
           },
-          if: {
-            after: true,
-          },
+          if: { after: true },
         },
       },
     ],
@@ -42,7 +44,13 @@ module.exports = {
       },
     ],
     'no-debugger': ['warn'],
-    'no-param-reassign': ['error', { props: true, ignorePropertyModificationsFor: ['state'] }],
+    'no-param-reassign': [
+      'error',
+      {
+        props: true,
+        ignorePropertyModificationsFor: ['state'],
+      },
+    ],
     'no-unused-vars': ['warn'],
     'import/extensions': 0,
     'import/order': [

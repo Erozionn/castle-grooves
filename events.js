@@ -165,9 +165,10 @@ const registerEvents = (client) => {
     }
 
     // sendMessage()
-    await generateNowPlayingCanvas(queue.songs)
+    const buffer = await generateNowPlayingCanvas(queue.songs)
     await sendMessage(queue.textChannel, {
-      content: `${WEB_URL}/static/musicplayer.png?v=${Math.random() * 10}`,
+      // content: `${WEB_URL}/static/musicplayer.png?v=${Math.random() * 10}`,
+      files: [buffer],
       components,
     })
   })
@@ -181,9 +182,10 @@ const registerEvents = (client) => {
     historyMenu.components[0].setOptions(await generateHistoryOptions())
 
     if (queue.songs.length > 1) {
-      await generateNowPlayingCanvas(queue.songs)
+      const buffer = await generateNowPlayingCanvas(queue.songs)
       await sendMessage(queue.textChannel, {
-        content: `${WEB_URL}/static/musicplayer.png?v=${Math.random() * 10}`,
+        // content: `${WEB_URL}/static/musicplayer.png?v=${Math.random() * 10}`,
+        files: [buffer],
         components,
       })
     }
