@@ -1,35 +1,35 @@
-import { MessageActionRow, MessageSelectMenu, MessageButton } from 'discord.js'
+import { ActionRowBuilder, SelectMenuBuilder, ButtonBuilder, ButtonStyle } from 'discord.js'
 
-const buttons = new MessageActionRow().addComponents(
-  new MessageButton()
+const buttons = new ActionRowBuilder().addComponents(
+  new ButtonBuilder()
     .setCustomId('back_button')
-    .setStyle('PRIMARY')
+    .setStyle(ButtonStyle.Primary)
     .setDisabled(false)
     .setEmoji('skipprevious:909248269236981761'),
-  new MessageButton()
+  new ButtonBuilder()
     .setCustomId('play_pause_button')
-    .setStyle('PRIMARY')
+    .setStyle(ButtonStyle.Primary)
     .setDisabled(false)
     .setEmoji('playpause:909248294406987806'),
-  new MessageButton()
+  new ButtonBuilder()
     .setCustomId('skip_button')
-    .setStyle('PRIMARY')
+    .setStyle(ButtonStyle.Primary)
     .setDisabled(false)
     .setEmoji('skipnext:909248255915868160'),
-  new MessageButton()
+  new ButtonBuilder()
     .setCustomId('repeat_button')
-    .setStyle('PRIMARY')
+    .setStyle(ButtonStyle.Primary)
     .setDisabled(false)
     .setEmoji('repeatoff:909248201427681290'),
-  new MessageButton()
+  new ButtonBuilder()
     .setCustomId('stop_button')
-    .setStyle('DANGER')
+    .setStyle(ButtonStyle.Danger)
     .setDisabled(false)
-    .setEmoji('musicoff:909248235623825439')
+    .setEmoji('disconnect:1043629464166355015')
 )
 
-const historyMenu = new MessageActionRow().addComponents(
-  new MessageSelectMenu()
+const historyMenu = new ActionRowBuilder().addComponents(
+  new SelectMenuBuilder()
     .setCustomId('history')
     .setMaxValues(20)
     .setPlaceholder('-- Song History --')

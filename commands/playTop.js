@@ -1,5 +1,4 @@
-import { SlashCommandBuilder, bold, inlineCode } from '@discordjs/builders'
-import { MessageEmbed } from 'discord.js'
+import { EmbedBuilder, SlashCommandBuilder, bold, inlineCode } from 'discord.js'
 
 import { getUserTopSongs, getTopSongs } from '#utils/songHistory.js'
 import { parseSongName } from '#utils/utilities.js'
@@ -79,7 +78,7 @@ const list = async (interaction) => {
     })
     .join('\n')
 
-  const embed = new MessageEmbed()
+  const embed = new EmbedBuilder()
     .setColor(user ? user.displayHexColor : '#0099ff')
     .setTitle(`🎵 | ${user ? user.displayName : 'The Server'}'s Top ${limit} ${timeRange} Songs:`)
     .setDescription(songList)

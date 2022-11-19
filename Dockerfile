@@ -10,6 +10,7 @@ WORKDIR /usr/src/castle-grooves
 
 # Install app dependencies
 COPY package*.json ./
+COPY patches ./patches
 RUN npm ci --only=production
 
 # Bundle app source

@@ -129,7 +129,7 @@ const nowPlayingCanvasWithUpNext = async (songs) => {
   canv.closePath()
   canv.clip()
 
-  const avatar = await loadImage(song.user.displayAvatarURL({ format: 'png', size: 64 }))
+  const avatar = await loadImage(song.user.displayAvatarURL({ extension: 'png', size: 64 }))
   canv.drawImage(avatar, 10, 348, 32, 32)
 
   canv.restore()
@@ -249,7 +249,7 @@ const nowPlayingCanvas = async (song) => {
   canv.closePath()
   canv.clip()
 
-  const avatar = await loadImage(song.user.displayAvatarURL({ format: 'png', size: 64 }))
+  const avatar = await loadImage(song.user.displayAvatarURL({ extension: 'png', size: 64 }))
   canv.drawImage(avatar, 320, 117, 32, 32)
 
   canv.restore()
