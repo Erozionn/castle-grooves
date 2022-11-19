@@ -8,8 +8,9 @@ export default {
       option.setName('song').setDescription('The song to play.').setRequired(true)
     ),
   async execute(interaction) {
-    const { client, channel, member } = interaction
+    const { client, channel, member, guildId } = interaction
     const { voice } = member
+    const queue = client.player.queues.get(guildId)
 
     await interaction.deferReply()
 
@@ -22,6 +23,12 @@ export default {
     const songName = interaction.options.getString('song')
     try {
       client.player.play(voice.channel, songName, { textChannel: channel, member })
+      if (queue && queue.paused) {
+        if (queue.songs.length >= 1) {
+          await queue.skip()
+        }
+        queue.resume()
+      }
     } catch (e) {
       console.log(e)
       await interaction.editReply({ content: 'Error joining your channel.' })
@@ -29,5 +36,5 @@ export default {
 
     const loadingMsg = await interaction.editReply({ content: '⏱ | Loading...' })
     setTimeout(() => loadingMsg.delete(), 1500)
-  },
+  }
 }

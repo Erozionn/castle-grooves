@@ -25,7 +25,7 @@ const buttons = new ActionRowBuilder().addComponents(
     .setCustomId('stop_button')
     .setStyle(ButtonStyle.Danger)
     .setDisabled(false)
-    .setEmoji('musicoff:909248235623825439')
+    .setEmoji('disconnect:1043629464166355015')
 )
 
 const historyMenu = new ActionRowBuilder().addComponents(
