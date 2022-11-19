@@ -4,5 +4,8 @@
   "printWidth": 100,
   "semi": false,
   "singleQuote": true,
-  "trailingComma": "es5"
+  "printWidth": 100,
+  "endOfLine": "lf",
+  "quoteProps": "as-needed",
+  "tabWidth": 2
 }

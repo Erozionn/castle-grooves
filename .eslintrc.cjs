@@ -2,11 +2,11 @@ module.exports = {
   extends: ['airbnb', 'prettier', 'plugin:import/recommended'],
   parserOptions: {
     ecmaVersion: 11,
-    sourceType: 'module',
+    sourceType: 'module'
   },
   env: {
     es6: true,
-    node: true,
+    node: true
   },
   plugins: ['compat', 'prettier', 'import'],
   rules: {
@@ -25,13 +25,13 @@ module.exports = {
         after: true,
         overrides: {
           return: {
-            after: true,
+            after: true
           },
           throw: {
-            after: true,
+            after: true
           },
           case: {
-            after: true,
+            after: true
           },
           if: { after: true },
         },
@@ -40,8 +40,8 @@ module.exports = {
     'no-console': [
       'warn',
       {
-        allow: ['warn', 'error'],
-      },
+        allow: ['warn', 'error']
+      }
     ],
     'no-debugger': ['warn'],
     'no-param-reassign': [
@@ -57,23 +57,23 @@ module.exports = {
       'warn',
       {
         groups: ['builtin', 'external', 'internal', ['sibling', 'parent']],
-        'newlines-between': 'always',
-      },
+        'newlines-between': 'always'
+      }
     ],
     'linebreak-style': ['error', process.platform === 'win32' ? 'windows' : 'unix'],
-    'prettier/prettier': [
-      'error',
-      {
-        arrowParens: 'always',
-        endOfLine: 'auto',
-        printWidth: 100,
-        semi: false,
-        singleQuote: true,
-        trailingComma: 'es5',
-      },
-    ],
+    // 'prettier/prettier': [
+    //   'error',
+    //   {
+    //     arrowParens: 'always',
+    //     endOfLine: 'auto',
+    //     printWidth: 100,
+    //     semi: false,
+    //     singleQuote: true,
+    //     trailingComma: 'es5',
+    //   },
+    // ],
     'arrow-body-style': 'off',
-    'prefer-arrow-callback': 'off',
+    'prefer-arrow-callback': 'off'
   },
   settings: {
     'import/resolver': {
@@ -81,8 +81,8 @@ module.exports = {
         ['#utils', './utils'],
         ['#api', './api/index.js'],
         ['#commands', './commands'],
-        ['#constants', './constants'],
-      ],
-    },
-  },
+        ['#constants', './constants']
+      ]
+    }
+  }
 }

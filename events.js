@@ -16,7 +16,7 @@ const registerEvents = (client) => {
     interaction.deferUpdate()
 
     const queue = client.player.queues.get(interaction.guildId)
-    const { channel } = interaction
+    const { channel, guildId } = interaction
 
     switch (interaction.customId) {
       case 'back_button':
@@ -54,10 +54,25 @@ const registerEvents = (client) => {
         break
       case 'stop_button':
         if (!queue) {
-          sendMessage(channel, { content: '❌ | No music is being played!' })
+          client.player.voices.leave(guildId)
           return
         }
-        queue.stop()
+
+        if (queue.playing) {
+          queue.pause()
+          queue.songs.splice(1)
+          buttons.components[4].setEmoji('disconnect:1043629464166355015')
+          historyMenu.components[0].setPlaceholder('-- Song History --')
+          for (let i = 0; i < 4; i++) {
+            buttons.components[i].setDisabled(true)
+          }
+          await sendMessage(queue.textChannel, {
+            content: '🎶 | Previously Played:',
+            components
+          })
+        } else {
+          queue.stop()
+        }
         break
       case 'repeat_button':
         if (!queue) {
@@ -113,9 +128,8 @@ const registerEvents = (client) => {
           const song = interaction.values[0]
           client.player.play(interaction.member.voice.channel, song, {
             textChannel: interaction.channel,
-            member: interaction.member,
+            member: interaction.member
           })
-          return
         }
 
         if (interaction.values.length > 1) {
@@ -124,12 +138,20 @@ const registerEvents = (client) => {
           const playlist = await client.player.createCustomPlaylist(songs, {
             textChannel: interaction.channel,
             member: interaction.member,
-            parallel: true,
+            parallel: true
           })
           client.player.play(interaction.member.voice.channel, playlist, {
             textChannel: interaction.channel,
-            member: interaction.member,
+            member: interaction.member
           })
+        }
+
+        if (queue && queue.paused) {
+          console.log(queue.songs.length)
+          if (queue.songs.length >= 1) {
+            await queue.skip()
+          }
+          queue.resume()
         }
         // interaction.values.forEach((song) => {
         //   // TODO: Add support for custom playlists if values.length > 1
@@ -153,6 +175,7 @@ const registerEvents = (client) => {
   })
 
   client.player.on('playSong', async (queue, song) => {
+    console.log('Playing song...')
     // Write song info into DB (playing [true:false], song)
     await addSong(queue.playing, song)
 
@@ -163,6 +186,9 @@ const registerEvents = (client) => {
     for (let i = 0; i < 4; i++) {
       buttons.components[i].setDisabled(false)
     }
+
+    // Change disconnect button to stop button
+    buttons.components[4].setEmoji('musicoff:909248235623825439')
 
     // sendMessage()
     const buffer = await generateNowPlayingCanvas(queue.songs)
@@ -175,13 +201,14 @@ const registerEvents = (client) => {
 
   // On add song event
   client.player.on('addSong', async (queue) => {
+    console.log('Adding song...')
     // Set queue volume to 100%
     queue.setVolume(100)
 
     // Add songs to history component
     historyMenu.components[0].setOptions(await generateHistoryOptions())
 
-    if (queue.songs.length > 1) {
+    if (queue.songs.length > 1 || queue.playing) {
       const buffer = await generateNowPlayingCanvas(queue.songs)
       await sendMessage(queue.textChannel, {
         // content: `${WEB_URL}/static/musicplayer.png?v=${Math.random() * 10}`,
@@ -198,7 +225,7 @@ const registerEvents = (client) => {
     historyMenu.components[0].setPlaceholder('-- Song History --')
     await sendMessage(queue.textChannel, {
       content: '🎶 | Previously Played:',
-      components: [historyMenu],
+      components: [historyMenu]
     })
   })
 
@@ -207,7 +234,7 @@ const registerEvents = (client) => {
     historyMenu.components[0].setPlaceholder('-- Song History --')
     await sendMessage(queue.textChannel, {
       content: '🎶 | Previously Played:',
-      components: [historyMenu],
+      components: [historyMenu]
     })
   })
 
@@ -217,9 +244,13 @@ const registerEvents = (client) => {
     for (let i = 0; i < 4; i++) {
       buttons.components[i].setDisabled()
     }
+
+    // Change stop button to disconnect button
+    buttons.components[4].setEmoji('disconnect:1043629464166355015')
+
     await sendMessage(queue.textChannel, {
       content: '✅ | Queue finished!',
-      components,
+      components
     })
     addSong(false)
   })
