@@ -66,13 +66,14 @@ const registerEvents = (client) => {
           for (let i = 0; i < 4; i++) {
             buttons.components[i].setDisabled(true)
           }
-          await sendMessage(queue.textChannel, {
-            content: '🎶 | Previously Played:',
-            components
-          })
         } else {
           queue.stop()
         }
+        await sendMessage(queue.textChannel, {
+          content: '🎶 | Previously Played:',
+          files: [],
+          components,
+        })
         break
       case 'repeat_button':
         if (!queue) {
@@ -128,7 +129,7 @@ const registerEvents = (client) => {
           const song = interaction.values[0]
           client.player.play(interaction.member.voice.channel, song, {
             textChannel: interaction.channel,
-            member: interaction.member
+            member: interaction.member,
           })
         }
 
@@ -138,11 +139,11 @@ const registerEvents = (client) => {
           const playlist = await client.player.createCustomPlaylist(songs, {
             textChannel: interaction.channel,
             member: interaction.member,
-            parallel: true
+            parallel: true,
           })
           client.player.play(interaction.member.voice.channel, playlist, {
             textChannel: interaction.channel,
-            member: interaction.member
+            member: interaction.member,
           })
         }
 
@@ -225,7 +226,7 @@ const registerEvents = (client) => {
     historyMenu.components[0].setPlaceholder('-- Song History --')
     await sendMessage(queue.textChannel, {
       content: '🎶 | Previously Played:',
-      components: [historyMenu]
+      components: [historyMenu],
     })
   })
 
@@ -234,7 +235,7 @@ const registerEvents = (client) => {
     historyMenu.components[0].setPlaceholder('-- Song History --')
     await sendMessage(queue.textChannel, {
       content: '🎶 | Previously Played:',
-      components: [historyMenu]
+      components: [historyMenu],
     })
   })
 
@@ -250,7 +251,7 @@ const registerEvents = (client) => {
 
     await sendMessage(queue.textChannel, {
       content: '✅ | Queue finished!',
-      components
+      components,
     })
     addSong(false)
   })
