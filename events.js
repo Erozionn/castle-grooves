@@ -207,7 +207,7 @@ const registerEvents = (client) => {
     // Add songs to history component
     historyMenu.components[0].setOptions(await generateHistoryOptions())
 
-    if (queue.songs.length > 1 || queue.playing) {
+    if (queue.songs.length > 1) {
       await generateNowPlayingCanvas(queue.songs)
       await sendMessage(queue.textChannel, {
         content: `${WEB_URL}/static/musicplayer.png?v=${Math.random() * 10}`,
