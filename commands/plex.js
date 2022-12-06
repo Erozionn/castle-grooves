@@ -76,6 +76,9 @@ export default {
         return
       }
 
+      // Only listen to button click once
+      client.off('interactionCreate', selectionEvent)
+
       const resultSelection = i.customId.match(/results_select_button_(\d+)/)
 
       if (!resultSelection) {
@@ -110,11 +113,11 @@ export default {
             .setEmoji('arrowleft:1033893582337220749')
             .setStyle(ButtonStyle.Danger),
           new ButtonBuilder()
-            .setCustomId(`results_season_select_button_${firstSeason.seasonNumber}`)
+            .setCustomId(`results_season_select_button_fist`)
             .setLabel('First Season')
             .setStyle(ButtonStyle.Secondary),
           new ButtonBuilder()
-            .setCustomId(`results_season_select_button_${lastSeason.seasonNumber}`)
+            .setCustomId(`results_season_select_button_last`)
             .setLabel('Last Season')
             .setStyle(ButtonStyle.Secondary),
           new ButtonBuilder()
@@ -128,10 +131,31 @@ export default {
           files: [...tvDetailsBuffer],
           components: [seasonSelectMenu],
         })
+
+        // Button Event Listener
+        const seasonSelectEvent = async (seasonInteraction) => {
+          if (!seasonInteraction.isButton()) {
+            return
+          }
+
+          // Only listen to button click once
+          client.off('interactionCreate', seasonSelectEvent)
+
+          const seasonSelection = seasonInteraction.customId.match(
+            /results_season_select_button_([\w]+)/
+          )
+          console.log(seasonInteraction.customId, seasonSelection[1])
+          // const tvSeasonSelectionResult = await OmbiClient.post(`/api/v2/Requests/tv`, {
+          //   // firstSeason: seasonSelection ==
+          // }).catch(async (err) => {
+          //   console.log(err)
+          //   await interaction.editReply({ content: `Unable to get details for: ${searchQuery}` })
+          // })
+        }
+        client.on('interactionCreate', seasonSelectEvent)
       } else if (chosenMedia.mediaType === 'movie') {
         console.log(chosenMedia.title)
       }
-      client.off('interactionCreate', selectionEvent)
     }
 
     client.on('interactionCreate', selectionEvent)
