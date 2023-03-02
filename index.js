@@ -12,15 +12,16 @@ import { generateHistoryOptions } from './utils/songHistory.js'
 import registerCommands from './deploy-commands.js'
 import registerEvents from './events.js'
 
-const { BOT_TOKEN, GUILD_ID, DEFAULT_TEXT_CHANNEL } = process.env
+const { BOT_TOKEN, GUILD_ID, DEFAULT_TEXT_CHANNEL, YOUTUBE_COOKIE, YOUTUBE_IDENTITY_TOKEN } =
+  process.env
 
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildVoiceStates,
-    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.GuildMessages
   ],
-  partials: [Partials.Channel],
+  partials: [Partials.Channel]
 })
 
 client.commands = new Collection()
@@ -46,7 +47,9 @@ client.player = new DisTube(client, {
   emptyCooldown: 300,
   nsfw: true,
   searchSongs: 1,
-  plugins: [new YtDlpPlugin()],
+  youtubeCookie: YOUTUBE_COOKIE,
+  youtubeIdentityToken: YOUTUBE_IDENTITY_TOKEN,
+  plugins: [new YtDlpPlugin()]
 })
 
 // Initialize the API and webserver.
@@ -68,7 +71,7 @@ commandFiles.forEach(async (file) => {
 client.once('ready', async () => {
   client.user.setActivity({
     name: '🎶 Music 🎶',
-    type: 'LISTENING',
+    type: 'LISTENING'
   })
 
   const mainGuild = await client.guilds.fetch(GUILD_ID)
@@ -97,7 +100,7 @@ client.once('ready', async () => {
   historyMenu.components[0].setPlaceholder('-- Song History --')
   await sendMessage(defaultTextChannel, {
     content: '🎶 | Pick a song below or use **/play**',
-    components: [historyMenu],
+    components: [historyMenu]
   })
 
   // eslint-disable-next-line no-console
@@ -115,7 +118,7 @@ client.on('interactionCreate', async (interaction) => {
     console.error(error)
     await interaction.reply({
       content: 'There was an error while executing this command!',
-      ephemeral: true,
+      ephemeral: true
     })
   }
 })
