@@ -1,0 +1,17 @@
+diff --git a/node_modules/distube/dist/index.js b/node_modules/distube/dist/index.js
+index 8e827f5..ab5ba81 100644
+--- a/node_modules/distube/dist/index.js
++++ b/node_modules/distube/dist/index.js
+@@ -769,7 +769,11 @@ var DisTubeVoice = class extends import_tiny_typed_emitter.TypedEmitter {
+       }
+     }).on(import_voice.VoiceConnectionStatus.Destroyed, () => {
+       this.leave();
+-    }).on("error", () => void 0);
++    }).on('stateChange', (old_state, new_state) => {
++      if (old_state.status === import_voice.VoiceConnectionStatus.Ready && new_state.status === import_voice.VoiceConnectionStatus.Connecting) {
++          connection.configureNetworking();
++      }
++  }).on("error", () => void 0);
+     this.connection.subscribe(this.audioPlayer);
+   }
+   get channelId() {
