@@ -9,7 +9,7 @@ index 8e827f5..ab5ba81 100644
 -    }).on("error", () => void 0);
 +    }).on('stateChange', (old_state, new_state) => {
 +      if (old_state.status === import_voice.VoiceConnectionStatus.Ready && new_state.status === import_voice.VoiceConnectionStatus.Connecting) {
-+          connection.configureNetworking();
++          this.connection.configureNetworking();
 +      }
 +  }).on("error", () => void 0);
      this.connection.subscribe(this.audioPlayer);
