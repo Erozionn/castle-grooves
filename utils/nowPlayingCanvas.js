@@ -10,7 +10,7 @@ FontLibrary.use([
   './assets/fonts/Montserrat-Light.ttf',
   './assets/fonts/Montserrat-Regular.ttf',
   './assets/fonts/Montserrat-SemiBold.ttf',
-  './assets/fonts/Montserrat-Bold.ttf',
+  './assets/fonts/Montserrat-Bold.ttf'
 ])
 
 const renderMultiLineTitle = (canvas, str, options = {}) => {
@@ -61,7 +61,7 @@ const nowPlayingCanvasWithUpNext = async (songs) => {
   const imageBuffer = await imageCanvas.toBuffer()
   const averageColor = await getAverageColor(imageBuffer, {
     defaultColor: [0, 0, 0, 0],
-    ignoredColor: [0, 0, 0, 255],
+    ignoredColor: [0, 0, 0, 255]
   })
   const [r, g, b] = averageColor.value
 
@@ -108,7 +108,7 @@ const nowPlayingCanvasWithUpNext = async (songs) => {
     fillStyle: '#ffffff',
     y: 240,
     x: 10,
-    font: 'bold 24px Montserrat',
+    font: 'bold 24px Montserrat'
   })
 
   // Render artist
@@ -117,7 +117,7 @@ const nowPlayingCanvasWithUpNext = async (songs) => {
       fillStyle: '#ffffff',
       y: 240 + songTitleHeight,
       x: 10,
-      font: '24px Montserrat',
+      font: '24px Montserrat'
     })
   }
 
@@ -129,8 +129,12 @@ const nowPlayingCanvasWithUpNext = async (songs) => {
   canv.closePath()
   canv.clip()
 
-  const avatar = await loadImage(song.user.displayAvatarURL({ extension: 'png', size: 64 }))
-  canv.drawImage(avatar, 10, 348, 32, 32)
+  try {
+    const avatar = await loadImage(song.user.displayAvatarURL({ extension: 'png', size: 64 }))
+    canv.drawImage(avatar, 10, 348, 32, 32)
+  } catch (e) {
+    console.warn('[AvatarError] ', e)
+  }
 
   canv.restore()
 
@@ -146,26 +150,46 @@ const nowPlayingCanvasWithUpNext = async (songs) => {
   canv.font = 'bold 28px Montserrat'
   canv.fillText('Up Next:', 330, 50)
 
-  // Render queued songs
-  for (let i = 1; i < Math.min(songs.length, 6); i++) {
+  try {
+    const pics = await Promise.all(
+      songs.slice(1, 7).map((s) => {
+        return loadImage(s.user.displayAvatarURL({ extension: 'png', size: 64 }))
+      })
+    )
+
+    pics.forEach((p, index) => {
+      const i = index + 1
+
+      canv.save()
+
+      canv.beginPath()
+      canv.arc(674, 30 + 60 * i, 16, 0, Math.PI * 2)
+      canv.closePath()
+      canv.clip()
+      canv.drawImage(p, 658, 14 + 60 * i, 32, 32)
+      canv.restore()
+    })
+  } catch (e) {
+    console.warn('[UpNextAvatarError] ', e)
+  }
+
+  await songs.slice(1, 7).forEach(async (songObj, index) => {
+    const i = index + 1
     canv.font = 'bold 22px Montserrat'
-    const parsedSong = parseSongName(songs[i].name)
+    const parsedSong = parseSongName(songObj.name)
     const a = parsedSong.artist
     const s = parsedSong.title
-    if (title !== null) {
+    if (s !== null) {
       canv.fillText(`${i}. ${s}`, 330, 30 + 60 * i)
       canv.font = '22px Montserrat'
       canv.fillText(`${a}`, 358, 55 + 60 * i)
     } else {
       canv.fillText(`${i}. ${a}`, 330, 30 + 60 * i)
     }
-  }
+  })
 
   // Buffer canvas
   const buffer = await canvas.toBuffer()
-
-  // fs.writeFileSync('./public/test.png', imageBuffer)
-  fs.writeFileSync('./public/musicplayer.png', buffer)
 
   return buffer
 }
@@ -183,7 +207,7 @@ const nowPlayingCanvas = async (song) => {
   const imageBuffer = await imageCanvas.toBuffer()
   const averageColor = await getAverageColor(imageBuffer, {
     defaultColor: [0, 0, 0, 0],
-    ignoredColor: [0, 0, 0, 255],
+    ignoredColor: [0, 0, 0, 255]
   })
   const [r, g, b] = averageColor.value
 
@@ -226,7 +250,7 @@ const nowPlayingCanvas = async (song) => {
     x: 320,
     font: 'bold 28px Montserrat',
     textAlign: 'start',
-    charsPerLine: 20,
+    charsPerLine: 20
   })
 
   // Render artist
@@ -237,7 +261,7 @@ const nowPlayingCanvas = async (song) => {
       x: 320,
       font: '28px Montserrat',
       textAlign: 'start',
-      charsPerLine: 20,
+      charsPerLine: 20
     })
   }
 
@@ -249,8 +273,12 @@ const nowPlayingCanvas = async (song) => {
   canv.closePath()
   canv.clip()
 
-  const avatar = await loadImage(song.user.displayAvatarURL({ extension: 'png', size: 64 }))
-  canv.drawImage(avatar, 320, 117, 32, 32)
+  try {
+    const avatar = await loadImage(song.user.displayAvatarURL({ extension: 'png', size: 64 }))
+    canv.drawImage(avatar, 320, 117, 32, 32)
+  } catch (e) {
+    console.warn('[AvatarError]', e)
+  }
 
   canv.restore()
 
@@ -262,9 +290,6 @@ const nowPlayingCanvas = async (song) => {
 
   // Buffer canvas
   const buffer = await canvas.toBuffer()
-
-  // fs.writeFileSync('./public/test.png', imageBuffer)
-  fs.writeFileSync('./public/musicplayer.png', buffer)
 
   return buffer
 }

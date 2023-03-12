@@ -6,8 +6,6 @@ import { sendMessage } from '#utils/mainMessage.js'
 import { addSong, generateHistoryOptions } from '#utils/songHistory.js'
 import { recordVoiceStateChange } from '#utils/recordActivity.js'
 
-const { WEB_URL } = process.env
-
 const registerEvents = (client) => {
   let repeatButtonState = 0
 
@@ -24,7 +22,13 @@ const registerEvents = (client) => {
           sendMessage(channel, { content: '❌ | No music is being played!' })
           return
         }
-        queue.previous()
+        if (queue.playing && queue.currentTime > 4) {
+          queue.seek(0)
+          return
+        }
+        if (queue.songs.length > 1) {
+          queue.previous()
+        }
         break
       case 'play_pause_button':
         if (!queue) {
@@ -176,8 +180,9 @@ const registerEvents = (client) => {
 
   client.player.on('playSong', async (queue, song) => {
     console.log('Playing song...')
-    // Write song info into DB (playing [true:false], song)
-    await addSong(queue.playing, song)
+
+    // Set queue volume to 100%
+    queue.setVolume(100)
 
     // Add songs to history component
     historyMenu.components[0].setOptions(await generateHistoryOptions())
@@ -191,26 +196,27 @@ const registerEvents = (client) => {
     buttons.components[4].setEmoji('musicoff:909248235623825439')
 
     // sendMessage()
-    await generateNowPlayingCanvas(queue.songs)
+    const buffer = await generateNowPlayingCanvas(queue.songs)
     await sendMessage(queue.textChannel, {
-      content: `${WEB_URL}/static/musicplayer.png?v=${Math.random() * 10}`,
+      files: [buffer],
       components
     })
+
+    // Write song info into DB (playing [true:false], song)
+    await addSong(queue.playing, song)
   })
 
   // On add song event
   client.player.on('addSong', async (queue) => {
     console.log('Adding song...')
-    // Set queue volume to 100%
-    queue.setVolume(100)
 
     // Add songs to history component
     historyMenu.components[0].setOptions(await generateHistoryOptions())
 
-    if (queue.songs.length > 1 || queue.playing) {
-      await generateNowPlayingCanvas(queue.songs)
+    if (queue.songs.length > 1) {
+      const buffer = await generateNowPlayingCanvas(queue.songs)
       await sendMessage(queue.textChannel, {
-        content: `${WEB_URL}/static/musicplayer.png?v=${Math.random() * 10}`,
+        files: [buffer],
         components
       })
     }
@@ -223,6 +229,7 @@ const registerEvents = (client) => {
     historyMenu.components[0].setPlaceholder('-- Song History --')
     await sendMessage(queue.textChannel, {
       content: '🎶 | Previously Played:',
+      files: [],
       components: [historyMenu]
     })
   })
@@ -232,6 +239,7 @@ const registerEvents = (client) => {
     historyMenu.components[0].setPlaceholder('-- Song History --')
     await sendMessage(queue.textChannel, {
       content: '🎶 | Previously Played:',
+      files: [],
       components: [historyMenu]
     })
   })
@@ -248,6 +256,7 @@ const registerEvents = (client) => {
 
     await sendMessage(queue.textChannel, {
       content: '✅ | Queue finished!',
+      files: [],
       components
     })
     addSong(false)
