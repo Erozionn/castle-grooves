@@ -1,0 +1,13 @@
+diff --git a/node_modules/distube/node_modules/@distube/ytdl-core/lib/sig.js b/node_modules/distube/node_modules/@distube/ytdl-core/lib/sig.js
+index 73e7b3d..f69736f 100644
+--- a/node_modules/distube/node_modules/@distube/ytdl-core/lib/sig.js
++++ b/node_modules/distube/node_modules/@distube/ytdl-core/lib/sig.js
+@@ -69,7 +69,7 @@ exports.extractFunctions = body => {
+       const functionPattern = `(${deobfuscationFuncName.replaceAll('$', '\\$')}=function\\([a-zA-Z0-9_]+\\)\\{.+?\\})`;
+       const deobfuscateFunction = `var ${matchGroup1(functionPattern, body)};`;
+       const helperObjectName = matchGroup1(';([A-Za-z0-9_\\$]{2})\\...\\(', deobfuscateFunction).replaceAll('$', '\\$');
+-      const helperPattern = `(var ${helperObjectName.replaceAll('$', '\\$')}=\\{[\\s\\S]+?\\}\\};)`;
++      const helperPattern = `(var ${helperObjectName}=\\{[\\s\\S]+?\\}\\};)`;
+       const helperObject = matchGroup1(helperPattern, body);
+       const callerFunction = `${deobfuscationFuncName}(sig);`;
+       const decipherFunction = helperObject + deobfuscateFunction + callerFunction;
