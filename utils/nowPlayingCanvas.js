@@ -1,6 +1,4 @@
 // const axios = require('axios')
-import fs from 'fs'
-
 import { Canvas, FontLibrary, loadImage } from 'skia-canvas'
 import { getAverageColor } from 'fast-average-color-node'
 

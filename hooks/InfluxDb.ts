@@ -1,4 +1,4 @@
-import { InfluxDB, QueryApi } from '@influxdata/influxdb-client'
+import { InfluxDB } from '@influxdata/influxdb-client'
 
 import ENV from '@constants/Env'
 

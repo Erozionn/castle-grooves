@@ -1,14 +1,14 @@
-import {
-  ButtonStyle,
-  CacheType,
-  GuildMember,
-  GuildTextBasedChannel,
-  Interaction,
-  MessageEditOptions,
-  StringSelectMenuInteraction,
-} from 'discord.js'
+import { ButtonInteraction, CacheType, Interaction, StringSelectMenuInteraction } from 'discord.js'
 import { Queue, Song } from 'distube'
 
+import {
+  stopButtonInteractionHandler,
+  skipButtonInteractionHandler,
+  playPauseButtonInteractionHandler,
+  repeatButtonInteractionHandler,
+  backButtonInteractionHandler,
+  historyInteractionHandler,
+} from '@components/interactions'
 import { ClientType } from '@types'
 import {
   components,
@@ -22,8 +22,6 @@ import { sendMessage } from '@utils/mainMessage'
 import { addSong, generateHistoryOptions } from '@utils/songHistory'
 
 const playerButtonKeys = Object.keys(playerButtons)
-
-let repeatButtonState = 0
 
 export const componentInteractionHandler = async (
   interaction: Interaction<CacheType>,
@@ -47,149 +45,22 @@ export const componentInteractionHandler = async (
 
   switch (customId) {
     case 'back_button':
-      if (!queue) {
-        sendMessage(channel, { content: '❌ | No music is being played!' })
-        return
-      }
-      if (queue.playing && queue.currentTime > 4) {
-        queue.seek(0)
-        return
-      }
-      if (queue.songs.length > 1) {
-        queue.previous()
-      }
+      backButtonInteractionHandler(queue)
       break
     case 'play_pause_button':
-      if (!queue) {
-        sendMessage(channel, { content: '❌ | No music is being played!' })
-        return
-      }
-      if (queue.playing) {
-        queue.pause()
-        playerButtons.playPause.setStyle(ButtonStyle.Success)
-      } else {
-        queue.resume()
-        playerButtons.playPause.setStyle(ButtonStyle.Primary)
-      }
-
-      interaction.message.edit({ components } as MessageEditOptions)
+      playPauseButtonInteractionHandler(queue, interaction as ButtonInteraction)
       break
     case 'skip_button':
-      if (!queue) {
-        sendMessage(channel, { content: '❌ | No music is being played!' })
-        return
-      }
-      if (queue.songs.length > 1) {
-        queue.skip()
-      } else {
-        queue.stop()
-      }
+      skipButtonInteractionHandler(queue, interaction as ButtonInteraction)
       break
     case 'stop_button':
-      if (!queue) {
-        client.player.voices.leave(interaction)
-        return
-      }
-
-      if (queue.playing && queue.textChannel) {
-        queue.pause()
-        queue.songs.splice(1)
-
-        playerButtons.stop.setEmoji('disconnect:1043629464166355015')
-        playerHistory.setPlaceholder('-- Song History --')
-
-        Object.keys(playerButtons).forEach((key) =>
-          playerButtons[key as playerButtonsType].setDisabled(true)
-        )
-
-        await sendMessage(queue.textChannel, {
-          content: '🎶 | Previously Played:',
-          components,
-        })
-      } else {
-        queue.stop()
-      }
+      stopButtonInteractionHandler(client, queue, interaction as ButtonInteraction)
       break
     case 'repeat_button':
-      if (!queue) {
-        sendMessage(channel, { content: '❌ | No music is being played!' })
-        return
-      }
-
-      if (repeatButtonState < 2) {
-        repeatButtonState += 1
-      } else {
-        repeatButtonState = 0
-      }
-
-      switch (repeatButtonState) {
-        case 1:
-          // Repeat Queue
-          queue.setRepeatMode(2)
-          playerButtons.repeat
-            .setEmoji('repeat:909248218972422154')
-            .setStyle(ButtonStyle.Success)
-            .setDisabled(false)
-          break
-        case 2:
-          // Repeat Song
-          queue.setRepeatMode(1)
-          playerButtons.repeat
-            .setEmoji('repeatonce:909248177268477982')
-            .setStyle(ButtonStyle.Success)
-            .setDisabled(false)
-          break
-        default:
-          // Repeat Off
-          queue.setRepeatMode(0)
-          playerButtons.repeat
-            .setEmoji('repeatoff:909248201427681290')
-            .setStyle(ButtonStyle.Primary)
-            .setDisabled(false)
-          break
-      }
-      interaction.message.edit({ components } as MessageEditOptions)
+      repeatButtonInteractionHandler(client, queue, interaction as ButtonInteraction)
       break
     case 'history':
-      const selectMenuInteraction = interaction as StringSelectMenuInteraction
-      const selectMenuGuildMember = selectMenuInteraction.member as GuildMember
-      if (!selectMenuGuildMember.voice.channelId) {
-        selectMenuInteraction.message.edit('❌ | You need to be in a voice channel!')
-        return
-      }
-      if (selectMenuInteraction.values.length === 0) {
-        selectMenuInteraction.message.edit('❌ | You need to select at least one song!')
-        return
-      }
-
-      if (selectMenuInteraction.values.length === 1 && selectMenuGuildMember.voice.channel) {
-        const song = selectMenuInteraction.values[0]
-        client.player.play(selectMenuGuildMember.voice.channel, song, {
-          textChannel: selectMenuInteraction.channel as GuildTextBasedChannel,
-          member: selectMenuGuildMember,
-        })
-      }
-
-      if (selectMenuInteraction.values.length > 1 && selectMenuGuildMember.voice.channel) {
-        const songs = selectMenuInteraction.values
-        console.log('Adding songs to queue...', songs)
-        const playlist = await client.player.createCustomPlaylist(songs, {
-          member: selectMenuGuildMember,
-          parallel: true,
-        })
-        client.player.play(selectMenuGuildMember.voice.channel, playlist, {
-          textChannel: selectMenuInteraction.channel as GuildTextBasedChannel,
-          member: selectMenuGuildMember,
-        })
-      }
-
-      if (queue && queue.paused) {
-        console.log(queue.songs.length)
-        if (queue.songs.length >= 1) {
-          await queue.skip()
-        }
-        queue.resume()
-      }
+      historyInteractionHandler(client, queue, interaction as StringSelectMenuInteraction)
       break
     default:
       break

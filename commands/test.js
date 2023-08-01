@@ -9,9 +9,6 @@ import {
 export default {
   data: new ContextMenuCommandBuilder().setName('Check for cheese').setType(3),
   async execute(interaction) {
-    const { client, channel, member } = interaction
-    const { voice } = member
-
     const modal = new ModalBuilder().setCustomId('myModal').setTitle('My Modal')
 
     // Add components to modal

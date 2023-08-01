@@ -81,8 +81,6 @@ client.once('ready', async () => {
     return
   }
 
-  console.log(GUILD_ID)
-
   const mainGuild = await client.guilds.cache.get(GUILD_ID)
 
   if (!mainGuild || !mainGuild) return
@@ -129,7 +127,6 @@ client.once('ready', async () => {
 })
 
 client.on('interactionCreate', async (interaction) => {
-  console.log(client.commands)
   const command = client.commands.get((interaction as CommandInteraction).commandName)
 
   if (!command) return

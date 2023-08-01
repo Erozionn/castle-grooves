@@ -1,7 +1,6 @@
 import { Point } from '@influxdata/influxdb-client'
 import { VoiceState } from 'discord.js'
 
-import ENV from '@constants/Env'
 import { writeApi } from '@hooks/InfluxDb'
 
 const recordVoiceStateChange = (oldState: VoiceState, newState: VoiceState) => {
