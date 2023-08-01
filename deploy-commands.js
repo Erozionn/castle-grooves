@@ -3,7 +3,9 @@ import fs from 'node:fs'
 import { REST } from '@discordjs/rest'
 import { Routes } from 'discord-api-types/v9'
 
-const { CLIENT_ID, GUILD_ID, BOT_TOKEN } = process.env
+import ENV from '@constants/Env'
+
+const { CLIENT_ID, GUILD_ID, BOT_TOKEN } = ENV
 
 const rest = new REST({ version: '9' }).setToken(BOT_TOKEN)
 

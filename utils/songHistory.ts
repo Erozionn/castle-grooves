@@ -1,13 +1,24 @@
 import { InfluxDB, Point } from '@influxdata/influxdb-client'
+import { Song } from 'distube'
 
-import { parseSongName } from '#utils/utilities.js'
+import ENV from '@constants/Env'
+import { parseSongName } from '@utils/utilities'
+import { queryApi, writeApi } from '@hooks/InfluxDb'
 
-const { INFLUX_URL, INFLUX_TOKEN, INFLUX_ORG, INFLUX_BUCKET } = process.env
+type SongHistory = {
+  songTitle: string
+  songUrl: string
+  songThumbnail: string
+  requestedById: string
+  requestedByUsername: string
+  requestedByAvatar: string
+  source: string
+  playing: boolean
+}
 
-const client = new InfluxDB({ url: INFLUX_URL, token: INFLUX_TOKEN, timeout: 30000 })
+const { INFLUX_BUCKET } = ENV
 
 const getSongsPlayed = async () => {
-  const queryApi = client.getQueryApi(INFLUX_ORG)
   const fluxQuery = `
   from(bucket:"${INFLUX_BUCKET}")
     |> range(
@@ -23,12 +34,11 @@ const getSongsPlayed = async () => {
     |>limit(n: 23)
   `
   // Execute query and receive table metadata and rows.
-  const results = await queryApi.collectRows(fluxQuery)
+  const results: SongHistory[] = await queryApi.collectRows(fluxQuery)
   return results
 }
 
 const getTopSongs = async (timeRange = 'monthly', limit = 20) => {
-  const queryApi = client.getQueryApi(INFLUX_ORG)
   let t
   switch (timeRange) {
     case 'yearly':
@@ -67,7 +77,7 @@ const getTopSongs = async (timeRange = 'monthly', limit = 20) => {
   return results
 }
 
-const getUserTopSongs = async (userId, timeRange = 'monthly', limit = 20) => {
+const getUserTopSongs = async (userId: string, timeRange = 'monthly', limit = 20) => {
   let t
   switch (timeRange) {
     case 'yearly':
@@ -85,7 +95,6 @@ const getUserTopSongs = async (userId, timeRange = 'monthly', limit = 20) => {
     default:
       t = '-30d'
   }
-  const queryApi = client.getQueryApi(INFLUX_ORG)
   const fluxQuery = `
   from(bucket:"${INFLUX_BUCKET}")
     |> range(
@@ -108,13 +117,14 @@ const getUserTopSongs = async (userId, timeRange = 'monthly', limit = 20) => {
   return results
 }
 
-const addSong = (playing, song) => {
-  const writeApi = client.getWriteApi(INFLUX_ORG, INFLUX_BUCKET)
-
+const addSong = (playing: boolean, song?: Song) => {
   const point = new Point('song')
   if (playing === false) {
     point.booleanField('playing', false)
   } else if (song && playing === true) {
+    if (!song.user || !song.name)
+      throw new Error('Song user or name is undefined. Cannot add song to DB.')
+
     point
       .tag('requestedById', song.user.id)
       .tag('requestedByUsername', song.user.username)
@@ -147,7 +157,7 @@ const generateHistoryOptions = async () => {
         label: title ? title.substring(0, 95) : artist.substring(0, 95),
         description: title ? artist.substring(0, 95) : ' ',
         emoji: '🎶',
-        value: `${s.songUrl.substring(0, 90)}?discord=${Math.floor(Math.random() * 99999)}`,
+        value: `${s.songUrl.substring(0, 90)}?discord=${Math.floor(Math.random() * 99999)}`
       }
     })
     .reverse()

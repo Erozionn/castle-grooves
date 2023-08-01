@@ -1,22 +1,26 @@
 # Use Node Version: 16 LTS
-FROM node:16
 
 # Set ARG and ENV variable defaults
 ARG port=1337
-ENV port=$port
 
-# Create a directory for the app
-WORKDIR /usr/src/castle-grooves
-
-# Install app dependencies
-COPY package*.json ./
-COPY patches ./patches
-RUN npm ci --only=production
-
-# Bundle app source
+FROM node:18.17.0 AS builder
+WORKDIR /app
 COPY . .
+ENV port=$port
+RUN yarn install
+RUN yarn build
+
+FROM node:18.17.0 AS final
+WORKDIR /app
+COPY --from=builder ./app/build ./build
+COPY package.json .
+COPY yarn.lock .
+RUN yarn install --production
+
+ENV port=$port
+ENV NODE_ENV production 
 
 # Expose port $port
 EXPOSE $port
 
-CMD [ "node", "index.js" ]
+CMD [ "yarn", "start" ]

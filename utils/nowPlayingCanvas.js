@@ -4,13 +4,13 @@ import fs from 'fs'
 import { Canvas, FontLibrary, loadImage } from 'skia-canvas'
 import { getAverageColor } from 'fast-average-color-node'
 
-import { shadeColor, splitAtClosestSpace, parseSongName } from '#utils/utilities.js'
+import { shadeColor, splitAtClosestSpace, parseSongName } from '@utils/utilities'
 
 FontLibrary.use([
   './assets/fonts/Montserrat-Light.ttf',
   './assets/fonts/Montserrat-Regular.ttf',
   './assets/fonts/Montserrat-SemiBold.ttf',
-  './assets/fonts/Montserrat-Bold.ttf'
+  './assets/fonts/Montserrat-Bold.ttf',
 ])
 
 const renderMultiLineTitle = (canvas, str, options = {}) => {
@@ -61,7 +61,7 @@ const nowPlayingCanvasWithUpNext = async (songs) => {
   const imageBuffer = await imageCanvas.toBuffer()
   const averageColor = await getAverageColor(imageBuffer, {
     defaultColor: [0, 0, 0, 0],
-    ignoredColor: [0, 0, 0, 255]
+    ignoredColor: [0, 0, 0, 255],
   })
   const [r, g, b] = averageColor.value
 
@@ -108,7 +108,7 @@ const nowPlayingCanvasWithUpNext = async (songs) => {
     fillStyle: '#ffffff',
     y: 240,
     x: 10,
-    font: 'bold 24px Montserrat'
+    font: 'bold 24px Montserrat',
   })
 
   // Render artist
@@ -117,7 +117,7 @@ const nowPlayingCanvasWithUpNext = async (songs) => {
       fillStyle: '#ffffff',
       y: 240 + songTitleHeight,
       x: 10,
-      font: '24px Montserrat'
+      font: '24px Montserrat',
     })
   }
 
@@ -207,7 +207,7 @@ const nowPlayingCanvas = async (song) => {
   const imageBuffer = await imageCanvas.toBuffer()
   const averageColor = await getAverageColor(imageBuffer, {
     defaultColor: [0, 0, 0, 0],
-    ignoredColor: [0, 0, 0, 255]
+    ignoredColor: [0, 0, 0, 255],
   })
   const [r, g, b] = averageColor.value
 
@@ -250,7 +250,7 @@ const nowPlayingCanvas = async (song) => {
     x: 320,
     font: 'bold 28px Montserrat',
     textAlign: 'start',
-    charsPerLine: 20
+    charsPerLine: 20,
   })
 
   // Render artist
@@ -261,7 +261,7 @@ const nowPlayingCanvas = async (song) => {
       x: 320,
       font: '28px Montserrat',
       textAlign: 'start',
-      charsPerLine: 20
+      charsPerLine: 20,
     })
   }
 
