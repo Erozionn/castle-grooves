@@ -25,7 +25,7 @@ const playerButtonKeys = Object.keys(playerButtons)
 
 let repeatButtonState = 0
 
-export const buttonInteractionHandler = async (
+export const componentInteractionHandler = async (
   interaction: Interaction<CacheType>,
   client: ClientType
 ) => {
@@ -285,7 +285,7 @@ export const finishEventHandler = async (queue: Queue) => {
 }
 
 export default {
-  buttonInteractionHandler,
+  componentInteractionHandler,
   playSongEventHandler,
   addSongEventHandler,
   disconnectEventHandler,

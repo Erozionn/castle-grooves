@@ -5,7 +5,6 @@ import ENV from '@constants/Env'
 import { writeApi } from '@hooks/InfluxDb'
 
 const recordVoiceStateChange = (oldState: VoiceState, newState: VoiceState) => {
-
   const state = newState?.channel?.id !== undefined ? newState : oldState
 
   const member = newState?.member || oldState?.member
@@ -34,10 +33,12 @@ const recordVoiceStateChange = (oldState: VoiceState, newState: VoiceState) => {
     .booleanField('voiceStateConnected', newState.channel?.id !== undefined)
     .stringField('userAvatar', member.displayAvatarURL())
 
-  writeApi.writePoint(point)
-  writeApi.close().catch((e) => {
-    console.log(e)
-  })
+  writeApi().writePoint(point)
+  writeApi()
+    .close()
+    .catch((e) => {
+      console.log(e)
+    })
 }
 
 export { recordVoiceStateChange }

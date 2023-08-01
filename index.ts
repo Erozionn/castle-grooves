@@ -10,14 +10,13 @@ import {
   TextChannel,
   Message,
   CommandInteraction,
-  Guild,
 } from 'discord.js'
 import { DisTube } from 'distube'
 import { YtDlpPlugin } from '@distube/yt-dlp'
 
 import {
   addSongEventHandler,
-  buttonInteractionHandler,
+  componentInteractionHandler,
   disconnectEventHandler,
   emptyEventHandler,
   finishEventHandler,
@@ -55,13 +54,20 @@ const player = new DisTube(client, {
 
 client.player = player
 
+client.commands = new Collection()
+
+// // Initialize the API and webserver.
+initApi(client)
+// Register commands.
+registerCommands()
+
 // Import commands.
 const commandFiles = fs.readdirSync('./commands').filter((file) => file.endsWith('.js'))
 
 commandFiles.forEach(async (file) => {
   const filePath = `./commands/${file}`
   const command = await import(filePath)
-  client.commands?.set(command.default.data.name, command.default)
+  client.commands.set(command.default.data.name, command.default)
 })
 
 client.once('ready', async () => {
@@ -69,11 +75,6 @@ client.once('ready', async () => {
     name: '🎶 Music 🎶',
     type: ActivityType.Listening,
   })
-
-  // // Initialize the API and webserver.
-  initApi(client)
-  // Register commands.
-  registerCommands()
 
   if (!GUILD_ID) {
     throw new Error('GUILD_ID is not set!')
@@ -128,6 +129,7 @@ client.once('ready', async () => {
 })
 
 client.on('interactionCreate', async (interaction) => {
+  console.log(client.commands)
   const command = client.commands.get((interaction as CommandInteraction).commandName)
 
   if (!command) return
@@ -145,7 +147,7 @@ client.on('interactionCreate', async (interaction) => {
 
 client.on(
   'interactionCreate',
-  async (interaction) => await buttonInteractionHandler(interaction, client)
+  async (interaction) => await componentInteractionHandler(interaction, client)
 )
 // On user join voice channel event
 client.on('voiceStateUpdate', (oldState, newState) => {

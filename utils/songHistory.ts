@@ -1,4 +1,4 @@
-import { InfluxDB, Point } from '@influxdata/influxdb-client'
+import { Point } from '@influxdata/influxdb-client'
 import { Song } from 'distube'
 
 import ENV from '@constants/Env'
@@ -34,7 +34,7 @@ const getSongsPlayed = async () => {
     |>limit(n: 23)
   `
   // Execute query and receive table metadata and rows.
-  const results: SongHistory[] = await queryApi.collectRows(fluxQuery)
+  const results: SongHistory[] = await queryApi().collectRows(fluxQuery)
   return results
 }
 
@@ -73,7 +73,7 @@ const getTopSongs = async (timeRange = 'monthly', limit = 20) => {
     |> limit(n: ${limit})
   `
   // Execute query and receive table metadata and rows.
-  const results = await queryApi.collectRows(fluxQuery)
+  const results = await queryApi().collectRows(fluxQuery)
   return results
 }
 
@@ -113,7 +113,7 @@ const getUserTopSongs = async (userId: string, timeRange = 'monthly', limit = 20
     |> limit(n: ${limit})
   `
   // Execute query and receive table metadata and rows.
-  const results = await queryApi.collectRows(fluxQuery)
+  const results = await queryApi().collectRows(fluxQuery)
   return results
 }
 
@@ -139,10 +139,12 @@ const addSong = (playing: boolean, song?: Song) => {
     return
   }
 
-  writeApi.writePoint(point)
-  writeApi.close().catch((e) => {
-    console.log(e)
-  })
+  writeApi().writePoint(point)
+  writeApi()
+    .close()
+    .catch((e) => {
+      console.log(e)
+    })
 }
 
 const generateHistoryOptions = async () => {
@@ -157,7 +159,7 @@ const generateHistoryOptions = async () => {
         label: title ? title.substring(0, 95) : artist.substring(0, 95),
         description: title ? artist.substring(0, 95) : ' ',
         emoji: '🎶',
-        value: `${s.songUrl.substring(0, 90)}?discord=${Math.floor(Math.random() * 99999)}`
+        value: `${s.songUrl.substring(0, 90)}?discord=${Math.floor(Math.random() * 99999)}`,
       }
     })
     .reverse()

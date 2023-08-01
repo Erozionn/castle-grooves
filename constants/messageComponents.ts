@@ -40,7 +40,7 @@ export const buttonsActionRow = new ActionRowBuilder<ButtonBuilder>().addCompone
 )
 
 export const historyActionRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
-  Object.values(playerHistory)
+  playerHistory
 )
 
 export const components = [buttonsActionRow, historyActionRow]
