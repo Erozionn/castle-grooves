@@ -5,8 +5,8 @@ import { ClientType } from '@types'
 
 export default async (
   client: ClientType,
-  queue: Queue,
-  interaction: StringSelectMenuInteraction
+  interaction: StringSelectMenuInteraction,
+  queue?: Queue
 ) => {
   const member = interaction.member as GuildMember
 
@@ -30,7 +30,7 @@ export default async (
 
   if (interaction.values.length > 1 && member.voice.channel) {
     const songs = interaction.values
-    console.log('Adding songs to queue...', songs)
+    console.log('[history] Adding songs to queue...', songs)
     const playlist = await client.player.createCustomPlaylist(songs, {
       member: member,
       parallel: true,

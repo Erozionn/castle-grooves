@@ -135,7 +135,7 @@ const addSong = (playing: boolean, song?: Song) => {
       .stringField('source', song.source)
       .stringField('requestedByAvatar', song.user.displayAvatarURL())
   } else {
-    console.log('Error: playing undefined.')
+    console.log('[addSongToDb] Error: playing boolean undefined. Not adding song to DB.')
     return
   }
 
@@ -143,7 +143,7 @@ const addSong = (playing: boolean, song?: Song) => {
   writeApi()
     .close()
     .catch((e) => {
-      console.log(e)
+      console.log('[addSongToDb]', e)
     })
 }
 

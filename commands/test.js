@@ -38,6 +38,6 @@ export default {
     // Show the modal to the user
     await interaction.showModal(modal)
 
-    console.log('member', member)
+    console.log('[member test]', member)
   },
 }

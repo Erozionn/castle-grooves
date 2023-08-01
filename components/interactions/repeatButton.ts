@@ -10,7 +10,7 @@ import {
 } from '@constants/messageComponents'
 import { ClientType } from '@types'
 
-export default async (client: ClientType, queue: Queue, interaction: ButtonInteraction) => {
+export default async (client: ClientType, interaction: ButtonInteraction, queue?: Queue) => {
   if (!queue) {
     client.player.voices.leave(interaction)
     return

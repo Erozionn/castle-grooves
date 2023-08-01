@@ -6,7 +6,7 @@ import { components, playerButtons } from '@constants/messageComponents'
 
 let repeatButtonState = 0
 
-export default async (queue: Queue, interaction: ButtonInteraction) => {
+export default async (interaction: ButtonInteraction, queue?: Queue) => {
   const mainMessage = getMainMessage()
 
   if (!queue) {

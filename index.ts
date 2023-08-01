@@ -9,19 +9,18 @@ import {
   ActivityType,
   TextChannel,
   Message,
-  CommandInteraction,
 } from 'discord.js'
 import { DisTube } from 'distube'
 import { YtDlpPlugin } from '@distube/yt-dlp'
 
 import {
   addSongEventHandler,
-  componentInteractionHandler,
   disconnectEventHandler,
   emptyEventHandler,
-  finishEventHandler,
   playSongEventHandler,
-} from '@utils/events'
+  songFinishEventHandler,
+  buttonHandler,
+} from '@components/events'
 import { ClientType } from '@types'
 import { historyActionRow, playerHistory } from '@constants/messageComponents'
 import { getMainMessage, sendMessage, deleteMessage } from '@utils/mainMessage'
@@ -29,6 +28,7 @@ import initApi from '@api'
 import ENV from '@constants/Env'
 import { generateHistoryOptions } from '@utils/songHistory'
 import { recordVoiceStateChange } from '@utils/recordActivity'
+import { commandInteractionHandler } from '@components/interactions'
 
 import registerCommands from './deploy-commands'
 
@@ -107,7 +107,9 @@ client.once('ready', async () => {
     const botMessages = messages.filter((message: Message) => message.author.id === client.user?.id)
 
     if (botMessages.size > 0)
-      console.log(`Deleting ${botMessages.size} old bot message(s) from ${channel.name}`)
+      console.log(
+        `[housekeeping] Deleting ${botMessages.size} old bot message(s) from ${channel.name}`
+      )
 
     botMessages.forEach((message) => {
       message.delete()
@@ -123,33 +125,16 @@ client.once('ready', async () => {
   })
 
   // eslint-disable-next-line no-console
-  console.log('Ready!')
+  console.log('[CastleGrooves] Ready!')
 })
 
-client.on('interactionCreate', async (interaction) => {
-  const command = client.commands.get((interaction as CommandInteraction).commandName)
-
-  if (!command) return
-
-  try {
-    await command.execute(interaction)
-  } catch (error) {
-    console.error(error)
-    await (interaction as CommandInteraction).reply({
-      content: 'There was an error while executing this command!',
-      ephemeral: true,
-    })
-  }
-})
-
-client.on(
-  'interactionCreate',
-  async (interaction) => await componentInteractionHandler(interaction, client)
+client.on('interactionCreate', async (interaction) =>
+  commandInteractionHandler(interaction, client)
 )
+
+client.on('interactionCreate', async (interaction) => await buttonHandler(interaction, client))
 // On user join voice channel event
-client.on('voiceStateUpdate', (oldState, newState) => {
-  recordVoiceStateChange(oldState, newState)
-})
+client.on('voiceStateUpdate', (oldState, newState) => recordVoiceStateChange(oldState, newState))
 
 client.player.on('playSong', playSongEventHandler)
 
@@ -163,11 +148,11 @@ client.player.on('disconnect', disconnectEventHandler)
 client.player.on('empty', emptyEventHandler)
 
 // On queue/song finish
-client.player.on('finish', finishEventHandler)
+client.player.on('finish', songFinishEventHandler)
 
 // On error
 client.player.on('error', async (channel, e) => {
-  console.log(e)
+  console.error('[playerError]', e)
 })
 
 // Resets main message if many messages have since been sent in the channel

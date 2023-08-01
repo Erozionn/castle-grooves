@@ -4,7 +4,7 @@ import { ButtonInteraction, ButtonStyle, MessageEditOptions } from 'discord.js'
 import { getMainMessage, sendMessage } from '@utils/mainMessage'
 import { components, playerButtons } from '@constants/messageComponents'
 
-export default async (queue: Queue, interaction: ButtonInteraction) => {
+export default async (interaction: ButtonInteraction, queue?: Queue) => {
   const mainMessage = getMainMessage()
 
   if (!queue) {
