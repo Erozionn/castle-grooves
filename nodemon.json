@@ -1,6 +1,6 @@
 {
   "watch": ["./"],
   "ext": ".ts,.js",
-  "ignore": [],
-  "exec": "yarn ts-node"
+  "ignore": ["./build", "./node_modules"],
+  "exec": "yarn build && yarn ts-node"
 }

@@ -117,7 +117,8 @@
       "@commands/*": ["commands/*"],
       "@constants/*": ["constants/*"],
       "@types/*": ["types/*"],
-      "@hooks/*": ["hooks/*"]
+      "@hooks/*": ["hooks/*"],
+      "@data/*": ["data/*"]
     }
   }
 }

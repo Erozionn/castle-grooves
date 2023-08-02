@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node -r dotenv/config index.js",
     "start:dev": "yarn build && nodemon -r dotenv/config build/index.js dotenv_config_path=.env.dev dotenv_config_debug=true",
+    "start:prefill": "yarn build && export NOW_PLAYING_MOCK_DATA=true || set NOW_PLAYING_MOCK_DATA=true && nodemon -r dotenv/config build/index.js dotenv_config_path=.env.dev dotenv_config_debug=true",
     "build": "rimraf ./build && tsc",
     "deploy-commands": "node -r dotenv/config deploy-commands.js dotenv_config_path=.env.dev dotenv_config_debug=true",
     "postinstall": "patch-package",

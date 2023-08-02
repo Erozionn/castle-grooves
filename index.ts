@@ -22,17 +22,26 @@ import {
   buttonHandler,
 } from '@components/events'
 import { ClientType } from '@types'
-import { historyActionRow, playerHistory } from '@constants/messageComponents'
+import { playerHistory } from '@constants/messageComponents'
 import { getMainMessage, sendMessage, deleteMessage } from '@utils/mainMessage'
 import initApi from '@api'
 import ENV from '@constants/Env'
 import { generateHistoryOptions } from '@utils/songHistory'
 import { recordVoiceStateChange } from '@utils/recordActivity'
 import { commandInteractionHandler } from '@components/interactions'
+import { nowPlayingCanvas, nowPlayingCanvasWithUpNext } from '@utils/nowPlayingCanvas'
+import mockSongArray from '@data/dummies/songArray'
 
 import registerCommands from './deploy-commands'
 
-const { BOT_TOKEN, GUILD_ID, DEFAULT_TEXT_CHANNEL, YOUTUBE_COOKIE, YOUTUBE_IDENTITY_TOKEN } = ENV
+const {
+  BOT_TOKEN,
+  GUILD_ID,
+  DEFAULT_TEXT_CHANNEL,
+  YOUTUBE_COOKIE,
+  YOUTUBE_IDENTITY_TOKEN,
+  NOW_PLAYING_MOCK_DATA,
+} = ENV
 
 const client = new Client({
   intents: [
@@ -60,6 +69,31 @@ client.commands = new Collection()
 initApi(client)
 // Register commands.
 registerCommands()
+
+if (NOW_PLAYING_MOCK_DATA) {
+  console.log('[nowPlayingMock] Generating mock now playing data...')
+
+  nowPlayingCanvasWithUpNext(mockSongArray).then((buffer) => {
+    fs.writeFileSync('mockNowPlayingMulti.png', buffer)
+  })
+
+  nowPlayingCanvas(mockSongArray[0]).then((buffer) => {
+    fs.writeFileSync('mockNowPlaying.png', buffer)
+  })
+
+  // client.once('ready', async () => {
+  //   console.log('[nowPlayingMock] Sending mock now playing data...')
+
+  //   try {
+  //     await sendMessage(defaultTextChannel, {
+  //       content: 'Debugging: Mock now playing data',
+  //       files: [buffer],
+  //     })
+  //   } catch (e) {
+  //     console.error('[nowPlayingMock] Error generating canvas:', e)
+  //   }
+  // })
+}
 
 // Import commands.
 const commandFiles = fs.readdirSync('./commands').filter((file) => file.endsWith('.js'))
@@ -119,10 +153,10 @@ client.once('ready', async () => {
   // Generate song history and sen d it to the main channel.
   playerHistory.setOptions(await generateHistoryOptions())
   playerHistory.setPlaceholder('-- Song History --')
-  await sendMessage(defaultTextChannel, {
-    content: '🎶 | Pick a song below or use **/play**',
-    components: [historyActionRow],
-  })
+  // await sendMessage(defaultTextChannel, {
+  //   content: '🎶 | Pick a song below or use **/play**',
+  //   components: [historyActionRow],
+  // })
 
   // eslint-disable-next-line no-console
   console.log('[CastleGrooves] Ready!')
