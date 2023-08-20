@@ -22,7 +22,7 @@ import {
   buttonHandler,
 } from '@components/events'
 import { ClientType } from '@types'
-import { playerHistory } from '@constants/messageComponents'
+import { historyActionRow, playerHistory } from '@constants/messageComponents'
 import { getMainMessage, sendMessage, deleteMessage } from '@utils/mainMessage'
 import initApi from '@api'
 import ENV from '@constants/Env'
@@ -96,10 +96,10 @@ if (NOW_PLAYING_MOCK_DATA) {
 }
 
 // Import commands.
-const commandFiles = fs.readdirSync('./commands').filter((file) => file.endsWith('.js'))
+const commandFiles = fs.readdirSync('build/commands').filter((file) => file.endsWith('.js'))
 
 commandFiles.forEach(async (file) => {
-  const filePath = `./commands/${file}`
+  const filePath = `build/commands/${file}`
   const command = await import(filePath)
   client.commands.set(command.default.data.name, command.default)
 })
@@ -153,10 +153,10 @@ client.once('ready', async () => {
   // Generate song history and sen d it to the main channel.
   playerHistory.setOptions(await generateHistoryOptions())
   playerHistory.setPlaceholder('-- Song History --')
-  // await sendMessage(defaultTextChannel, {
-  //   content: '🎶 | Pick a song below or use **/play**',
-  //   components: [historyActionRow],
-  // })
+  await sendMessage(defaultTextChannel, {
+    content: `🎶 | Pick a song below or use </play:991566063068250134>`,
+    components: [historyActionRow],
+  })
 
   // eslint-disable-next-line no-console
   console.log('[CastleGrooves] Ready!')

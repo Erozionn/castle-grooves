@@ -30,7 +30,7 @@ export default async (interaction: Interaction<CacheType>, client: ClientType) =
       playPauseButtonInteractionHandler(interaction as ButtonInteraction, queue)
       break
     case 'skip_button':
-      skipButtonInteractionHandler(interaction as ButtonInteraction, queue)
+      skipButtonInteractionHandler(queue)
       break
     case 'stop_button':
       stopButtonInteractionHandler(client, interaction as ButtonInteraction, queue)

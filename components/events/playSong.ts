@@ -34,6 +34,7 @@ export default async (queue: Queue, song: Song) => {
 
   if (queue.textChannel) {
     await sendMessage(queue.textChannel, {
+      content: '',
       files: [buffer],
       components,
     })

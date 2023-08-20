@@ -1,5 +1,5 @@
 import { Queue } from 'distube'
-import { ButtonInteraction, ButtonStyle, MessageEditOptions } from 'discord.js'
+import { ButtonInteraction, ButtonStyle } from 'discord.js'
 
 import { getMainMessage, sendMessage } from '@utils/mainMessage'
 import { components, playerButtons } from '@constants/messageComponents'
@@ -19,5 +19,5 @@ export default async (interaction: ButtonInteraction, queue?: Queue) => {
     playerButtons.playPause.setStyle(ButtonStyle.Primary)
   }
 
-  interaction.message.edit({ components } as MessageEditOptions)
+  sendMessage(interaction.message.channel, { components })
 }

@@ -2,12 +2,13 @@
 import { Canvas, FontLibrary, loadImage } from 'skia-canvas'
 import { getAverageColor } from 'fast-average-color-node'
 
-import { shadeColor, splitAtClosestSpace, parseSongName } from '@utils/utilities'
+import { shadeColor, splitAtClosestSpace, parseSongName, truncateString } from '@utils/utilities'
 
 FontLibrary.use([
   './assets/fonts/Poppins-Thin.ttf',
   './assets/fonts/Poppins-Light.ttf',
   './assets/fonts/Poppins-Regular.ttf',
+  './assets/fonts/Poppins-Medium.ttf',
   './assets/fonts/Poppins-SemiBold.ttf',
   './assets/fonts/Poppins-Bold.ttf',
 ])
@@ -107,7 +108,7 @@ export const nowPlayingCanvasWithUpNext = async (songs) => {
     fillStyle: '#ffffff',
     y: 220,
     x: 10,
-    font: '24px Poppins',
+    font: '600 24px Poppins',
   })
 
   // Render artist
@@ -116,7 +117,7 @@ export const nowPlayingCanvasWithUpNext = async (songs) => {
       fillStyle: '#ffffff',
       y: 220 + songTitleHeight,
       x: 10,
-      font: '100 24px Poppins',
+      font: '300 24px Poppins',
     })
   }
 
@@ -140,13 +141,13 @@ export const nowPlayingCanvasWithUpNext = async (songs) => {
   // Render requester name
   canv.fillStyle = '#ffffff'
   canv.textAlign = 'left'
-  canv.font = '400 18px Poppins'
+  canv.font = '600 18px Poppins'
   canv.fillText(song.member.displayName, 54, 370)
 
   // Render "Up Next"
   canv.textAlign = 'left'
   canv.fillStyle = averageColor.isDark ? `#ffffff` : shadeColor(averageColor.hex, -200)
-  canv.font = '18px Poppins'
+  canv.font = '22px Poppins'
   canv.fillText('UP NEXT:', 330, 40)
 
   try {
@@ -175,20 +176,23 @@ export const nowPlayingCanvasWithUpNext = async (songs) => {
   await songs.slice(1, 6).forEach(async (songObj, index) => {
     const i = index + 1
     canv.fillStyle = averageColor.isDark ? `#ffffff` : shadeColor(averageColor.hex, -200)
-    canv.font = '400 22px Poppins'
+    canv.font = '600 22px Poppins'
     const parsedSong = parseSongName(songObj.name)
     const a = parsedSong.artist
     const s = parsedSong.title
     if (s !== null) {
-      canv.fillText(`${i}. ${s}`, 330, 26 + 65 * i)
-      canv.font = '100 22px Poppins'
-      canv.fillText(`${a}`, 358, 51 + 65 * i)
+      canv.fillText(truncateString(`${i}. ${s}`, 25), 330, 26 + 65 * i)
+      canv.font = '300 22px Poppins'
+      canv.fillText(truncateString(`${a}`, 25), 358, 51 + 65 * i)
     } else {
-      canv.fillText(`${i}. ${a}`, 330, 30 + 65 * i)
+      canv.fillText(truncateString(`${i}. ${a}`, 25), 330, 30 + 65 * i)
     }
 
-    canv.fillStyle = 'rgba(255, 255, 255, 0.2)'
-    canv.fillRect(330, 60 + 66 * i, 360, 1)
+    if (i < 5 && songs.length > 2) {
+      canv.fillStyle = 'rgba(255, 255, 255, 0.3)'
+      canv.fillRect(330, 60 + 66 * i, 360, 1)
+      canv.fillStyle = averageColor.isDark ? `#ffffff` : shadeColor(averageColor.hex, -200)
+    }
   })
 
   // Buffer canvas
@@ -251,7 +255,7 @@ export const nowPlayingCanvas = async (song) => {
     fillStyle: '#ffffff',
     y: 50,
     x: 320,
-    font: '400 28px Poppins',
+    font: '600 28px Poppins',
     textAlign: 'start',
     charsPerLine: 20,
   })
@@ -262,7 +266,7 @@ export const nowPlayingCanvas = async (song) => {
       fillStyle: '#ffffff',
       y: 50 + songTitleHeight,
       x: 320,
-      font: '100 28px Poppins',
+      font: '300 28px Poppins',
       textAlign: 'start',
       charsPerLine: 20,
     })
@@ -288,7 +292,7 @@ export const nowPlayingCanvas = async (song) => {
   // Render requester name
   canv.fillStyle = '#ffffff'
   canv.textAlign = 'left'
-  canv.font = '400 18px Poppins'
+  canv.font = '600 18px Poppins'
   canv.fillText(song.member.displayName, 362, 140)
 
   // Buffer canvas

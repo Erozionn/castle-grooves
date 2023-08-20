@@ -28,7 +28,6 @@ export default async (client: ClientType, interaction: ButtonInteraction, queue?
     }
 
     await sendMessage(queue.textChannel, {
-      content: '🎶 | Previously Played:',
       components,
     })
   } else {

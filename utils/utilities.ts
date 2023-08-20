@@ -9,11 +9,10 @@ const shadeColor = (color: string, percent: number) => {
   let G = parseInt(color.substring(3, 5), 16)
   let B = parseInt(color.substring(5, 7), 16)
 
-  R = (R * (100 + percent)) / 100,
-  G = (G * (100 + percent)) / 100,
-  B = (B * (100 + percent)) / 100,
-
-  R = R < 255 ? R : 255
+  ;(R = (R * (100 + percent)) / 100),
+    (G = (G * (100 + percent)) / 100),
+    (B = (B * (100 + percent)) / 100),
+    (R = R < 255 ? R : 255)
   G = G < 255 ? G : 255
   B = B < 255 ? B : 255
 
@@ -30,6 +29,13 @@ const parseSongName = (name: string) => {
     artist: split[0] || name,
     title: split[1] ? split[1] : null,
   }
+}
+
+export const truncateString = (str: string, num: number) => {
+  if (str.length <= num) {
+    return str
+  }
+  return str.slice(0, num) + '...'
 }
 
 export { splitAtClosestSpace, shadeColor, parseSongName }

@@ -4,8 +4,9 @@
   "description": "Castle Grooves music bot.",
   "main": "index.js",
   "scripts": {
-    "start": "node -r dotenv/config index.js",
+    "start": "node -r dotenv/config build/index.js",
     "start:dev": "yarn build && nodemon -r dotenv/config build/index.js dotenv_config_path=.env.dev dotenv_config_debug=true",
+    "start:prod": "node build/index.js",
     "start:prefill": "yarn build && export NOW_PLAYING_MOCK_DATA=true || set NOW_PLAYING_MOCK_DATA=true && nodemon -r dotenv/config build/index.js dotenv_config_path=.env.dev dotenv_config_debug=true",
     "build": "rimraf ./build && tsc",
     "deploy-commands": "node -r dotenv/config deploy-commands.js dotenv_config_path=.env.dev dotenv_config_debug=true",
@@ -65,10 +66,33 @@
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.1.6"
   },
-  "imports": {
-    "#utils/*": "./utils/*",
-    "#api": "./api/index.js",
-    "#commands/*": "./commands/*",
-    "#constants/*": "./constants/*"
+  "paths": {
+    "@*": [
+      "build/*"
+    ],
+    "@utils/*": [
+      "build/utils/*"
+    ],
+    "@api/*": [
+      "build/api/*"
+    ],
+    "@commands/*": [
+      "build/commands/*"
+    ],
+    "@components/*": [
+      "build/components/*"
+    ],
+    "@constants/*": [
+      "build/constants/*"
+    ],
+    "@types/*": [
+      "build/types/*"
+    ],
+    "@hooks/*": [
+      "build/hooks/*"
+    ],
+    "@data/*": [
+      "build/data/*"
+    ]
   }
 }

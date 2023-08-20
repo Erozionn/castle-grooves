@@ -115,6 +115,7 @@
       "@utils/*": ["utils/*"],
       "@api/*": ["api/*"],
       "@commands/*": ["commands/*"],
+      "@components/*": ["components/*"],
       "@constants/*": ["constants/*"],
       "@types/*": ["types/*"],
       "@hooks/*": ["hooks/*"],

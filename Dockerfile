@@ -23,4 +23,4 @@ ENV NODE_ENV production
 # Expose port $port
 EXPOSE $port
 
-CMD [ "yarn", "start" ]
+CMD [ "yarn", "start:prod" ]
