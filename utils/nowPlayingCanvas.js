@@ -1,16 +1,18 @@
 // const axios = require('axios')
+import path from 'node:path'
+
 import { Canvas, FontLibrary, loadImage } from 'skia-canvas'
 import { getAverageColor } from 'fast-average-color-node'
 
 import { shadeColor, splitAtClosestSpace, parseSongName, truncateString } from '@utils/utilities'
 
 FontLibrary.use([
-  './assets/fonts/Poppins-Thin.ttf',
-  './assets/fonts/Poppins-Light.ttf',
-  './assets/fonts/Poppins-Regular.ttf',
-  './assets/fonts/Poppins-Medium.ttf',
-  './assets/fonts/Poppins-SemiBold.ttf',
-  './assets/fonts/Poppins-Bold.ttf',
+  path.resolve('./assets/fonts/Poppins-Thin.ttf'),
+  path.resolve('./assets/fonts/Poppins-Light.ttf'),
+  path.resolve('./assets/fonts/Poppins-Regular.ttf'),
+  path.resolve('./assets/fonts/Poppins-Medium.ttf'),
+  path.resolve('./assets/fonts/Poppins-SemiBold.ttf'),
+  path.resolve('./assets/fonts/Poppins-Bold.ttf'),
 ])
 
 const renderMultiLineTitle = (canvas, str, options = {}) => {

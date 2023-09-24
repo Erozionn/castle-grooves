@@ -1,4 +1,6 @@
+import 'module-alias/register'
 import fs from 'node:fs'
+import path from 'node:path'
 
 import {
   Client,
@@ -10,7 +12,7 @@ import {
   TextChannel,
   Message,
 } from 'discord.js'
-import { DisTube } from 'distube'
+import { DisTube, Queue, Song } from 'distube'
 import { YtDlpPlugin } from '@distube/yt-dlp'
 
 import {
@@ -96,10 +98,11 @@ if (NOW_PLAYING_MOCK_DATA) {
 }
 
 // Import commands.
-const commandFiles = fs.readdirSync('build/commands').filter((file) => file.endsWith('.js'))
+const commandsPath = './build/commands'
+const commandFiles = fs.readdirSync(commandsPath).filter((file) => file.endsWith('.js'))
 
 commandFiles.forEach(async (file) => {
-  const filePath = `build/commands/${file}`
+  const filePath = path.resolve(commandsPath, file)
   const command = await import(filePath)
   client.commands.set(command.default.data.name, command.default)
 })
@@ -174,6 +177,9 @@ client.player.on('playSong', playSongEventHandler)
 
 // On add song event
 client.player.on('addSong', addSongEventHandler)
+
+// on add playlist event
+client.player.on('addList', addSongEventHandler)
 
 // On bot disconnected from voice channel
 client.player.on('disconnect', disconnectEventHandler)

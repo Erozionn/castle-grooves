@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import path from 'node:path'
 
 import { REST } from '@discordjs/rest'
 import { Routes } from 'discord-api-types/v9'
@@ -16,7 +17,7 @@ const commands = []
 
 const registerCommands = async () => {
   for (let i = 0; i < commandFiles.length; i++) {
-    const filePath = `build/commands/${commandFiles[i]}`
+    const filePath = path.resolve(commandsPath, commandFiles[i])
     // eslint-disable-next-line no-await-in-loop
     const command = await import(filePath)
     commands.push(command.default.data.toJSON())

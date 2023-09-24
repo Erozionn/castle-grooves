@@ -29,10 +29,8 @@ export default async (queue: Queue, song: Song) => {
   // Change disconnect button to stop button
   playerButtons.stop.setEmoji('musicoff:909248235623825439')
 
-  // sendMessage()
-  const buffer = await generateNowPlayingCanvas(queue.songs)
-
-  if (queue.textChannel) {
+  if (queue.songs.length > 0 && queue.textChannel) {
+    const buffer = await generateNowPlayingCanvas(queue.songs)
     await sendMessage(queue.textChannel, {
       content: '',
       files: [buffer],
