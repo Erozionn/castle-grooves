@@ -1,7 +1,7 @@
 import { EmbedBuilder, SlashCommandBuilder, bold, inlineCode } from 'discord.js'
 
-import { getUserTopSongs, getTopSongs } from '#utils/songHistory.js'
-import { parseSongName } from '#utils/utilities.js'
+import { getUserTopSongs, getTopSongs } from '@utils/songHistory'
+import { parseSongName } from '@utils/utilities'
 
 const play = async (interaction) => {
   const limit = interaction.options.getInteger('number', false) || 10

@@ -30,11 +30,11 @@ export default {
         queue.resume()
       }
     } catch (e) {
-      console.log(e)
+      console.log('[playCommand]', e)
       await interaction.editReply({ content: 'Error joining your channel.' })
     }
 
     const loadingMsg = await interaction.editReply({ content: '⏱ | Loading...' })
     setTimeout(() => loadingMsg.delete(), 1500)
-  }
+  },
 }

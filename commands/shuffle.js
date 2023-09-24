@@ -1,9 +1,7 @@
 import { SlashCommandBuilder } from 'discord.js'
 
-import { getMainMessage, sendMessage } from '#utils/mainMessage.js'
-import { generateNowPlayingCanvas } from '#utils/nowPlayingCanvas.js'
-
-const { WEB_URL } = process.env
+import { getMainMessage, sendMessage } from '@utils/mainMessage'
+import { generateNowPlayingCanvas } from '@utils/nowPlayingCanvas'
 
 export default {
   data: new SlashCommandBuilder().setName('shuffle').setDescription('Shuffles the queue.'),
