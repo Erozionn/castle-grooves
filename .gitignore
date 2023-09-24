@@ -110,7 +110,6 @@ dist
 
 .pnp.*
 .yarn/
-yarn.lock
 
 build
 
