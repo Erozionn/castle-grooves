@@ -12,8 +12,9 @@ import {
   TextChannel,
   Message,
 } from 'discord.js'
-import { DisTube, Queue, Song } from 'distube'
+import { DisTube } from 'distube'
 import { YtDlpPlugin } from '@distube/yt-dlp'
+import { SpotifyPlugin } from '@distube/spotify'
 
 import {
   addSongEventHandler,
@@ -43,6 +44,7 @@ const {
   YOUTUBE_COOKIE,
   YOUTUBE_IDENTITY_TOKEN,
   NOW_PLAYING_MOCK_DATA,
+  SPOTIFY,
 } = ENV
 
 const client = new Client({
@@ -54,13 +56,39 @@ const client = new Client({
   partials: [Partials.Channel],
 }) as ClientType
 
+if (SPOTIFY.CLIENT_ID && SPOTIFY.CLIENT_SECRET) console.log('[init] Loading with Spotify search')
+
 const player = new DisTube(client, {
   emptyCooldown: 300,
   nsfw: true,
   searchSongs: 1,
   youtubeCookie: YOUTUBE_COOKIE,
   youtubeIdentityToken: YOUTUBE_IDENTITY_TOKEN,
-  plugins: [new YtDlpPlugin()],
+  plugins: [
+    new YtDlpPlugin(),
+    ...(SPOTIFY && SPOTIFY.CLIENT_ID && SPOTIFY.CLIENT_SECRET
+      ? [
+          new SpotifyPlugin({
+            parallel: true,
+            emitEventsAfterFetching: true,
+            api: {
+              clientId: SPOTIFY.CLIENT_ID,
+              clientSecret: SPOTIFY.CLIENT_SECRET,
+              topTracksCountry: SPOTIFY.COUNTRY,
+            },
+          }),
+        ]
+      : []),
+
+    new SpotifyPlugin({
+      parallel: true,
+      api: {
+        clientId: 'SpotifyAppClientID',
+        clientSecret: 'SpotifyAppClientSecret',
+        topTracksCountry: 'CA',
+      },
+    }),
+  ],
 })
 
 client.player = player
