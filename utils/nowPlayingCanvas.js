@@ -111,6 +111,7 @@ export const nowPlayingCanvasWithUpNext = async (songs) => {
     y: 220,
     x: 10,
     font: '600 24px Poppins',
+    charsPerLine: 15,
   })
 
   // Render artist
@@ -119,9 +120,16 @@ export const nowPlayingCanvasWithUpNext = async (songs) => {
       fillStyle: '#ffffff',
       y: 220 + songTitleHeight,
       x: 10,
-      font: '300 24px Poppins',
+      font: '300 20px Poppins',
     })
   }
+
+  // Render requester profile picture pill
+  canv.font = '600 24px Poppins'
+  canv.fillStyle = song.member.displayHexColor
+  canv.measureText(song.member.displayName).width
+  canv.roundRect(6, 344, canv.measureText(song.member.displayName).width + 36, 40, 20)
+  canv.fill()
 
   // Render requester profile picture
   canv.save()
@@ -145,6 +153,7 @@ export const nowPlayingCanvasWithUpNext = async (songs) => {
   canv.textAlign = 'left'
   canv.font = '600 18px Poppins'
   canv.fillText(song.member.displayName, 54, 370)
+  canv.fillStyle = '#ffffff'
 
   // Render "Up Next"
   canv.textAlign = 'left'
@@ -255,7 +264,7 @@ export const nowPlayingCanvas = async (song) => {
   // Render title
   const songTitleHeight = renderMultiLineTitle(canvas, title || artist, {
     fillStyle: '#ffffff',
-    y: 50,
+    y: 44,
     x: 320,
     font: '600 28px Poppins',
     textAlign: 'start',
@@ -266,14 +275,32 @@ export const nowPlayingCanvas = async (song) => {
   if (title) {
     renderMultiLineTitle(canvas, artist, {
       fillStyle: '#ffffff',
-      y: 50 + songTitleHeight,
+      y: 48 + songTitleHeight,
       x: 320,
-      font: '300 28px Poppins',
+      font: '300 24px Poppins',
       textAlign: 'start',
       charsPerLine: 20,
     })
   }
 
+  // canv.save()
+
+  // canv.beginPath()
+  // canv.arc(336, 133, 20, 0, Math.PI * 2)
+  // canv.closePath()
+  // canv.clip()
+
+  // canv.fillStyle = song.member.displayHexColor
+  // canv.fillRect(312, 109, 48, 48)
+
+  // canv.restore()
+
+  // Render requester profile picture pill
+  canv.font = '600 28px Poppins'
+  canv.fillStyle = song.member.displayHexColor
+  canv.measureText(song.member.displayName).width
+  canv.roundRect(316, 113, canv.measureText(song.member.displayName).width + 26, 40, 20)
+  canv.fill()
   // Render requester profile picture
   canv.save()
 
@@ -295,7 +322,7 @@ export const nowPlayingCanvas = async (song) => {
   canv.fillStyle = '#ffffff'
   canv.textAlign = 'left'
   canv.font = '600 18px Poppins'
-  canv.fillText(song.member.displayName, 362, 140)
+  canv.fillText(song.member.displayName, 362, 139)
 
   // Buffer canvas
   const buffer = await canvas.toBuffer()

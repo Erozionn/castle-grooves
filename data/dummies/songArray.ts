@@ -3786,6 +3786,7 @@ export default mockSongs.map((song) => {
     member: {
       displayName: "User's name",
       displayAvatarURL: () => './assets/images/placeholder.png',
+      displayHexColor: '#0097ff',
     },
   }
 })
