@@ -95,7 +95,7 @@ client.player = player
 
 client.commands = new Collection()
 
-// // Initialize the API and webserver.
+// Initialize the API and webserver.
 initApi(client)
 // Register commands.
 registerCommands()
@@ -230,15 +230,15 @@ client.on('messageCreate', (msg) => {
 
   if (!botMsg) return
 
-  const { channel, content, components } = botMsg
+  const { channel, content, components, attachments } = botMsg
 
   if (msg.channel.id === botMsg.channel.id && msg.author.id !== botMsg.author.id) {
     msgResetCount += 1
   }
 
-  if (msgResetCount > 2) {
+  if (msgResetCount > 0) {
     deleteMessage()
-    sendMessage(channel, { content, components })
+    sendMessage(channel, { content, components, files: attachments.map((a) => a.url) })
     msgResetCount = 0
   }
 })
