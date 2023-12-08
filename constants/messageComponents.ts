@@ -16,11 +16,11 @@ export const playerButtons = {
     .setStyle(ButtonStyle.Primary)
     .setDisabled(false)
     .setEmoji('skipnext:909248255915868160'),
-  repeat: new ButtonBuilder()
-    .setCustomId('repeat_button')
-    .setStyle(ButtonStyle.Primary)
+  recommended: new ButtonBuilder()
+    .setCustomId('recommended_button')
+    .setStyle(ButtonStyle.Secondary)
     .setDisabled(false)
-    .setEmoji('repeatoff:909248201427681290'),
+    .setEmoji('recommended:1182536446914076702'),
   stop: new ButtonBuilder()
     .setCustomId('stop_button')
     .setStyle(ButtonStyle.Danger)

@@ -18,7 +18,11 @@ export const queryApi = () => {
   if (!INFLUX_URL || !INFLUX_TOKEN || !INFLUX_ORG || !INFLUX_BUCKET)
     throw new Error('[InfluxDB] InfluxDB not configured.')
 
-  const influxDbClient = new InfluxDB({ url: INFLUX_URL || '', token: INFLUX_TOKEN })
+  const influxDbClient = new InfluxDB({
+    url: INFLUX_URL || '',
+    token: INFLUX_TOKEN,
+    timeout: 20000,
+  })
   return influxDbClient.getQueryApi(INFLUX_ORG)
 }
 
@@ -26,7 +30,11 @@ export const writeApi = () => {
   if (!INFLUX_URL || !INFLUX_TOKEN || !INFLUX_ORG || !INFLUX_BUCKET)
     throw new Error('[InfluxDB] InfluxDB not configured.')
 
-  const influxDbClient = new InfluxDB({ url: INFLUX_URL || '', token: INFLUX_TOKEN })
+  const influxDbClient = new InfluxDB({
+    url: INFLUX_URL || '',
+    token: INFLUX_TOKEN,
+    timeout: 20000,
+  })
   return influxDbClient.getWriteApi(INFLUX_ORG, INFLUX_BUCKET)
 }
 
