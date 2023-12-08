@@ -7,6 +7,7 @@ import {
   repeatButtonInteractionHandler,
   backButtonInteractionHandler,
   historyInteractionHandler,
+  recommendedButtonInteractionHandler,
 } from '@components/interactions'
 import { ClientType } from '@types'
 
@@ -37,6 +38,9 @@ export default async (interaction: Interaction<CacheType>, client: ClientType) =
       break
     case 'repeat_button':
       repeatButtonInteractionHandler(client, interaction as ButtonInteraction, queue)
+      break
+    case 'recommended_button':
+      recommendedButtonInteractionHandler(client, interaction as ButtonInteraction, queue)
       break
     case 'history':
       historyInteractionHandler(client, interaction as StringSelectMenuInteraction, queue)

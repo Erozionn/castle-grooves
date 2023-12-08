@@ -10,7 +10,7 @@ export default async (queue?: Queue) => {
     return
   }
 
-  if (queue.songs.length > 1) {
+  if (queue.songs.length > 1 || queue.autoplay) {
     queue.skip()
   } else {
     queue.stop()
