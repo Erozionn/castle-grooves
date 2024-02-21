@@ -12,9 +12,7 @@ import {
   TextChannel,
   Message,
 } from 'discord.js'
-import { DisTube } from 'distube'
-import { YtDlpPlugin } from '@distube/yt-dlp'
-import { SpotifyPlugin } from '@distube/spotify'
+import { Player } from 'discord-player'
 
 import {
   addSongEventHandler,
@@ -58,38 +56,7 @@ const client = new Client({
 
 if (SPOTIFY.CLIENT_ID && SPOTIFY.CLIENT_SECRET) console.log('[init] Loading with Spotify search')
 
-const player = new DisTube(client, {
-  emptyCooldown: 300,
-  nsfw: true,
-  searchSongs: 1,
-  youtubeCookie: YOUTUBE_COOKIE,
-  youtubeIdentityToken: YOUTUBE_IDENTITY_TOKEN,
-  plugins: [
-    new YtDlpPlugin(),
-    ...(SPOTIFY && SPOTIFY.CLIENT_ID && SPOTIFY.CLIENT_SECRET
-      ? [
-          new SpotifyPlugin({
-            parallel: true,
-            emitEventsAfterFetching: true,
-            api: {
-              clientId: SPOTIFY.CLIENT_ID,
-              clientSecret: SPOTIFY.CLIENT_SECRET,
-              topTracksCountry: SPOTIFY.COUNTRY,
-            },
-          }),
-        ]
-      : []),
-
-    new SpotifyPlugin({
-      parallel: true,
-      api: {
-        clientId: 'SpotifyAppClientID',
-        clientSecret: 'SpotifyAppClientSecret',
-        topTracksCountry: 'CA',
-      },
-    }),
-  ],
-})
+const player = new Player(client)
 
 client.player = player
 
@@ -136,6 +103,8 @@ commandFiles.forEach(async (file) => {
 })
 
 client.once('ready', async () => {
+  await player.extractors.loadDefault()
+
   client.user?.setActivity({
     name: '🎶 Music 🎶',
     type: ActivityType.Listening,
@@ -201,25 +170,25 @@ client.on('interactionCreate', async (interaction) => await buttonHandler(intera
 // On user join voice channel event
 client.on('voiceStateUpdate', (oldState, newState) => recordVoiceStateChange(oldState, newState))
 
-client.player.on('playSong', playSongEventHandler)
+player.events.on('playerStart', playSongEventHandler)
 
 // On add song event
-client.player.on('addSong', addSongEventHandler)
+player.events.on('audioTrackAdd', addSongEventHandler)
 
 // on add playlist event
-client.player.on('addList', addSongEventHandler)
+player.events.on('audioTracksAdd', addSongEventHandler)
 
 // On bot disconnected from voice channel
-client.player.on('disconnect', disconnectEventHandler)
+player.events.on('disconnect', disconnectEventHandler)
 
 // On voice channel empty
-client.player.on('empty', emptyEventHandler)
+player.events.on('emptyChannel', emptyEventHandler)
 
 // On queue/song finish
-client.player.on('finish', songFinishEventHandler)
+player.events.on('emptyQueue', songFinishEventHandler)
 
 // On error
-client.player.on('error', async (channel, e) => {
+player.events.on('error', async (channel, e) => {
   console.error('[playerError]', e)
 })
 

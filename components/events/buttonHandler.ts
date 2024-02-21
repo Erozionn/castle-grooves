@@ -1,4 +1,5 @@
 import { ButtonInteraction, CacheType, Interaction, StringSelectMenuInteraction } from 'discord.js'
+import { GuildQueue, useQueue } from 'discord-player'
 
 import {
   stopButtonInteractionHandler,
@@ -16,7 +17,12 @@ export default async (interaction: Interaction<CacheType>, client: ClientType) =
   interaction.deferUpdate()
 
   const { channel, customId } = interaction
-  const queue = client.player.queues.get(interaction)
+  const queue = useQueue(interaction.guild?.id as string) as GuildQueue<Interaction>
+
+  if (!queue) {
+    console.log('[buttonHandler] No queue found!')
+    return
+  }
 
   if (!channel) {
     console.log('[buttonHandler] No channel found!')
@@ -28,22 +34,22 @@ export default async (interaction: Interaction<CacheType>, client: ClientType) =
       backButtonInteractionHandler(queue)
       break
     case 'play_pause_button':
-      playPauseButtonInteractionHandler(interaction as ButtonInteraction, queue)
+      playPauseButtonInteractionHandler(queue)
       break
     case 'skip_button':
       skipButtonInteractionHandler(queue)
       break
     case 'stop_button':
-      stopButtonInteractionHandler(client, interaction as ButtonInteraction, queue)
+      stopButtonInteractionHandler(queue)
       break
     case 'repeat_button':
-      repeatButtonInteractionHandler(client, interaction as ButtonInteraction, queue)
+      repeatButtonInteractionHandler(queue)
       break
     case 'recommended_button':
-      recommendedButtonInteractionHandler(client, interaction as ButtonInteraction, queue)
+      recommendedButtonInteractionHandler(queue)
       break
     case 'history':
-      historyInteractionHandler(client, interaction as StringSelectMenuInteraction, queue)
+      historyInteractionHandler(queue as GuildQueue<StringSelectMenuInteraction>)
       break
     default:
       break

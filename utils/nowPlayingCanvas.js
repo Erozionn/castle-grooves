@@ -1,4 +1,3 @@
-// const axios = require('axios')
 import path from 'node:path'
 
 import { Canvas, FontLibrary, loadImage } from 'skia-canvas'
@@ -103,7 +102,7 @@ export const nowPlayingCanvasWithUpNext = async (songs) => {
   canv.drawImage(thumbnail, 10, 10, 300, 169)
 
   // Split artist and title
-  const { artist, title } = parseSongName(song.name)
+  const { author: artist, title } = song
 
   // Render title
   const songTitleHeight = renderMultiLineTitle(canvas, title || artist, {
@@ -126,9 +125,9 @@ export const nowPlayingCanvasWithUpNext = async (songs) => {
 
   // Render requester profile picture pill
   canv.font = '600 24px Poppins'
-  canv.fillStyle = song.member.displayHexColor
-  canv.measureText(song.member.displayName).width
-  canv.roundRect(6, 344, canv.measureText(song.member.displayName).width + 36, 40, 20)
+  canv.fillStyle = song.requestedBy.displayHexColor
+  canv.measureText(song.requestedBy.displayName).width
+  canv.roundRect(6, 344, canv.measureText(song.requestedBy.displayName).width + 36, 40, 20)
   canv.fill()
 
   // Render requester profile picture
@@ -140,7 +139,9 @@ export const nowPlayingCanvasWithUpNext = async (songs) => {
   canv.clip()
 
   try {
-    const avatar = await loadImage(song.user.displayAvatarURL({ extension: 'png', size: 64 }))
+    const avatar = await loadImage(
+      song.requestedBy.displayAvatarURL({ extension: 'png', size: 64 })
+    )
     canv.drawImage(avatar, 10, 348, 32, 32)
   } catch (e) {
     console.warn('[AvatarError] ', e)
@@ -152,7 +153,7 @@ export const nowPlayingCanvasWithUpNext = async (songs) => {
   canv.fillStyle = '#ffffff'
   canv.textAlign = 'left'
   canv.font = '600 18px Poppins'
-  canv.fillText(song.member.displayName, 54, 370)
+  canv.fillText(song.requestedBy.displayName, 54, 370)
   canv.fillStyle = '#ffffff'
 
   // Render "Up Next"
@@ -259,7 +260,7 @@ export const nowPlayingCanvas = async (song) => {
   canv.drawImage(thumbnail, 0, 0, 300, 169)
 
   // Split artist and title
-  const { artist, title } = parseSongName(song.name)
+  const { author: artist, title } = song
 
   // Render title
   const songTitleHeight = renderMultiLineTitle(canvas, title || artist, {
@@ -290,16 +291,16 @@ export const nowPlayingCanvas = async (song) => {
   // canv.closePath()
   // canv.clip()
 
-  // canv.fillStyle = song.member.displayHexColor
+  // canv.fillStyle = song.requestedBy.displayHexColor
   // canv.fillRect(312, 109, 48, 48)
 
   // canv.restore()
 
   // Render requester profile picture pill
   canv.font = '600 28px Poppins'
-  canv.fillStyle = song.member.displayHexColor
-  canv.measureText(song.member.displayName).width
-  canv.roundRect(316, 113, canv.measureText(song.member.displayName).width + 26, 40, 20)
+  canv.fillStyle = song.requestedBy.displayHexColor
+  canv.measureText(song.requestedBy.displayName).width
+  canv.roundRect(316, 113, canv.measureText(song.requestedBy.displayName).width + 26, 40, 20)
   canv.fill()
   // Render requester profile picture
   canv.save()
@@ -310,7 +311,9 @@ export const nowPlayingCanvas = async (song) => {
   canv.clip()
 
   try {
-    const avatar = await loadImage(song.user?.displayAvatarURL({ extension: 'png', size: 64 }))
+    const avatar = await loadImage(
+      song.requestedBy?.displayAvatarURL({ extension: 'png', size: 64 })
+    )
     canv.drawImage(avatar, 320, 117, 32, 32)
   } catch (e) {
     console.warn('[AvatarError]', e)
@@ -322,7 +325,7 @@ export const nowPlayingCanvas = async (song) => {
   canv.fillStyle = '#ffffff'
   canv.textAlign = 'left'
   canv.font = '600 18px Poppins'
-  canv.fillText(song.member.displayName, 362, 139)
+  canv.fillText(song.requestedBy.displayName, 362, 139)
 
   // Buffer canvas
   const buffer = await canvas.toBuffer()
@@ -330,13 +333,14 @@ export const nowPlayingCanvas = async (song) => {
   return buffer
 }
 
-const generateNowPlayingCanvas = async (songs) => {
-  if (!songs || songs.length < 1)
+const generateNowPlayingCanvas = async (tracks) => {
+  const tracksArray = tracks.toArray()
+  if (!tracksArray || tracksArray.length < 1)
     throw Error('Error: Cannot generate now playing canvas without songs')
-  if (songs.length > 1) {
-    return nowPlayingCanvasWithUpNext(songs)
+  if (tracksArray.length > 1) {
+    return nowPlayingCanvasWithUpNext(tracksArray)
   }
-  return nowPlayingCanvas(songs[0])
+  return nowPlayingCanvas(tracksArray[0])
 }
 
 export { generateNowPlayingCanvas, getAverageColor }

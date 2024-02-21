@@ -1,29 +1,29 @@
-import { Queue } from 'distube'
-import { ButtonInteraction, ButtonStyle } from 'discord.js'
+import { ButtonStyle, Interaction } from 'discord.js'
+import { GuildQueue, QueueRepeatMode } from 'discord-player'
 
 import { getMainMessage, sendMessage } from '@utils/mainMessage'
 import { components, playerButtons } from '@constants/messageComponents'
-import { ClientType } from '@types'
 
-export default async (client: ClientType, interaction: ButtonInteraction, queue?: Queue) => {
+export default async (queue: GuildQueue<Interaction>) => {
   const mainMessage = getMainMessage()
+  const { channel } = queue.metadata
+
+  if (!channel) return
 
   if (!queue) {
     mainMessage && sendMessage(mainMessage.channel, { content: '❌ | No music is being played!' })
     return
   }
 
-  queue.toggleAutoplay()
+  queue.setRepeatMode(QueueRepeatMode.AUTOPLAY)
 
-  if (queue.autoplay) {
+  if (queue.repeatMode === QueueRepeatMode.AUTOPLAY) {
     playerButtons.recommended.setStyle(ButtonStyle.Success)
   } else {
     playerButtons.recommended.setStyle(ButtonStyle.Secondary)
   }
 
-  if (queue.textChannel) {
-    await sendMessage(queue.textChannel, {
-      components,
-    })
-  }
+  await sendMessage(channel, {
+    components,
+  })
 }

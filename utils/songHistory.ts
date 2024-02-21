@@ -1,5 +1,5 @@
 import { Point } from '@influxdata/influxdb-client'
-import { Song } from 'distube'
+import { Track } from 'discord-player'
 
 import ENV from '@constants/Env'
 import { parseSongName } from '@utils/utilities'
@@ -117,23 +117,23 @@ const getUserTopSongs = async (userId: string, timeRange = 'monthly', limit = 20
   return results
 }
 
-const addSong = (playing: boolean, song?: Song) => {
+const addSong = (playing: boolean, track?: Track) => {
   const point = new Point('song')
   if (playing === false) {
     point.booleanField('playing', false)
-  } else if (song && playing === true) {
-    if (!song.user || !song.name)
+  } else if (track && playing === true) {
+    if (!track.requestedBy || !track.title || !track.author)
       throw new Error('Song user or name is undefined. Cannot add song to DB.')
 
     point
-      .tag('requestedById', song.user.id)
-      .tag('requestedByUsername', song.user.username)
-      .tag('songTitle', song.name)
+      .tag('requestedById', track.requestedBy.id)
+      .tag('requestedByUsername', track.requestedBy.username)
+      .tag('songTitle', `${track.author} - ${track.title}`)
       .booleanField('playing', true)
-      .stringField('songUrl', song.url)
-      .stringField('songThumbnail', song.thumbnail)
-      .stringField('source', song.source)
-      .stringField('requestedByAvatar', song.user.displayAvatarURL())
+      .stringField('songUrl', track.url)
+      .stringField('songThumbnail', track.thumbnail)
+      .stringField('source', track.source)
+      .stringField('requestedByAvatar', track.requestedBy.displayAvatarURL())
   } else {
     console.log('[addSongToDb] Error: playing boolean undefined. Not adding song to DB.')
     return

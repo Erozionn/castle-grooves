@@ -1,4 +1,5 @@
-import { Queue, Song } from 'distube'
+import { GuildQueue, Track } from 'discord-player'
+import { Interaction } from 'discord.js'
 
 import {
   components,
@@ -12,11 +13,10 @@ import { generateHistoryOptions, addSong } from '@utils/songHistory'
 
 const playerButtonKeys = Object.keys(playerButtons)
 
-export default async (queue: Queue, song: Song) => {
-  console.log('[playSong] Playing song...')
+export default async (queue: GuildQueue<Interaction>, track: Track) => {
+  const { channel } = queue.metadata
 
-  // Set queue volume to 100%
-  queue.setVolume(100)
+  if (!channel) return
 
   // Add songs to history component
   playerHistory.setOptions(await generateHistoryOptions())
@@ -29,9 +29,9 @@ export default async (queue: Queue, song: Song) => {
   // Change disconnect button to stop button
   playerButtons.stop.setEmoji('musicoff:909248235623825439')
 
-  if (queue.songs.length > 0 && queue.textChannel) {
-    const buffer = await generateNowPlayingCanvas(queue.songs)
-    await sendMessage(queue.textChannel, {
+  if (queue.tracks.size > 0 && queue.metadata.channel) {
+    const buffer = await generateNowPlayingCanvas(queue.tracks.toArray())
+    await sendMessage(channel, {
       content: '',
       files: [buffer],
       components,
@@ -39,5 +39,7 @@ export default async (queue: Queue, song: Song) => {
   }
 
   // Write song info into DB (playing [true:false], song)
-  await addSong(queue.playing, song)
+  await addSong(queue.isPlaying(), track)
+
+  console.log(`[playSong] Playing song: ${track.author} - ${track.title}`)
 }

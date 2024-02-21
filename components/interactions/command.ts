@@ -11,7 +11,10 @@ export default async (interaction: Interaction<CacheType>, client: ClientType) =
     await command.execute(interaction)
   } catch (error) {
     console.error('[commandInteraction]', error)
-    await (interaction as CommandInteraction).reply({
+
+    if (!interaction.isCommand()) return
+
+    await interaction.reply({
       content: 'There was an error while executing this command!',
       ephemeral: true,
     })

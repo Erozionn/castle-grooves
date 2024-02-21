@@ -1,5 +1,5 @@
-import { Queue } from 'distube'
-import { ButtonInteraction } from 'discord.js'
+import { GuildQueue } from 'discord-player'
+import { Interaction } from 'discord.js'
 
 import { sendMessage } from '@utils/mainMessage'
 import {
@@ -8,17 +8,13 @@ import {
   playerButtonsType,
   playerHistory,
 } from '@constants/messageComponents'
-import { ClientType } from '@types'
 
-export default async (client: ClientType, interaction: ButtonInteraction, queue?: Queue) => {
-  if (!queue) {
-    client.player.voices.leave(interaction)
-    return
-  }
+export default async (queue: GuildQueue<Interaction>) => {
+  const { channel } = queue.metadata
 
-  if (queue.playing && queue.textChannel) {
-    queue.pause()
-    queue.songs.splice(1)
+  if (queue.isPlaying() && channel) {
+    queue.node.pause()
+    queue.removeTrack(0)
 
     playerButtons.stop.setEmoji('disconnect:1043629464166355015')
     playerHistory.setPlaceholder('-- Song History --')
@@ -27,10 +23,10 @@ export default async (client: ClientType, interaction: ButtonInteraction, queue?
       playerButtons[Object.keys(playerButtons)[i] as playerButtonsType].setDisabled(true)
     }
 
-    await sendMessage(queue.textChannel, {
+    await sendMessage(channel, {
       components,
     })
   } else {
-    queue.stop()
+    queue.delete()
   }
 }

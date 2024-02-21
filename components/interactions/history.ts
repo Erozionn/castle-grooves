@@ -1,50 +1,51 @@
-import { Queue } from 'distube'
-import { GuildMember, GuildTextBasedChannel, StringSelectMenuInteraction } from 'discord.js'
+import { GuildMember, StringSelectMenuInteraction } from 'discord.js'
+import { GuildQueue } from 'discord-player'
 
-import { ClientType } from '@types'
+export default async (queue: GuildQueue<StringSelectMenuInteraction>) => {
+  const interaction = queue.metadata
+  const { member, message, values } = interaction
+  const {
+    voice: { channel: voiceChannel },
+  } = member as GuildMember
 
-export default async (
-  client: ClientType,
-  interaction: StringSelectMenuInteraction,
-  queue?: Queue
-) => {
-  const member = interaction.member as GuildMember
-
-  if (!member.voice.channelId) {
-    interaction.message.edit('❌ | You need to be in a voice channel!')
+  if (!voiceChannel) {
+    message.edit('❌ | You need to be in a voice channel!')
     return
   }
 
-  if (interaction.values.length === 0) {
-    interaction.message.edit('❌ | You need to select at least one song!')
+  if (values.length === 0) {
+    message.edit('❌ | You need to select at least one song!')
     return
   }
 
-  if (interaction.values.length === 1 && member.voice.channel) {
-    const song = interaction.values[0]
-    client.player.play(member.voice.channel, song, {
-      textChannel: interaction.channel as GuildTextBasedChannel,
-      member: member,
+  if (values.length === 1) {
+    const songName = values[0]
+    queue.player.play(voiceChannel, songName, {
+      nodeOptions: { metadata: interaction },
     })
   }
 
-  if (interaction.values.length > 1 && member.voice.channel) {
-    const songs = interaction.values
+  if (values.length > 1) {
+    const songs = values
     console.log('[history] Adding songs to queue...', songs)
-    const playlist = await client.player.createCustomPlaylist(songs, {
-      member: member,
-      parallel: true,
-    })
-    client.player.play(member.voice.channel, playlist, {
-      textChannel: interaction.channel as GuildTextBasedChannel,
-      member: member,
-    })
+
+    try {
+      const searchResults = await Promise.all(songs.map((song) => queue.player.search(song)))
+      searchResults.forEach((result) =>
+        queue.player.play(voiceChannel, result.tracks[0], {
+          requestedBy: member as GuildMember,
+          nodeOptions: { metadata: interaction },
+        })
+      )
+    } catch (e) {
+      console.log('[history]', e)
+    }
   }
 
-  if (queue && queue.paused) {
-    if (queue.songs.length >= 1) {
-      await queue.skip()
+  if (queue && queue.node.isPaused()) {
+    if (queue.tracks.size >= 1) {
+      await queue.node.skip()
     }
-    queue.resume()
+    queue.node.resume()
   }
 }
