@@ -9,7 +9,9 @@ import {
   playerHistory,
 } from '@constants/messageComponents'
 
-export default async (queue: GuildQueue<Interaction>) => {
+export default async (queue: GuildQueue<Interaction> | null) => {
+  if (!queue) return
+
   const { channel } = queue.metadata
 
   if (queue.isPlaying() && channel) {

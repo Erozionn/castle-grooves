@@ -3,7 +3,7 @@ import { Interaction } from 'discord.js'
 
 import { getMainMessage, sendMessage } from '@utils/mainMessage'
 
-export default async (queue: GuildQueue<Interaction>) => {
+export default async (queue: GuildQueue<Interaction> | null) => {
   const mainMessage = getMainMessage()
 
   if (!queue) {
@@ -11,7 +11,7 @@ export default async (queue: GuildQueue<Interaction>) => {
     return
   }
 
-  if (queue.tracks.size > 1 || queue.repeatMode === QueueRepeatMode.AUTOPLAY) {
+  if (queue.tracks.size > 0 || queue.repeatMode === QueueRepeatMode.AUTOPLAY) {
     queue.node.skip()
   } else {
     queue.node.stop()

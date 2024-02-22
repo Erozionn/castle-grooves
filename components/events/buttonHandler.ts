@@ -17,12 +17,12 @@ export default async (interaction: Interaction<CacheType>, client: ClientType) =
   interaction.deferUpdate()
 
   const { channel, customId } = interaction
-  const queue = useQueue(interaction.guild?.id as string) as GuildQueue<Interaction>
+  const queue = useQueue<Interaction>(interaction.guild?.id as string)
 
-  if (!queue) {
-    console.log('[buttonHandler] No queue found!')
-    return
-  }
+  // if (!queue) {
+  //   console.log('[buttonHandler] No queue found!')
+  //   return
+  // }
 
   if (!channel) {
     console.log('[buttonHandler] No channel found!')
@@ -49,7 +49,10 @@ export default async (interaction: Interaction<CacheType>, client: ClientType) =
       recommendedButtonInteractionHandler(queue)
       break
     case 'history':
-      historyInteractionHandler(queue as GuildQueue<StringSelectMenuInteraction>)
+      historyInteractionHandler(
+        queue as GuildQueue<StringSelectMenuInteraction> | null,
+        interaction as StringSelectMenuInteraction
+      )
       break
     default:
       break

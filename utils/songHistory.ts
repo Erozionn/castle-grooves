@@ -1,5 +1,5 @@
 import { Point } from '@influxdata/influxdb-client'
-import { Track } from 'discord-player'
+import { Track, serialize } from 'discord-player'
 
 import ENV from '@constants/Env'
 import { parseSongName } from '@utils/utilities'
@@ -12,6 +12,7 @@ type SongHistory = {
   requestedById: string
   requestedByUsername: string
   requestedByAvatar: string
+  serializedTrack: string
   source: string
   playing: boolean
 }
@@ -133,6 +134,7 @@ const addSong = (playing: boolean, track?: Track) => {
       .stringField('songUrl', track.url)
       .stringField('songThumbnail', track.thumbnail)
       .stringField('source', track.source)
+      .stringField('serializedTrack', JSON.stringify(serialize(track)))
       .stringField('requestedByAvatar', track.requestedBy.displayAvatarURL())
   } else {
     console.log('[addSongToDb] Error: playing boolean undefined. Not adding song to DB.')
@@ -159,7 +161,7 @@ const generateHistoryOptions = async () => {
         label: title ? title.substring(0, 95) : artist.substring(0, 95),
         description: title ? artist.substring(0, 95) : ' ',
         emoji: '🎶',
-        value: `${s.songUrl.substring(0, 90)}?discord=${Math.floor(Math.random() * 99999)}`,
+        value: `${title?.substring(0, 90)} ${artist.substring(0, 90)} ${Math.floor(Math.random() * 99999)}`,
       }
     })
     .reverse()

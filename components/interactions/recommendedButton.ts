@@ -4,7 +4,9 @@ import { GuildQueue, QueueRepeatMode } from 'discord-player'
 import { getMainMessage, sendMessage } from '@utils/mainMessage'
 import { components, playerButtons } from '@constants/messageComponents'
 
-export default async (queue: GuildQueue<Interaction>) => {
+export default async (queue: GuildQueue<Interaction> | null) => {
+  if (!queue) return
+
   const mainMessage = getMainMessage()
   const { channel } = queue.metadata
 

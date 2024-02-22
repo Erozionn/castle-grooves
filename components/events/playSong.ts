@@ -16,7 +16,10 @@ const playerButtonKeys = Object.keys(playerButtons)
 export default async (queue: GuildQueue<Interaction>, track: Track) => {
   const { channel } = queue.metadata
 
-  if (!channel) return
+  if (!channel) {
+    console.error('[playSong] Channel not found')
+    return
+  }
 
   // Add songs to history component
   playerHistory.setOptions(await generateHistoryOptions())
@@ -29,8 +32,14 @@ export default async (queue: GuildQueue<Interaction>, track: Track) => {
   // Change disconnect button to stop button
   playerButtons.stop.setEmoji('musicoff:909248235623825439')
 
-  if (queue.tracks.size > 0 && queue.metadata.channel) {
-    const buffer = await generateNowPlayingCanvas(queue.tracks.toArray())
+  console.log('[playSong] Setting components', queue.tracks.toArray(), queue.metadata.channel)
+
+  if ((queue.tracks.size > 0 || queue.currentTrack) && queue.metadata.channel) {
+    const tracks = queue.tracks.toArray()
+    if (queue.currentTrack) tracks.push(queue.currentTrack)
+
+    console.log('[playSong] Generating now playing canvas')
+    const buffer = await generateNowPlayingCanvas(tracks)
     await sendMessage(channel, {
       content: '',
       files: [buffer],
@@ -41,5 +50,7 @@ export default async (queue: GuildQueue<Interaction>, track: Track) => {
   // Write song info into DB (playing [true:false], song)
   await addSong(queue.isPlaying(), track)
 
-  console.log(`[playSong] Playing song: ${track.author} - ${track.title}`)
+  console.log(
+    `[playSong] Playing song: ${track.title?.substring(0, 90)} ${track.author.substring(0, 90)}`
+  )
 }

@@ -14,7 +14,10 @@ export default async (queue: GuildQueue<Interaction>) => {
   playerHistory.setOptions(await generateHistoryOptions())
 
   if (queue.tracks.size > 1 && channel) {
-    const buffer = await generateNowPlayingCanvas(queue.tracks)
+    const tracks = queue.tracks.toArray()
+    if (queue.currentTrack) tracks.push(queue.currentTrack)
+
+    const buffer = await generateNowPlayingCanvas(tracks)
     await sendMessage(channel, {
       files: [buffer],
       components,

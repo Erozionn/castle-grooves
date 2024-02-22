@@ -55,7 +55,7 @@ export const nowPlayingCanvasWithUpNext = async (songs) => {
 
   const song = songs[0]
 
-  const thumbnail = await loadImage(`https://img.youtube.com/vi/${song.id}/mqdefault.jpg`)
+  const thumbnail = await loadImage(song.thumbnail)
 
   // Get average thumbnail color
   imageCtx.drawImage(thumbnail, 0, 0, 222, 125)
@@ -165,7 +165,7 @@ export const nowPlayingCanvasWithUpNext = async (songs) => {
   try {
     const pics = await Promise.all(
       songs.slice(1, 7).map((s) => {
-        return loadImage(s.user.displayAvatarURL({ extension: 'png', size: 64 }))
+        return loadImage(s.requestedBy.displayAvatarURL({ extension: 'png', size: 64 }))
       })
     )
 
@@ -189,9 +189,8 @@ export const nowPlayingCanvasWithUpNext = async (songs) => {
     const i = index + 1
     canv.fillStyle = averageColor.isDark ? `#ffffff` : shadeColor(averageColor.hex, -200)
     canv.font = '600 22px Poppins'
-    const parsedSong = parseSongName(songObj.name)
-    const a = parsedSong.artist
-    const s = parsedSong.title
+    const a = songObj.author
+    const s = songObj.title
     if (s !== null) {
       canv.fillText(truncateString(`${i}. ${s}`, 25), 330, 26 + 65 * i)
       canv.font = '300 22px Poppins'
@@ -219,7 +218,7 @@ export const nowPlayingCanvas = async (song) => {
   const imageCanvas = new Canvas(222, 125)
   const imageCtx = imageCanvas.getContext('2d')
 
-  const thumbnail = await loadImage(`https://img.youtube.com/vi/${song.id}/mqdefault.jpg`)
+  const thumbnail = await loadImage(song.thumbnail)
 
   // Get average thumbnail color
   imageCtx.drawImage(thumbnail, 0, 0, 222, 125)
@@ -334,13 +333,12 @@ export const nowPlayingCanvas = async (song) => {
 }
 
 const generateNowPlayingCanvas = async (tracks) => {
-  const tracksArray = tracks.toArray()
-  if (!tracksArray || tracksArray.length < 1)
+  if (!tracks || tracks.length < 1)
     throw Error('Error: Cannot generate now playing canvas without songs')
-  if (tracksArray.length > 1) {
-    return nowPlayingCanvasWithUpNext(tracksArray)
+  if (tracks.length > 1) {
+    return nowPlayingCanvasWithUpNext(tracks)
   }
-  return nowPlayingCanvas(tracksArray[0])
+  return nowPlayingCanvas(tracks[0])
 }
 
 export { generateNowPlayingCanvas, getAverageColor }

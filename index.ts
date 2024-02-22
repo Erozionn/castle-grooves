@@ -56,7 +56,15 @@ const client = new Client({
 
 if (SPOTIFY.CLIENT_ID && SPOTIFY.CLIENT_SECRET) console.log('[init] Loading with Spotify search')
 
-const player = new Player(client)
+const player = new Player(client, {
+  ytdlOptions: {
+    requestOptions: {
+      headers: {
+        cookie: YOUTUBE_COOKIE,
+      },
+    },
+  },
+})
 
 client.player = player
 
@@ -103,7 +111,9 @@ commandFiles.forEach(async (file) => {
 })
 
 client.once('ready', async () => {
-  await player.extractors.loadDefault()
+  await player.extractors.loadDefault(
+    (ext) => ext === 'YouTubeExtractor' || ext === 'SpotifyExtractor'
+  )
 
   client.user?.setActivity({
     name: '🎶 Music 🎶',
@@ -190,6 +200,24 @@ player.events.on('emptyQueue', songFinishEventHandler)
 // On error
 player.events.on('error', async (channel, e) => {
   console.error('[playerError]', e)
+})
+
+player.events.on('playerError', (queue, error) => {
+  // Emitted when the audio player errors while streaming audio track
+  console.log(`Player error event: ${error.message}`)
+  console.log(error)
+})
+
+player.on('debug', async (message) => {
+  // Emitted when the player sends debug info
+  // Useful for seeing what dependencies, extractors, etc are loaded
+  console.log(`General player debug event: ${message}`)
+})
+
+player.events.on('debug', async (queue, message) => {
+  // Emitted when the player queue sends debug info
+  // Useful for seeing what state the current queue is at
+  console.log(`Player debug event: ${message}`)
 })
 
 // Resets main message if many messages have since been sent in the channel

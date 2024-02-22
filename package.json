@@ -2,16 +2,15 @@
   "name": "crastle-grooves",
   "version": "0.2.0",
   "description": "Castle Grooves music bot.",
-  "main": "index.js",
-  "type": "module",
+  "main": "index.ts",
   "scripts": {
     "start": "node -r dotenv/config build/index.js dotenv_config_path=.env.dev dotenv_config_debug=true",
-    "start:dev": "ts-node-esm index.ts -r tsconfig-paths/register -r dotenv/config dotenv_config_path=.env.dev dotenv_config_debug=true",
+    "start:dev": "ts-node-dev -r tsconfig-paths/register -r dotenv/config index.ts --inspect dotenv_config_path=.env.dev dotenv_config_debug=true",
     "start:prod": "node build/index.js",
     "start:prefill": "export NOW_PLAYING_MOCK_DATA=true || set NOW_PLAYING_MOCK_DATA=true && tsnd -r tsconfig-paths/register -r dotenv/config --respawn index.ts dotenv_config_path=.env.dev dotenv_config_debug=true",
     "start:docker": "docker run --env-file .env.dev --name castle-grooves castle-grooves:dev",
     "build": "rimraf ./build && tsc && tsc-alias",
-    "build:docker": "yarn build && docker build -t castle-grooves .",
+    "build:docker": "yarn build && docker build -t castle-grooves:dev .",
     "deploy-commands": "node -r dotenv/config deploy-commands.js dotenv_config_path=.env.dev dotenv_config_debug=true",
     "postinstall": "patch-package",
     "nuke": "rimraf ./node_modules && yarn",
@@ -32,6 +31,7 @@
     "@discordjs/opus": "^0.9.0",
     "@discordjs/rest": "^2.2.0",
     "@discordjs/voice": "^0.16.1",
+    "@distube/ytdl-core": "^4.13.3",
     "@influxdata/influxdb-client": "^1.26.0",
     "discord-api-types": "^0.37.70",
     "discord-player": "^6.6.7",
@@ -43,9 +43,7 @@
     "module-alias": "^2.2.3",
     "patch-package": "^8.0.0",
     "sharp": "^0.33.2",
-    "skia-canvas": "^1.0.1",
-    "youtube-ext": "^1.1.16",
-    "ytdl-core": "^4.11.4"
+    "skia-canvas": "^1.0.1"
   },
   "devDependencies": {
     "@types/node": "^20.11.19",
@@ -67,6 +65,7 @@
     "prettier": "^3.2.5",
     "rimraf": "^5.0.5",
     "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
     "tsc-alias": "^1.8.8",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.3.3"
@@ -81,5 +80,6 @@
     "@types": "types",
     "@hooks": "hooks",
     "@data": "data"
-  }
+  },
+  "packageManager": "yarn@4.1.0"
 }

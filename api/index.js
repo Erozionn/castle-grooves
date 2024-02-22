@@ -26,6 +26,7 @@ function initApi(client) {
       return
     }
 
+    // TODO: Fix this to use discord-player
     try {
       client.player.play(member.voice.channel, query, { textChannel: channel, member })
     } catch (e) {
