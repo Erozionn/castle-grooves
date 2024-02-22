@@ -19,11 +19,6 @@ export default async (interaction: Interaction<CacheType>, client: ClientType) =
   const { channel, customId } = interaction
   const queue = useQueue<Interaction>(interaction.guild?.id as string)
 
-  // if (!queue) {
-  //   console.log('[buttonHandler] No queue found!')
-  //   return
-  // }
-
   if (!channel) {
     console.log('[buttonHandler] No channel found!')
     return

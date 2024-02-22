@@ -32,7 +32,7 @@ export default async (queue: GuildQueue<Interaction>, track: Track) => {
   // Change disconnect button to stop button
   playerButtons.stop.setEmoji('musicoff:909248235623825439')
 
-  console.log('[playSong] Setting components', queue.tracks.toArray(), queue.metadata.channel)
+  console.log(queue.tracks.toArray())
 
   if ((queue.tracks.size > 0 || queue.currentTrack) && queue.metadata.channel) {
     const tracks = queue.tracks.toArray()

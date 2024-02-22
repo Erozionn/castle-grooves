@@ -37,12 +37,12 @@ export default {
         nodeOptions: { metadata: interaction },
       })
 
-      // if (queue && queue.node.isPaused()) {
-      //   if (queue.tracks.size >= 1) {
-      //     await queue.node.skip()
-      //   }
-      //   queue.node.resume()
-      // }
+      if (queue && queue.node.isPaused()) {
+        if (queue.tracks.size + (queue.currentTrack ? 1 : 0) >= 1) {
+          await queue.node.skip()
+        }
+        queue.node.resume()
+      }
     } catch (e) {
       console.log('[playCommand]', e)
       await interaction.editReply({ content: 'Error joining your channel.' })

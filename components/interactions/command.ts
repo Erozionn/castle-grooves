@@ -12,11 +12,15 @@ export default async (interaction: Interaction<CacheType>, client: ClientType) =
   } catch (error) {
     console.error('[commandInteraction]', error)
 
-    if (!interaction.isCommand()) return
+    if (!interaction.isCommand() || interaction.replied || interaction.deferred) return
 
-    await interaction.reply({
-      content: 'There was an error while executing this command!',
-      ephemeral: true,
-    })
+    try {
+      await interaction.reply({
+        content: 'There was an error while executing this command!',
+        ephemeral: true,
+      })
+    } catch (e) {
+      console.error('[commandInteraction]', e)
+    }
   }
 }

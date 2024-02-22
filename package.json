@@ -7,7 +7,7 @@
     "start": "node -r dotenv/config build/index.js dotenv_config_path=.env.dev dotenv_config_debug=true",
     "start:dev": "ts-node-dev -r tsconfig-paths/register -r dotenv/config index.ts --inspect dotenv_config_path=.env.dev dotenv_config_debug=true",
     "start:prod": "node build/index.js",
-    "start:prefill": "export NOW_PLAYING_MOCK_DATA=true || set NOW_PLAYING_MOCK_DATA=true && tsnd -r tsconfig-paths/register -r dotenv/config --respawn index.ts dotenv_config_path=.env.dev dotenv_config_debug=true",
+    "start:prefill": "export NOW_PLAYING_MOCK_DATA=true || set NOW_PLAYING_MOCK_DATA=true && yarn start:dev",
     "start:docker": "docker run --env-file .env.dev --name castle-grooves castle-grooves:dev",
     "build": "rimraf ./build && tsc && tsc-alias",
     "build:docker": "yarn build && docker build -t castle-grooves:dev .",

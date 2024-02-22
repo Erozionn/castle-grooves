@@ -52,7 +52,7 @@ export default async (
   }
 
   if (queue && queue.node.isPaused()) {
-    if (queue.tracks.size >= 1) {
+    if (queue.tracks.size + (queue.currentTrack ? 1 : 0) >= 1) {
       await queue.node.skip()
     }
     queue.node.resume()

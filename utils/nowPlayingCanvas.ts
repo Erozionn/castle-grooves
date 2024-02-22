@@ -2,8 +2,9 @@ import path from 'node:path'
 
 import { Canvas, FontLibrary, loadImage } from 'skia-canvas'
 import { getAverageColor } from 'fast-average-color-node'
+import { Track } from 'discord-player'
 
-import { shadeColor, splitAtClosestSpace, parseSongName, truncateString } from '@utils/utilities'
+import { shadeColor, splitAtClosestSpace, truncateString } from '@utils/utilities'
 
 FontLibrary.use([
   path.resolve('./assets/fonts/Poppins-Thin.ttf'),
@@ -14,7 +15,19 @@ FontLibrary.use([
   path.resolve('./assets/fonts/Poppins-Bold.ttf'),
 ])
 
-const renderMultiLineTitle = (canvas, str, options = {}) => {
+const renderMultiLineTitle = (
+  canvas: Canvas,
+  str: string,
+  options: {
+    x?: number
+    y?: number
+    textAlign?: CanvasTextAlign
+    charsPerLine?: number
+    lineHeight?: number
+    font: string
+    fillStyle: CanvasFillStrokeStyles['fillStyle']
+  }
+) => {
   const canvas2D = canvas.getContext('2d')
   canvas2D.font = options.font || '28px Poppins'
   canvas2D.fillStyle = options.fillStyle || '#ffffff'
@@ -47,7 +60,7 @@ const renderMultiLineTitle = (canvas, str, options = {}) => {
   return lineHeight * multiLineArray.length
 }
 
-export const nowPlayingCanvasWithUpNext = async (songs) => {
+export const nowPlayingCanvasWithUpNext = async (songs: Track[]) => {
   const canvas = new Canvas(700, 394)
   const canv = canvas.getContext('2d')
   const imageCanvas = new Canvas(222, 125)
@@ -55,11 +68,13 @@ export const nowPlayingCanvasWithUpNext = async (songs) => {
 
   const song = songs[0]
 
+  const { requestedBy } = song
+
   const thumbnail = await loadImage(song.thumbnail)
 
   // Get average thumbnail color
-  imageCtx.drawImage(thumbnail, 0, 0, 222, 125)
-  const imageBuffer = await imageCanvas.toBuffer()
+  imageCtx.drawImage(thumbnail, 0, 0, 125 * (thumbnail.height / thumbnail.width), 125)
+  const imageBuffer = await imageCanvas.toBuffer('png')
   const averageColor = await getAverageColor(imageBuffer, {
     defaultColor: [0, 0, 0, 0],
     ignoredColor: [0, 0, 0, 255],
@@ -123,66 +138,62 @@ export const nowPlayingCanvasWithUpNext = async (songs) => {
     })
   }
 
-  // Render requester profile picture pill
-  canv.font = '600 24px Poppins'
-  canv.fillStyle = song.requestedBy.displayHexColor
-  canv.measureText(song.requestedBy.displayName).width
-  canv.roundRect(6, 344, canv.measureText(song.requestedBy.displayName).width + 36, 40, 20)
-  canv.fill()
+  if (requestedBy) {
+    // Render requester profile picture
+    canv.save()
 
-  // Render requester profile picture
-  canv.save()
+    canv.beginPath()
+    canv.arc(26, 364, 16, 0, Math.PI * 2)
+    canv.closePath()
+    canv.clip()
 
-  canv.beginPath()
-  canv.arc(26, 364, 16, 0, Math.PI * 2)
-  canv.closePath()
-  canv.clip()
+    try {
+      const avatar = await loadImage(requestedBy.displayAvatarURL({ extension: 'png', size: 64 }))
+      canv.drawImage(avatar, 10, 348, 32, 32)
+    } catch (e) {
+      console.warn('[AvatarError] ', e)
+    }
 
-  try {
-    const avatar = await loadImage(
-      song.requestedBy.displayAvatarURL({ extension: 'png', size: 64 })
-    )
-    canv.drawImage(avatar, 10, 348, 32, 32)
-  } catch (e) {
-    console.warn('[AvatarError] ', e)
-  }
+    canv.restore()
 
-  canv.restore()
+    // Render requester name
+    canv.fillStyle = '#ffffff'
+    canv.textAlign = 'left'
+    canv.font = '600 18px Poppins'
+    canv.fillText(requestedBy.displayName, 54, 370)
+    canv.fillStyle = '#ffffff'
 
-  // Render requester name
-  canv.fillStyle = '#ffffff'
-  canv.textAlign = 'left'
-  canv.font = '600 18px Poppins'
-  canv.fillText(song.requestedBy.displayName, 54, 370)
-  canv.fillStyle = '#ffffff'
+    // Render "Up Next"
+    canv.textAlign = 'left'
+    canv.fillStyle = averageColor.isDark ? `#ffffff` : shadeColor(averageColor.hex, -200)
+    canv.font = '22px Poppins'
+    canv.fillText('UP NEXT:', 330, 40)
 
-  // Render "Up Next"
-  canv.textAlign = 'left'
-  canv.fillStyle = averageColor.isDark ? `#ffffff` : shadeColor(averageColor.hex, -200)
-  canv.font = '22px Poppins'
-  canv.fillText('UP NEXT:', 330, 40)
+    try {
+      const pics = await Promise.all(
+        songs.slice(1, 7).map((s) => {
+          return s.requestedBy
+            ? loadImage(s.requestedBy.displayAvatarURL({ extension: 'png', size: 64 }))
+            : null
+        })
+      )
 
-  try {
-    const pics = await Promise.all(
-      songs.slice(1, 7).map((s) => {
-        return loadImage(s.requestedBy.displayAvatarURL({ extension: 'png', size: 64 }))
+      pics.forEach((p, index) => {
+        if (!p) return
+
+        const i = index + 1
+        canv.save()
+
+        canv.beginPath()
+        canv.arc(674, 30 + 65 * i, 16, 0, Math.PI * 2)
+        canv.closePath()
+        canv.clip()
+        canv.drawImage(p, 658, 14 + 65 * i, 32, 32)
+        canv.restore()
       })
-    )
-
-    pics.forEach((p, index) => {
-      const i = index + 1
-
-      canv.save()
-
-      canv.beginPath()
-      canv.arc(674, 30 + 65 * i, 16, 0, Math.PI * 2)
-      canv.closePath()
-      canv.clip()
-      canv.drawImage(p, 658, 14 + 65 * i, 32, 32)
-      canv.restore()
-    })
-  } catch (e) {
-    console.warn('[UpNextAvatarError] ', e)
+    } catch (e) {
+      console.warn('[UpNextAvatarError] ', e)
+    }
   }
 
   await songs.slice(1, 6).forEach(async (songObj, index) => {
@@ -207,12 +218,12 @@ export const nowPlayingCanvasWithUpNext = async (songs) => {
   })
 
   // Buffer canvas
-  const buffer = await canvas.toBuffer()
+  const buffer = await canvas.toBuffer('png')
 
   return buffer
 }
 
-export const nowPlayingCanvas = async (song) => {
+export const nowPlayingCanvas = async (song: Track) => {
   const canvas = new Canvas(700, 169)
   const canv = canvas.getContext('2d')
   const imageCanvas = new Canvas(222, 125)
@@ -220,9 +231,11 @@ export const nowPlayingCanvas = async (song) => {
 
   const thumbnail = await loadImage(song.thumbnail)
 
+  const { requestedBy } = song
+
   // Get average thumbnail color
   imageCtx.drawImage(thumbnail, 0, 0, 222, 125)
-  const imageBuffer = await imageCanvas.toBuffer()
+  const imageBuffer = await imageCanvas.toBuffer('png')
   const averageColor = await getAverageColor(imageBuffer, {
     defaultColor: [0, 0, 0, 0],
     ignoredColor: [0, 0, 0, 255],
@@ -283,56 +296,38 @@ export const nowPlayingCanvas = async (song) => {
     })
   }
 
-  // canv.save()
+  if (requestedBy) {
+    // Render requester profile picture
+    canv.save()
 
-  // canv.beginPath()
-  // canv.arc(336, 133, 20, 0, Math.PI * 2)
-  // canv.closePath()
-  // canv.clip()
+    canv.beginPath()
+    canv.arc(336, 133, 16, 0, Math.PI * 2)
+    canv.closePath()
+    canv.clip()
 
-  // canv.fillStyle = song.requestedBy.displayHexColor
-  // canv.fillRect(312, 109, 48, 48)
+    try {
+      const avatar = await loadImage(requestedBy.displayAvatarURL({ extension: 'png', size: 64 }))
+      canv.drawImage(avatar, 320, 117, 32, 32)
+    } catch (e) {
+      console.warn('[AvatarError]', e)
+    }
 
-  // canv.restore()
+    canv.restore()
 
-  // Render requester profile picture pill
-  canv.font = '600 28px Poppins'
-  canv.fillStyle = song.requestedBy.displayHexColor
-  canv.measureText(song.requestedBy.displayName).width
-  canv.roundRect(316, 113, canv.measureText(song.requestedBy.displayName).width + 26, 40, 20)
-  canv.fill()
-  // Render requester profile picture
-  canv.save()
-
-  canv.beginPath()
-  canv.arc(336, 133, 16, 0, Math.PI * 2)
-  canv.closePath()
-  canv.clip()
-
-  try {
-    const avatar = await loadImage(
-      song.requestedBy?.displayAvatarURL({ extension: 'png', size: 64 })
-    )
-    canv.drawImage(avatar, 320, 117, 32, 32)
-  } catch (e) {
-    console.warn('[AvatarError]', e)
+    // Render requester name
+    canv.fillStyle = '#ffffff'
+    canv.textAlign = 'left'
+    canv.font = '600 18px Poppins'
+    canv.fillText(requestedBy.displayName, 362, 139)
   }
 
-  canv.restore()
-
-  // Render requester name
-  canv.fillStyle = '#ffffff'
-  canv.textAlign = 'left'
-  canv.font = '600 18px Poppins'
-  canv.fillText(song.requestedBy.displayName, 362, 139)
-
   // Buffer canvas
-  const buffer = await canvas.toBuffer()
+  const buffer = await canvas.toBuffer('png')
 
   return buffer
 }
 
-const generateNowPlayingCanvas = async (tracks) => {
+const generateNowPlayingCanvas = async (tracks: Track[]) => {
   if (!tracks || tracks.length < 1)
     throw Error('Error: Cannot generate now playing canvas without songs')
   if (tracks.length > 1) {
