@@ -4,6 +4,8 @@ const splitAtClosestSpace = (str: string, charsPerLine: number) => {
   return str.replace(regex, '$&@').split(/\s+@/)
 }
 
+export const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
+
 const shadeColor = (color: string, percent: number) => {
   let R = parseInt(color.substring(1, 3), 16)
   let G = parseInt(color.substring(3, 5), 16)
@@ -35,7 +37,7 @@ export const truncateString = (str: string, num: number) => {
   if (str.length <= num) {
     return str
   }
-  return str.slice(0, num) + '...'
+  return str.slice(0, num) + '…'
 }
 
 export { splitAtClosestSpace, shadeColor, parseSongName }

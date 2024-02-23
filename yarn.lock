@@ -1550,7 +1550,6 @@ __metadata:
     eslint-plugin-prettier: "npm:^5.1.3"
     eslint-plugin-promise: "npm:^6.0.0"
     express: "npm:^4.18.1"
-    fast-average-color-node: "npm:^3.0.0"
     libsodium-wrappers: "npm:^0.7.13"
     module-alias: "npm:^2.2.3"
     patch-package: "npm:^8.0.0"
@@ -2535,24 +2534,6 @@ __metadata:
     utils-merge: "npm:1.0.1"
     vary: "npm:~1.1.2"
   checksum: 10c0/75af556306b9241bc1d7bdd40c9744b516c38ce50ae3210658efcbf96e3aed4ab83b3432f06215eae5610c123bc4136957dc06e50dfc50b7d4d775af56c4c59c
-  languageName: node
-  linkType: hard
-
-"fast-average-color-node@npm:^3.0.0":
-  version: 3.0.0
-  resolution: "fast-average-color-node@npm:3.0.0"
-  dependencies:
-    fast-average-color: "npm:^9.4.0"
-    node-fetch: "npm:^2.6.7"
-    sharp: "npm:^0.33.2"
-  checksum: 10c0/92b9dd3f19a7ef64542e47d512ca25b93d38da5b4a3c47ee1e9e2e8df3f3a24cac1f2a21fd028b443c92dae3b608702195d596aaa0d6877d9fb9c990361ae69c
-  languageName: node
-  linkType: hard
-
-"fast-average-color@npm:^9.4.0":
-  version: 9.4.0
-  resolution: "fast-average-color@npm:9.4.0"
-  checksum: 10c0/9031181113356abe240c52f78e908607e3b47dc0121cec3077b3735823951e40f8d6e14eca50d9941e30bcea60e0ed52e36410a8ded0972a89253c3dbefc966d
   languageName: node
   linkType: hard
 

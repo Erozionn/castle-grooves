@@ -1,6 +1,8 @@
 import { useMainPlayer, useQueue } from 'discord-player'
 import { GuildMember, Interaction, SlashCommandBuilder } from 'discord.js'
 
+import { nodeOptions } from '@constants/PlayerInitOptions'
+
 export default {
   data: new SlashCommandBuilder()
     .setName('play')
@@ -34,7 +36,7 @@ export default {
     try {
       player.play(voiceChannel, songName, {
         requestedBy: member as GuildMember,
-        nodeOptions: { metadata: interaction },
+        nodeOptions: { ...nodeOptions, metadata: interaction },
       })
 
       if (queue && queue.node.isPaused()) {

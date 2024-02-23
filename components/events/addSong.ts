@@ -13,9 +13,9 @@ export default async (queue: GuildQueue<Interaction>) => {
   // Add songs to history component
   playerHistory.setOptions(await generateHistoryOptions())
 
-  if (queue.tracks.size > 1 && channel) {
+  if (queue.tracks.size + (queue.currentTrack ? 1 : 0) >= 1 && channel) {
     const tracks = queue.tracks.toArray()
-    if (queue.currentTrack) tracks.push(queue.currentTrack)
+    if (queue.currentTrack) tracks.unshift(queue.currentTrack)
 
     const buffer = await generateNowPlayingCanvas(tracks)
     await sendMessage(channel, {

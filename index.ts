@@ -12,7 +12,7 @@ import {
   TextChannel,
   Message,
 } from 'discord.js'
-import { Player } from 'discord-player'
+import { Player, Track } from 'discord-player'
 
 import {
   addSongEventHandler,
@@ -31,7 +31,7 @@ import { generateHistoryOptions } from '@utils/songHistory'
 import { recordVoiceStateChange } from '@utils/recordActivity'
 import { commandInteractionHandler } from '@components/interactions'
 import { nowPlayingCanvas, nowPlayingCanvasWithUpNext } from '@utils/nowPlayingCanvas'
-import mockSongArray from '@data/dummies/songArray'
+import useMockTracks from '@data/dummies/songArray'
 
 import registerCommands from './deploy-commands'
 
@@ -74,15 +74,16 @@ client.commands = new Collection()
 initApi(client)
 // Register commands.
 registerCommands()
-
+console.log(NOW_PLAYING_MOCK_DATA)
 if (NOW_PLAYING_MOCK_DATA) {
   console.log('[nowPlayingMock] Generating mock now playing data...')
+  const mockTracks = useMockTracks()
 
-  nowPlayingCanvasWithUpNext(mockSongArray).then((buffer) => {
+  nowPlayingCanvasWithUpNext(mockTracks).then((buffer) => {
     fs.writeFileSync('mockNowPlayingMulti.png', buffer)
   })
 
-  nowPlayingCanvas(mockSongArray[0]).then((buffer) => {
+  nowPlayingCanvas(mockTracks[0]).then((buffer) => {
     fs.writeFileSync('mockNowPlaying.png', buffer)
   })
 
@@ -208,17 +209,17 @@ player.events.on('playerError', (queue, error) => {
   console.log(error)
 })
 
-player.on('debug', async (message) => {
-  // Emitted when the player sends debug info
-  // Useful for seeing what dependencies, extractors, etc are loaded
-  console.log(`General player debug event: ${message}`)
-})
+// player.on('debug', async (message) => {
+//   // Emitted when the player sends debug info
+//   // Useful for seeing what dependencies, extractors, etc are loaded
+//   console.log(`General player debug event: ${message}`)
+// })
 
-player.events.on('debug', async (queue, message) => {
-  // Emitted when the player queue sends debug info
-  // Useful for seeing what state the current queue is at
-  console.log(`Player debug event: ${message}`)
-})
+// player.events.on('debug', async (queue, message) => {
+//   // Emitted when the player queue sends debug info
+//   // Useful for seeing what state the current queue is at
+//   console.log(`Player debug event: ${message}`)
+// })
 
 // Resets main message if many messages have since been sent in the channel
 let msgResetCount = 0

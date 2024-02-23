@@ -1,4 +1,4 @@
-import { GuildQueue, Track } from 'discord-player'
+import { GuildQueue, Track, serialize } from 'discord-player'
 import { Interaction } from 'discord.js'
 
 import {
@@ -32,11 +32,12 @@ export default async (queue: GuildQueue<Interaction>, track: Track) => {
   // Change disconnect button to stop button
   playerButtons.stop.setEmoji('musicoff:909248235623825439')
 
-  console.log(queue.tracks.toArray())
-
   if ((queue.tracks.size > 0 || queue.currentTrack) && queue.metadata.channel) {
     const tracks = queue.tracks.toArray()
-    if (queue.currentTrack) tracks.push(queue.currentTrack)
+    if (queue.currentTrack) tracks.unshift(queue.currentTrack)
+
+    console.log('[playSong] Tracks')
+    console.log(JSON.stringify(serialize(queue.currentTrack)))
 
     console.log('[playSong] Generating now playing canvas')
     const buffer = await generateNowPlayingCanvas(tracks)

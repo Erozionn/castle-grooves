@@ -161,7 +161,10 @@ const generateHistoryOptions = async () => {
         label: title ? title.substring(0, 95) : artist.substring(0, 95),
         description: title ? artist.substring(0, 95) : ' ',
         emoji: '🎶',
-        value: `${title?.substring(0, 90)} ${artist.substring(0, 90)} ${Math.floor(Math.random() * 99999)}`,
+        value:
+          s.source === 'youtube'
+            ? `${s.songUrl}?x=${Math.floor(Math.random() * 99999)}`
+            : `${title?.substring(0, 90)} ${artist.substring(0, 90)} ${Math.floor(Math.random() * 99999)}`,
       }
     })
     .reverse()

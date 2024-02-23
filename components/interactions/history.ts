@@ -1,6 +1,8 @@
 import { GuildMember, StringSelectMenuInteraction } from 'discord.js'
 import { GuildQueue, Track, useMainPlayer } from 'discord-player'
 
+import { nodeOptions } from '@constants/PlayerInitOptions'
+
 export default async (
   queue: GuildQueue<StringSelectMenuInteraction> | null,
   interaction: StringSelectMenuInteraction
@@ -25,12 +27,12 @@ export default async (
     if (queue) {
       queue.player.play(voiceChannel, songName, {
         requestedBy: member as GuildMember,
-        nodeOptions: { metadata: interaction },
+        nodeOptions: { ...nodeOptions, metadata: interaction },
       })
     } else {
       player.play(voiceChannel, songName, {
         requestedBy: member as GuildMember,
-        nodeOptions: { metadata: interaction },
+        nodeOptions: { ...nodeOptions, metadata: interaction },
       })
     }
   }

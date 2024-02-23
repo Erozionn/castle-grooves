@@ -1,10 +1,9 @@
 import path from 'node:path'
 
 import { Canvas, FontLibrary, loadImage } from 'skia-canvas'
-import { getAverageColor } from 'fast-average-color-node'
 import { Track } from 'discord-player'
 
-import { shadeColor, splitAtClosestSpace, truncateString } from '@utils/utilities'
+import { capitalize, parseSongName, splitAtClosestSpace, truncateString } from '@utils/utilities'
 
 FontLibrary.use([
   path.resolve('./assets/fonts/Poppins-Thin.ttf'),
@@ -47,7 +46,7 @@ const renderMultiLineTitle = (
     textBoxWidth = lineWidth > textBoxWidth ? lineWidth : textBoxWidth
   }
 
-  const xCentered = (300 - textBoxWidth) / 2 + textBoxWidth / 2
+  const xCentered = (320 - textBoxWidth) / 2 + textBoxWidth / 2
 
   // render the text
   for (let i = 0; i < multiLineArray.length; i++) {
@@ -61,10 +60,9 @@ const renderMultiLineTitle = (
 }
 
 export const nowPlayingCanvasWithUpNext = async (songs: Track[]) => {
+  console.time('nowPlayingCanvasWithUpNext')
   const canvas = new Canvas(700, 394)
   const canv = canvas.getContext('2d')
-  const imageCanvas = new Canvas(222, 125)
-  const imageCtx = imageCanvas.getContext('2d')
 
   const song = songs[0]
 
@@ -72,22 +70,13 @@ export const nowPlayingCanvasWithUpNext = async (songs: Track[]) => {
 
   const thumbnail = await loadImage(song.thumbnail)
 
-  // Get average thumbnail color
-  imageCtx.drawImage(thumbnail, 0, 0, 125 * (thumbnail.height / thumbnail.width), 125)
-  const imageBuffer = await imageCanvas.toBuffer('png')
-  const averageColor = await getAverageColor(imageBuffer, {
-    defaultColor: [0, 0, 0, 0],
-    ignoredColor: [0, 0, 0, 255],
-  })
-  const [r, g, b] = averageColor.value
-
   // Generate gradient background
-  const boxGradient = canv.createLinearGradient(0, 0, 700, 0)
-  boxGradient.addColorStop(0, 'rgba(32, 34, 37, 0.7)')
-  boxGradient.addColorStop(0.4, 'rgba(32, 34, 37, 0.7)')
-  boxGradient.addColorStop(1, 'rgba(32, 34, 37, 0)')
-  canv.fillStyle = boxGradient
-  canv.fillRect(394, 0, 300, 394)
+  // const boxGradient = canv.createLinearGradient(0, 0, 700, 0)
+  // boxGradient.addColorStop(0, 'rgba(32, 34, 37, 0.7)')
+  // boxGradient.addColorStop(0.4, 'rgba(32, 34, 37, 0.7)')
+  // boxGradient.addColorStop(1, 'rgba(32, 34, 37, 0)')
+  // canv.fillStyle = boxGradient
+  // canv.fillRect(394, 0, 300, 394)
 
   // Drop shadow
   // canv.filter = 'blur(16px)'
@@ -99,22 +88,25 @@ export const nowPlayingCanvasWithUpNext = async (songs: Track[]) => {
   canv.drawImage(thumbnail, -10, -10, 720, 405)
   canv.filter = 'none'
 
-  // Darken blurred thumbnail
-  canv.fillStyle = `rgba(
-    ${Math.max(r - 50, 0)},
-    ${Math.max(g - 50, 0)},
-    ${Math.max(b - 50, 0)},
-    0.4)`
-  canv.fillRect(0, 0, 700, 394)
-  // canv.fillStyle = `rgba(32, 34, 37, 0.2)`
+  // // Darken blurred thumbnail
+  // canv.fillStyle = `rgba(
+  //   ${Math.max(r - 10, 0)},
+  //   ${Math.max(g - 10, 0)},
+  //   ${Math.max(b - 10, 0)},
+  //   0.4)`
+  // // canv.fillRect(0, 0, 700, 394)
+  // // canv.fillStyle = `rgba(32, 34, 37, 0.2)`
   // canv.fillRect(0, 0, 700, 394)
 
   // Render vertical divider
-  canv.fillStyle = 'rgba(255, 255, 255, 0.2)'
-  canv.fillRect(320, 0, 380, 394)
+  canv.fillStyle = 'rgba(0, 0, 0, 0.4)'
+  canv.fillRect(0, 0, 700, 394)
+  canv.fillStyle = 'rgba(255, 255, 255, 1)'
+  canv.fillRect(320, 25, 1, 344)
 
   // Render Thumbnail
-  canv.drawImage(thumbnail, 10, 10, 300, 169)
+  const _width = Math.min(169 * (thumbnail.width / thumbnail.height), 270)
+  canv.drawImage(thumbnail, 160 - _width / 2, 25, _width, 169)
 
   // Split artist and title
   const { author: artist, title } = song
@@ -122,7 +114,7 @@ export const nowPlayingCanvasWithUpNext = async (songs: Track[]) => {
   // Render title
   const songTitleHeight = renderMultiLineTitle(canvas, title || artist, {
     fillStyle: '#ffffff',
-    y: 220,
+    y: 235,
     x: 10,
     font: '600 24px Poppins',
     charsPerLine: 15,
@@ -132,7 +124,7 @@ export const nowPlayingCanvasWithUpNext = async (songs: Track[]) => {
   if (title) {
     renderMultiLineTitle(canvas, artist, {
       fillStyle: '#ffffff',
-      y: 220 + songTitleHeight,
+      y: 235 + songTitleHeight,
       x: 10,
       font: '300 20px Poppins',
     })
@@ -143,13 +135,13 @@ export const nowPlayingCanvasWithUpNext = async (songs: Track[]) => {
     canv.save()
 
     canv.beginPath()
-    canv.arc(26, 364, 16, 0, Math.PI * 2)
+    canv.arc(41, 359, 16, 0, Math.PI * 2)
     canv.closePath()
     canv.clip()
 
     try {
       const avatar = await loadImage(requestedBy.displayAvatarURL({ extension: 'png', size: 64 }))
-      canv.drawImage(avatar, 10, 348, 32, 32)
+      canv.drawImage(avatar, 25, 343, 32, 32)
     } catch (e) {
       console.warn('[AvatarError] ', e)
     }
@@ -160,14 +152,14 @@ export const nowPlayingCanvasWithUpNext = async (songs: Track[]) => {
     canv.fillStyle = '#ffffff'
     canv.textAlign = 'left'
     canv.font = '600 18px Poppins'
-    canv.fillText(requestedBy.displayName, 54, 370)
+    canv.fillText(capitalize(requestedBy.displayName), 70, 364)
     canv.fillStyle = '#ffffff'
 
     // Render "Up Next"
     canv.textAlign = 'left'
-    canv.fillStyle = averageColor.isDark ? `#ffffff` : shadeColor(averageColor.hex, -200)
+    canv.fillStyle = `#ffffff`
     canv.font = '22px Poppins'
-    canv.fillText('UP NEXT:', 330, 40)
+    canv.fillText('UP NEXT:', 345, 40)
 
     try {
       const pics = await Promise.all(
@@ -185,10 +177,10 @@ export const nowPlayingCanvasWithUpNext = async (songs: Track[]) => {
         canv.save()
 
         canv.beginPath()
-        canv.arc(674, 30 + 65 * i, 16, 0, Math.PI * 2)
+        canv.arc(664, 30 + 65 * i, 16, 0, Math.PI * 2)
         canv.closePath()
         canv.clip()
-        canv.drawImage(p, 658, 14 + 65 * i, 32, 32)
+        canv.drawImage(p, 648, 14 + 65 * i, 32, 32)
         canv.restore()
       })
     } catch (e) {
@@ -196,89 +188,73 @@ export const nowPlayingCanvasWithUpNext = async (songs: Track[]) => {
     }
   }
 
-  await songs.slice(1, 6).forEach(async (songObj, index) => {
-    const i = index + 1
-    canv.fillStyle = averageColor.isDark ? `#ffffff` : shadeColor(averageColor.hex, -200)
-    canv.font = '600 22px Poppins'
-    const a = songObj.author
-    const s = songObj.title
-    if (s !== null) {
-      canv.fillText(truncateString(`${i}. ${s}`, 25), 330, 26 + 65 * i)
-      canv.font = '300 22px Poppins'
-      canv.fillText(truncateString(`${a}`, 25), 358, 51 + 65 * i)
-    } else {
-      canv.fillText(truncateString(`${i}. ${a}`, 25), 330, 30 + 65 * i)
-    }
+  await songs
+    .slice(1, 6)
+    // .reverse()
+    .forEach(async (songObj, index) => {
+      const i = index + 1
+      canv.fillStyle = `#ffffff`
+      canv.font = '600 22px Poppins'
+      canv.textAlign = 'left'
+      const a = songObj.author
+      const s = songObj.title
+      canv.fillText(`${i}`, 345, 36 + 65 * i)
+      if (s !== null) {
+        canv.font = '600 22px Poppins'
+        canv.fillText(truncateString(s, 20), 370, 26 + 65 * i)
+        canv.font = '300 22px Poppins'
+        canv.fillText(truncateString(a, 20), 370, 51 + 65 * i)
+      } else {
+        canv.font = '600 22px Poppins'
+        canv.fillText(truncateString(a, 20), 370, 30 + 65 * i)
+      }
 
-    if (i < 5 && songs.length > 2) {
-      canv.fillStyle = 'rgba(255, 255, 255, 0.3)'
-      canv.fillRect(330, 60 + 66 * i, 360, 1)
-      canv.fillStyle = averageColor.isDark ? `#ffffff` : shadeColor(averageColor.hex, -200)
-    }
-  })
+      // if (i < 5 && songs.length > 2) {
+      //   canv.fillStyle = 'rgba(255, 255, 255, 0.3)'
+      //   canv.fillRect(345, 60 + 66 * i, 325, 1)
+      //   canv.fillStyle = `#ffffff`
+      // }
+    })
 
   // Buffer canvas
   const buffer = await canvas.toBuffer('png')
-
+  console.timeEnd('nowPlayingCanvasWithUpNext')
   return buffer
 }
 
 export const nowPlayingCanvas = async (song: Track) => {
+  console.time('nowPlayingCanvas')
   const canvas = new Canvas(700, 169)
   const canv = canvas.getContext('2d')
-  const imageCanvas = new Canvas(222, 125)
-  const imageCtx = imageCanvas.getContext('2d')
 
   const thumbnail = await loadImage(song.thumbnail)
-
+  const _width = 169 * (thumbnail.width / thumbnail.height)
   const { requestedBy } = song
-
-  // Get average thumbnail color
-  imageCtx.drawImage(thumbnail, 0, 0, 222, 125)
-  const imageBuffer = await imageCanvas.toBuffer('png')
-  const averageColor = await getAverageColor(imageBuffer, {
-    defaultColor: [0, 0, 0, 0],
-    ignoredColor: [0, 0, 0, 255],
-  })
-  const [r, g, b] = averageColor.value
-
-  // Generate gradient background
-  const boxGradient = canv.createLinearGradient(0, 0, 700, 0)
-  boxGradient.addColorStop(0, 'rgba(32, 34, 37, 0.7)')
-  boxGradient.addColorStop(0.4, 'rgba(32, 34, 37, 0.7)')
-  boxGradient.addColorStop(1, 'rgba(32, 34, 37, 0)')
-  canv.fillStyle = boxGradient
-  canv.fillRect(394, 0, 300, 169)
-
-  // Drop shadow
-  // canv.filter = 'blur(16px)'
-  // canv.fillStyle = 'rgba(32, 34, 37, 0.8)'
-  // canv.fillRect(285, -30, 20, 334)
 
   // Blur thumbnail for background
   canv.filter = 'blur(24px)'
   canv.drawImage(thumbnail, -10, -10, 720, 245)
   canv.filter = 'none'
 
-  // Darken blurred thumbnail
-  canv.fillStyle = `rgba(
-    ${Math.max(r - 50, 0)},
-    ${Math.max(g - 50, 0)},
-    ${Math.max(b - 50, 0)},
-    0.4)`
+  // Generate gradient background
+  canv.fillStyle = 'rgba(0, 0, 0, 0.4)'
   canv.fillRect(0, 0, 700, 169)
-
   // Render Thumbnail
-  canv.drawImage(thumbnail, 0, 0, 300, 169)
+  canv.drawImage(thumbnail, 0, 0, _width, 169)
 
   // Split artist and title
-  const { author: artist, title } = song
+  let { author: artist, title } = song
+  if (song.source === 'youtube') {
+    const titleObj = parseSongName(song.title)
+    artist = titleObj.artist
+    if (titleObj.title) title = titleObj.title
+  }
 
   // Render title
   const songTitleHeight = renderMultiLineTitle(canvas, title || artist, {
     fillStyle: '#ffffff',
     y: 44,
-    x: 320,
+    x: _width + 25,
     font: '600 28px Poppins',
     textAlign: 'start',
     charsPerLine: 20,
@@ -289,7 +265,7 @@ export const nowPlayingCanvas = async (song: Track) => {
     renderMultiLineTitle(canvas, artist, {
       fillStyle: '#ffffff',
       y: 48 + songTitleHeight,
-      x: 320,
+      x: _width + 25,
       font: '300 24px Poppins',
       textAlign: 'start',
       charsPerLine: 20,
@@ -301,13 +277,13 @@ export const nowPlayingCanvas = async (song: Track) => {
     canv.save()
 
     canv.beginPath()
-    canv.arc(336, 133, 16, 0, Math.PI * 2)
+    canv.arc(_width + 41, 133, 16, 0, Math.PI * 2)
     canv.closePath()
     canv.clip()
 
     try {
       const avatar = await loadImage(requestedBy.displayAvatarURL({ extension: 'png', size: 64 }))
-      canv.drawImage(avatar, 320, 117, 32, 32)
+      canv.drawImage(avatar, _width + 25, 117, 32, 32)
     } catch (e) {
       console.warn('[AvatarError]', e)
     }
@@ -318,12 +294,12 @@ export const nowPlayingCanvas = async (song: Track) => {
     canv.fillStyle = '#ffffff'
     canv.textAlign = 'left'
     canv.font = '600 18px Poppins'
-    canv.fillText(requestedBy.displayName, 362, 139)
+    canv.fillText(capitalize(requestedBy.displayName), _width + 25 + 32 + 12, 139)
   }
 
   // Buffer canvas
   const buffer = await canvas.toBuffer('png')
-
+  console.timeEnd('nowPlayingCanvas')
   return buffer
 }
 
@@ -336,4 +312,4 @@ const generateNowPlayingCanvas = async (tracks: Track[]) => {
   return nowPlayingCanvas(tracks[0])
 }
 
-export { generateNowPlayingCanvas, getAverageColor }
+export { generateNowPlayingCanvas }
