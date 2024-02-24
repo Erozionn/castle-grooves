@@ -36,10 +36,6 @@ export default async (queue: GuildQueue<Interaction>, track: Track) => {
     const tracks = queue.tracks.toArray()
     if (queue.currentTrack) tracks.unshift(queue.currentTrack)
 
-    console.log('[playSong] Tracks')
-    console.log(JSON.stringify(serialize(queue.currentTrack)))
-
-    console.log('[playSong] Generating now playing canvas')
     const buffer = await generateNowPlayingCanvas(tracks)
     await sendMessage(channel, {
       content: '',

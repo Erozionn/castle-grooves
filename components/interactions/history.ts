@@ -43,13 +43,12 @@ export default async (
 
   if (values.length > 1) {
     const songs = values
-    console.log('[history] Adding songs to queue...', songs)
 
     try {
       const searchResults = await Promise.all(songs.map((song) => player.search(song)))
       searchResults.forEach((result) => playSong(result.tracks[0]))
     } catch (e) {
-      console.log('[history]', e)
+      console.warn('[history]', e)
     }
   }
 

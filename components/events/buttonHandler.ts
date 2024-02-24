@@ -1,4 +1,4 @@
-import { ButtonInteraction, CacheType, Interaction, StringSelectMenuInteraction } from 'discord.js'
+import { CacheType, Interaction, StringSelectMenuInteraction } from 'discord.js'
 import { GuildQueue, useQueue } from 'discord-player'
 
 import {
@@ -10,9 +10,8 @@ import {
   historyInteractionHandler,
   recommendedButtonInteractionHandler,
 } from '@components/interactions'
-import { ClientType } from '@types'
 
-export default async (interaction: Interaction<CacheType>, client: ClientType) => {
+export default async (interaction: Interaction<CacheType>) => {
   if (!interaction.isButton() && !interaction.isStringSelectMenu()) return
   interaction.deferUpdate()
 

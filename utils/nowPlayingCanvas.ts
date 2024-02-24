@@ -4,6 +4,7 @@ import { Canvas, FontLibrary, loadImage } from 'skia-canvas'
 import { Track } from 'discord-player'
 
 import { capitalize, parseSongName, splitAtClosestSpace, truncateString } from '@utils/utilities'
+import { TrackWithSpotifyMetadata, TrackWithYoutubeMetadata } from '@types'
 
 FontLibrary.use([
   path.resolve('./assets/fonts/Poppins-Thin.ttf'),
@@ -13,6 +14,15 @@ FontLibrary.use([
   path.resolve('./assets/fonts/Poppins-SemiBold.ttf'),
   path.resolve('./assets/fonts/Poppins-Bold.ttf'),
 ])
+
+const getThumbnailUrl = (song: Track) => {
+  if (song.source === 'youtube') {
+    return `https://img.youtube.com/vi/${(song as TrackWithYoutubeMetadata).metadata.id}/mqdefault.jpg`
+  } else if (song.source === 'spotify') {
+    return (song as TrackWithSpotifyMetadata).metadata?.source?.thumbnail || song.thumbnail
+  }
+  return null
+}
 
 const renderMultiLineTitle = (
   canvas: Canvas,
@@ -65,51 +75,39 @@ export const nowPlayingCanvasWithUpNext = async (songs: Track[]) => {
   const canv = canvas.getContext('2d')
 
   const song = songs[0]
-
   const { requestedBy } = song
+  const thumbnailUrl = getThumbnailUrl(song)
 
-  const thumbnail = await loadImage(song.thumbnail)
+  try {
+    if (thumbnailUrl) {
+      const thumbnail = await loadImage(thumbnailUrl)
 
-  // Generate gradient background
-  // const boxGradient = canv.createLinearGradient(0, 0, 700, 0)
-  // boxGradient.addColorStop(0, 'rgba(32, 34, 37, 0.7)')
-  // boxGradient.addColorStop(0.4, 'rgba(32, 34, 37, 0.7)')
-  // boxGradient.addColorStop(1, 'rgba(32, 34, 37, 0)')
-  // canv.fillStyle = boxGradient
-  // canv.fillRect(394, 0, 300, 394)
+      // Blur thumbnail for background
+      canv.filter = 'blur(32px)'
+      canv.drawImage(thumbnail, -10, -10, 720, 405)
+      canv.filter = 'none'
 
-  // Drop shadow
-  // canv.filter = 'blur(16px)'
-  // canv.fillStyle = 'rgba(32, 34, 37, 0.8)'
-  // canv.fillRect(285, -30, 20, 334)
+      // Render vertical divider
+      canv.fillStyle = 'rgba(0, 0, 0, 0.4)'
+      canv.fillRect(0, 0, 700, 394)
+      canv.fillStyle = 'rgba(255, 255, 255, 1)'
+      canv.fillRect(320, 25, 1, 344)
 
-  // Blur thumbnail for background
-  canv.filter = 'blur(24px)'
-  canv.drawImage(thumbnail, -10, -10, 720, 405)
-  canv.filter = 'none'
-
-  // // Darken blurred thumbnail
-  // canv.fillStyle = `rgba(
-  //   ${Math.max(r - 10, 0)},
-  //   ${Math.max(g - 10, 0)},
-  //   ${Math.max(b - 10, 0)},
-  //   0.4)`
-  // // canv.fillRect(0, 0, 700, 394)
-  // // canv.fillStyle = `rgba(32, 34, 37, 0.2)`
-  // canv.fillRect(0, 0, 700, 394)
-
-  // Render vertical divider
-  canv.fillStyle = 'rgba(0, 0, 0, 0.4)'
-  canv.fillRect(0, 0, 700, 394)
-  canv.fillStyle = 'rgba(255, 255, 255, 1)'
-  canv.fillRect(320, 25, 1, 344)
-
-  // Render Thumbnail
-  const _width = Math.min(169 * (thumbnail.width / thumbnail.height), 270)
-  canv.drawImage(thumbnail, 160 - _width / 2, 25, _width, 169)
+      // Render Thumbnail
+      const _width = Math.min(169 * (thumbnail.width / thumbnail.height), 270)
+      canv.drawImage(thumbnail, 160 - _width / 2, 25, _width, 169)
+    }
+  } catch (e) {
+    console.warn('[ThumbnailError] ', e)
+  }
 
   // Split artist and title
-  const { author: artist, title } = song
+  let { author: artist, title } = song
+  if (song.source === 'youtube') {
+    const titleObj = parseSongName(song.title)
+    artist = titleObj.artist
+    if (titleObj.title) title = titleObj.title
+  }
 
   // Render title
   const songTitleHeight = renderMultiLineTitle(canvas, title || artist, {
@@ -226,21 +224,30 @@ export const nowPlayingCanvas = async (song: Track) => {
   console.time('nowPlayingCanvas')
   const canvas = new Canvas(700, 169)
   const canv = canvas.getContext('2d')
-
-  const thumbnail = await loadImage(song.thumbnail)
-  const _width = 169 * (thumbnail.width / thumbnail.height)
   const { requestedBy } = song
+  const thumbnailUrl = getThumbnailUrl(song)
 
-  // Blur thumbnail for background
-  canv.filter = 'blur(24px)'
-  canv.drawImage(thumbnail, -10, -10, 720, 245)
-  canv.filter = 'none'
+  let _width = 0
 
-  // Generate gradient background
-  canv.fillStyle = 'rgba(0, 0, 0, 0.4)'
-  canv.fillRect(0, 0, 700, 169)
-  // Render Thumbnail
-  canv.drawImage(thumbnail, 0, 0, _width, 169)
+  try {
+    if (thumbnailUrl) {
+      const thumbnail = await loadImage(thumbnailUrl)
+      _width = 169 * (thumbnail.width / thumbnail.height)
+
+      // Blur thumbnail for background
+      canv.filter = 'blur(32px)'
+      canv.drawImage(thumbnail, -10, -10, 720, 245)
+      canv.filter = 'none'
+
+      // Generate gradient background
+      canv.fillStyle = 'rgba(0, 0, 0, 0.4)'
+      canv.fillRect(0, 0, 700, 169)
+      // Render Thumbnail
+      canv.drawImage(thumbnail, 0, 0, _width, 169)
+    }
+  } catch (e) {
+    console.warn('[ThumbnailError]', e)
+  }
 
   // Split artist and title
   let { author: artist, title } = song

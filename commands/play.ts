@@ -46,7 +46,7 @@ export default {
         queue.node.resume()
       }
     } catch (e) {
-      console.log('[playCommand]', e)
+      console.warn('[playCommand]', e)
       await interaction.editReply({ content: 'Error joining your channel.' })
     }
 

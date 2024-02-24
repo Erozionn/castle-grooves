@@ -1,6 +1,5 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { pathToFileURL } from 'node:url'
 
 import { REST } from '@discordjs/rest'
 import { Routes } from 'discord-api-types/v9'

@@ -36,7 +36,7 @@ const recordVoiceStateChange = (oldState: VoiceState, newState: VoiceState) => {
   writeApi()
     .close()
     .catch((e) => {
-      console.log(e)
+      console.warn(e)
     })
 }
 

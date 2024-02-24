@@ -12,7 +12,7 @@ import {
   TextChannel,
   Message,
 } from 'discord.js'
-import { Player, Track } from 'discord-player'
+import { Player } from 'discord-player'
 
 import {
   addSongEventHandler,
@@ -74,7 +74,7 @@ client.commands = new Collection()
 initApi(client)
 // Register commands.
 registerCommands()
-console.log(NOW_PLAYING_MOCK_DATA)
+
 if (NOW_PLAYING_MOCK_DATA) {
   console.log('[nowPlayingMock] Generating mock now playing data...')
   const mockTracks = useMockTracks()
@@ -177,7 +177,7 @@ client.on('interactionCreate', async (interaction) =>
   commandInteractionHandler(interaction, client)
 )
 
-client.on('interactionCreate', async (interaction) => await buttonHandler(interaction, client))
+client.on('interactionCreate', async (interaction) => await buttonHandler(interaction))
 // On user join voice channel event
 client.on('voiceStateUpdate', (oldState, newState) => recordVoiceStateChange(oldState, newState))
 

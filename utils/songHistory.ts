@@ -145,7 +145,7 @@ const addSong = (playing: boolean, track?: Track) => {
   writeApi()
     .close()
     .catch((e) => {
-      console.log('[addSongToDb]', e)
+      console.warn('[addSongToDb]', e)
     })
 }
 
