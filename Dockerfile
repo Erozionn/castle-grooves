@@ -22,7 +22,7 @@ FROM node:lts-alpine AS final
 
 COPY --from=ffmpeg / /
 
-RUN apk add --no-cache python3 make g++
+RUN apk update && apk add --no-cache python3 make g++ fontconfig
 
 ENV NODE_ENV production
 

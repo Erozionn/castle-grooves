@@ -110,7 +110,7 @@ export const nowPlayingCanvasWithUpNext = async (songs: Track[]) => {
   }
 
   // Render title
-  const songTitleHeight = renderMultiLineTitle(canvas, title || artist, {
+  const songTitleHeight = renderMultiLineTitle(canvas, truncateString(title || artist, 42), {
     fillStyle: '#ffffff',
     y: 235,
     x: 10,
@@ -120,7 +120,7 @@ export const nowPlayingCanvasWithUpNext = async (songs: Track[]) => {
 
   // Render artist
   if (title) {
-    renderMultiLineTitle(canvas, artist, {
+    renderMultiLineTitle(canvas, truncateString(artist, 20), {
       fillStyle: '#ffffff',
       y: 235 + songTitleHeight,
       x: 10,
@@ -258,7 +258,7 @@ export const nowPlayingCanvas = async (song: Track) => {
   }
 
   // Render title
-  const songTitleHeight = renderMultiLineTitle(canvas, title || artist, {
+  const songTitleHeight = renderMultiLineTitle(canvas, truncateString(title || artist, 42), {
     fillStyle: '#ffffff',
     y: 44,
     x: _width + 25,
@@ -269,7 +269,7 @@ export const nowPlayingCanvas = async (song: Track) => {
 
   // Render artist
   if (title) {
-    renderMultiLineTitle(canvas, artist, {
+    renderMultiLineTitle(canvas, truncateString(artist, 20), {
       fillStyle: '#ffffff',
       y: 48 + songTitleHeight,
       x: _width + 25,
@@ -310,13 +310,13 @@ export const nowPlayingCanvas = async (song: Track) => {
   return buffer
 }
 
-const generateNowPlayingCanvas = async (tracks: Track[]) => {
+export const generateNowPlayingCanvas = async (tracks: Track[]) => {
   if (!tracks || tracks.length < 1)
     throw Error('Error: Cannot generate now playing canvas without songs')
   if (tracks.length > 1) {
-    return nowPlayingCanvasWithUpNext(tracks)
+    return await nowPlayingCanvasWithUpNext(tracks)
   }
-  return nowPlayingCanvas(tracks[0])
+  return await nowPlayingCanvas(tracks[0])
 }
 
-export { generateNowPlayingCanvas }
+export default generateNowPlayingCanvas

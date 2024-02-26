@@ -36,6 +36,12 @@ export default async (queue: GuildQueue<Interaction>, track: Track) => {
     const tracks = queue.tracks.toArray()
     if (queue.currentTrack) tracks.unshift(queue.currentTrack)
 
+    // Write song info into DB (playing [true:false], song)
+    await addSong(queue.isPlaying(), track)
+
+    // Add songs to history component
+    playerHistory.setOptions(await generateHistoryOptions())
+
     const buffer = await generateNowPlayingCanvas(tracks)
     await sendMessage(channel, {
       content: '',
@@ -43,9 +49,6 @@ export default async (queue: GuildQueue<Interaction>, track: Track) => {
       components,
     })
   }
-
-  // Write song info into DB (playing [true:false], song)
-  await addSong(queue.isPlaying(), track)
 
   console.log(
     `[playSong] Playing song: ${track.title?.substring(0, 90)} ${track.author.substring(0, 90)}`

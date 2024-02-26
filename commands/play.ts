@@ -21,7 +21,10 @@ export default {
       voice: { channel: voiceChannel },
     } = member as GuildMember
 
-    await interaction.deferReply()
+    const loadingMsg = await interaction.reply({ content: '⏱ | Loading...' })
+    setTimeout(() => loadingMsg.delete(), 1500)
+
+    // await interaction.deferReply()
 
     if (!voiceChannel) {
       const errMsg = await interaction.editReply({
@@ -49,8 +52,5 @@ export default {
       console.warn('[playCommand]', e)
       await interaction.editReply({ content: 'Error joining your channel.' })
     }
-
-    const loadingMsg = await interaction.editReply({ content: '⏱ | Loading...' })
-    setTimeout(() => loadingMsg.delete(), 1500)
   },
 }

@@ -128,7 +128,7 @@ client.once('ready', async () => {
 
   const mainGuild = await client.guilds.cache.get(GUILD_ID)
 
-  if (!mainGuild || !mainGuild) return
+  if (!mainGuild) return
 
   const channels = await mainGuild.channels.fetch()
 
