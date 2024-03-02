@@ -32,7 +32,7 @@ export type playerButtonsType = keyof typeof playerButtons
 
 export const playerHistory = new StringSelectMenuBuilder()
   .setCustomId('history')
-  .setMaxValues(20)
+  .setMaxValues(18)
   .setPlaceholder('-- Song History --')
 
 export const buttonsActionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(

@@ -54,7 +54,7 @@ const client = new Client({
   partials: [Partials.Channel],
 }) as ClientType
 
-if (SPOTIFY.CLIENT_ID && SPOTIFY.CLIENT_SECRET) console.log('[init] Loading with Spotify search')
+// if (SPOTIFY.CLIENT_ID && SPOTIFY.CLIENT_SECRET) console.log('[init] Loading with Spotify search')
 
 const player = new Player(client, {
   ytdlOptions: {
@@ -162,7 +162,8 @@ client.once('ready', async () => {
   })
 
   // Generate song history and sen d it to the main channel.
-  playerHistory.setOptions(await generateHistoryOptions())
+  const { options, songs } = await generateHistoryOptions()
+  playerHistory.setOptions(options)
   playerHistory.setPlaceholder('-- Song History --')
   await sendMessage(defaultTextChannel, {
     content: `🎶 | Pick a song below or use </play:991566063068250134>`,

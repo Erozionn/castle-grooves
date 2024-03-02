@@ -17,11 +17,11 @@ export default async (queue: GuildQueue<Interaction> | null) => {
     return
   }
 
-  queue.setRepeatMode(QueueRepeatMode.AUTOPLAY)
-
-  if (queue.repeatMode === QueueRepeatMode.AUTOPLAY) {
+  if (queue.repeatMode !== QueueRepeatMode.AUTOPLAY) {
+    queue.setRepeatMode(QueueRepeatMode.AUTOPLAY)
     playerButtons.recommended.setStyle(ButtonStyle.Success)
   } else {
+    queue.setRepeatMode(QueueRepeatMode.OFF)
     playerButtons.recommended.setStyle(ButtonStyle.Secondary)
   }
 

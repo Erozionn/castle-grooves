@@ -5,8 +5,8 @@ import { playerOptions, nodeOptions } from '@constants/PlayerInitOptions'
 
 export default {
   data: new SlashCommandBuilder()
-    .setName('play')
-    .setDescription('Plays a song.')
+    .setName('play-next')
+    .setDescription('Plays a song next in queue.')
     .addStringOption((option) =>
       option.setName('song').setDescription('The song to play.').setRequired(true)
     ),
@@ -21,11 +21,6 @@ export default {
       voice: { channel: voiceChannel },
     } = member as GuildMember
 
-    const loadingMsg = await interaction.reply({ content: '⏱ | Loading...' })
-    setTimeout(() => loadingMsg.delete(), 1500)
-
-    // await interaction.deferReply()
-
     if (!voiceChannel) {
       const errMsg = await interaction.editReply({
         content: '❌ | You need to be in a voice channel!',
@@ -34,17 +29,29 @@ export default {
       return
     }
 
+    const loadingMsg = await interaction.reply({ content: '⏱ | Loading...' })
+    setTimeout(() => loadingMsg.delete(), 1500)
+
     const songName = interaction.options.get('song')?.value as string
 
     try {
-      player.play(voiceChannel, songName, {
-        ...playerOptions,
-        nodeOptions: {
-          ...nodeOptions,
-          metadata: interaction,
-        },
-        requestedBy: member as GuildMember,
-      })
+      if (queue?.node.isPlaying()) {
+        console.log('queue.node.isPlaying()')
+        const searchResult = await player.search(songName, {
+          requestedBy: member as GuildMember,
+        })
+        queue?.insertTrack(searchResult.tracks[0], 0)
+      } else {
+        console.log('queue.node.isPlaying() is false')
+        player.play(voiceChannel, songName, {
+          ...playerOptions,
+          nodeOptions: {
+            ...nodeOptions,
+            metadata: interaction,
+          },
+          requestedBy: member as GuildMember,
+        })
+      }
 
       if (queue && queue.node.isPaused()) {
         if (queue.tracks.size + (queue.currentTrack ? 1 : 0) >= 1) {

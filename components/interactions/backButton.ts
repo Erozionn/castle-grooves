@@ -14,7 +14,7 @@ export default async (queue: GuildQueue<Interaction> | null) => {
   const history = useHistory(queue.metadata.guildId as string)
   const timestamp = queue.node.getTimestamp() || { current: { value: 0 } }
 
-  if (queue.isPlaying() && timestamp.current?.value > 4) {
+  if (queue.isPlaying() && timestamp.current.value > 5000) {
     await queue.node.seek(0)
     return
   }

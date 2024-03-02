@@ -7,18 +7,27 @@ import { generateNowPlayingCanvas } from '@utils/nowPlayingCanvas'
 import { generateHistoryOptions } from '@utils/songHistory'
 
 export default async (queue: GuildQueue<Interaction>, track: Track | Track[]) => {
+  if (!queue.metadata?.channel) {
+    console.error('[addSong] Channel not found')
+    return
+  }
+
   const { channel } = queue.metadata
 
+  const log = (track: Track) =>
+    console.log(
+      `[addSong] Adding song: ${track.title?.substring(0, 90)} ${track.author.substring(0, 90)}`
+    )
+
   if (Array.isArray(track)) {
-    for (const t of track) {
-      console.log(`[addSong] Adding song: ${t?.author} - ${t?.title}`)
-    }
+    for (const t of track) log(t)
   } else {
-    console.log(`[addSong] Adding song: ${track?.author} - ${track?.title}`)
+    log(track)
   }
 
   // Add songs to history component
-  playerHistory.setOptions(await generateHistoryOptions())
+  const { options, songs } = await generateHistoryOptions()
+  playerHistory.setOptions(options)
 
   if (queue.tracks.size + (queue.currentTrack ? 1 : 0) >= 1 && channel) {
     const tracks = queue.tracks.toArray()

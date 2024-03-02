@@ -8,12 +8,13 @@ import { generateHistoryOptions } from '@utils/songHistory'
 export default async (queue: GuildQueue<Interaction>) => {
   const { channel } = queue.metadata
 
-  playerHistory.setOptions(await generateHistoryOptions())
+  const { options, songs } = await generateHistoryOptions()
+  playerHistory.setOptions(options)
   playerHistory.setPlaceholder('-- Song History --')
 
   if (!channel) return
   await sendMessage(channel, {
-    content: '🎶 | Previously Played:',
+    content: '🎶 | Pick a song below or use </play:991566063068250134>',
     files: [],
     components: [historyActionRow],
   })

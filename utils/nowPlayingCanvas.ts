@@ -70,7 +70,6 @@ const renderMultiLineTitle = (
 }
 
 export const nowPlayingCanvasWithUpNext = async (songs: Track[]) => {
-  console.time('nowPlayingCanvasWithUpNext')
   const canvas = new Canvas(700, 394)
   const canv = canvas.getContext('2d')
 
@@ -194,17 +193,21 @@ export const nowPlayingCanvasWithUpNext = async (songs: Track[]) => {
       canv.fillStyle = `#ffffff`
       canv.font = '600 22px Poppins'
       canv.textAlign = 'left'
-      const a = songObj.author
-      const s = songObj.title
+      let { author: artist, title } = songObj
+      if (songObj.source === 'youtube') {
+        const titleObj = parseSongName(songObj.title)
+        artist = titleObj.artist
+        if (titleObj.title) title = titleObj.title
+      }
       canv.fillText(`${i}`, 345, 36 + 65 * i)
-      if (s !== null) {
+      if (title !== null) {
         canv.font = '600 22px Poppins'
-        canv.fillText(truncateString(s, 20), 370, 26 + 65 * i)
+        canv.fillText(truncateString(title, 20), 370, 26 + 65 * i)
         canv.font = '300 22px Poppins'
-        canv.fillText(truncateString(a, 20), 370, 51 + 65 * i)
+        canv.fillText(truncateString(artist, 20), 370, 51 + 65 * i)
       } else {
         canv.font = '600 22px Poppins'
-        canv.fillText(truncateString(a, 20), 370, 30 + 65 * i)
+        canv.fillText(truncateString(artist, 20), 370, 30 + 65 * i)
       }
 
       // if (i < 5 && songs.length > 2) {
@@ -215,13 +218,10 @@ export const nowPlayingCanvasWithUpNext = async (songs: Track[]) => {
     })
 
   // Buffer canvas
-  const buffer = await canvas.toBuffer('png')
-  console.timeEnd('nowPlayingCanvasWithUpNext')
-  return buffer
+  return await canvas.toBuffer('png')
 }
 
 export const nowPlayingCanvas = async (song: Track) => {
-  console.time('nowPlayingCanvas')
   const canvas = new Canvas(700, 169)
   const canv = canvas.getContext('2d')
   const { requestedBy } = song
@@ -305,9 +305,7 @@ export const nowPlayingCanvas = async (song: Track) => {
   }
 
   // Buffer canvas
-  const buffer = await canvas.toBuffer('png')
-  console.timeEnd('nowPlayingCanvas')
-  return buffer
+  return await canvas.toBuffer('png')
 }
 
 export const generateNowPlayingCanvas = async (tracks: Track[]) => {

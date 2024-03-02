@@ -1,5 +1,5 @@
 import { Point } from '@influxdata/influxdb-client'
-import { Track, serialize } from 'discord-player'
+import { Track, serialize, deserialize, useMainPlayer } from 'discord-player'
 
 import ENV from '@constants/Env'
 import { parseSongName } from '@utils/utilities'
@@ -32,7 +32,7 @@ const getSongsPlayed = async () => {
     |> filter(fn: (r) => r["playing"] == true)
     |> group()
     |> sort(columns: ["_time"], desc: true)
-    |>limit(n: 23)
+    |> limit(n: 24)
   `
   // Execute query and receive table metadata and rows.
   const results: SongHistory[] = await queryApi().collectRows(fluxQuery)
@@ -150,26 +150,28 @@ const addSong = (playing: boolean, track?: Track) => {
 }
 
 const generateHistoryOptions = async () => {
-  // Read song play history
   const history = await getSongsPlayed()
+  const player = useMainPlayer()
+
+  const songs = history
+    .filter((s) => s.serializedTrack)
+    .map((s) => deserialize(player, JSON.parse(s.serializedTrack)) as Track)
 
   // Prepare song history for the history component
-  const options = history
-    .map((s) => {
-      const { artist, title } = parseSongName(s.songTitle)
+  const options = songs
+    .map((s, index) => {
+      const { author, title } = s
+
       return {
-        label: title ? title.substring(0, 95) : artist.substring(0, 95),
-        description: title ? artist.substring(0, 95) : ' ',
+        label: title ? title.substring(0, 95) : author.substring(0, 95),
+        description: title ? author.substring(0, 95) : ' ',
         emoji: '🎶',
-        value:
-          s.source === 'youtube'
-            ? `${s.songUrl}?x=${Math.floor(Math.random() * 99999)}`
-            : `${title?.substring(0, 90)} ${artist.substring(0, 90)} ${Math.floor(Math.random() * 99999)}`,
+        value: index.toString(),
       }
     })
     .reverse()
 
-  return options
+  return { options, songs }
 }
 
 export { getSongsPlayed, getTopSongs, getUserTopSongs, addSong, generateHistoryOptions }

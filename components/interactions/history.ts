@@ -1,7 +1,8 @@
 import { GuildMember, StringSelectMenuInteraction } from 'discord.js'
 import { GuildQueue, Track, useMainPlayer } from 'discord-player'
 
-import { nodeOptions } from '@constants/PlayerInitOptions'
+import { playerOptions, nodeOptions } from '@constants/PlayerInitOptions'
+import { generateHistoryOptions } from '@utils/songHistory'
 
 export default async (
   queue: GuildQueue<StringSelectMenuInteraction> | null,
@@ -23,17 +24,24 @@ export default async (
     return
   }
 
-  const playSong = async (songName: Track | string) => {
+  const { songs } = await generateHistoryOptions()
+
+  const options = {
+    ...playerOptions,
+    nodeOptions: {
+      ...nodeOptions,
+      metadata: interaction,
+    },
+    requestedBy: member as GuildMember,
+  }
+
+  const playSong = async (value: string | Track) => {
+    const track = typeof value === 'string' ? songs[parseInt(value)] : value
+
     if (queue) {
-      queue.player.play(voiceChannel, songName, {
-        requestedBy: member as GuildMember,
-        nodeOptions: { ...nodeOptions, metadata: interaction },
-      })
+      queue.player.play(voiceChannel, track, options)
     } else {
-      player.play(voiceChannel, songName, {
-        requestedBy: member as GuildMember,
-        nodeOptions: { ...nodeOptions, metadata: interaction },
-      })
+      player.play(voiceChannel, track, options)
     }
   }
 

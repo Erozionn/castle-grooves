@@ -14,15 +14,16 @@ import { generateHistoryOptions, addSong } from '@utils/songHistory'
 const playerButtonKeys = Object.keys(playerButtons)
 
 export default async (queue: GuildQueue<Interaction>, track: Track) => {
-  const { channel } = queue.metadata
-
-  if (!channel) {
+  if (!queue.metadata?.channel) {
     console.error('[playSong] Channel not found')
     return
   }
 
+  const { channel } = queue.metadata
+
   // Add songs to history component
-  playerHistory.setOptions(await generateHistoryOptions())
+  const { options, songs } = await generateHistoryOptions()
+  playerHistory.setOptions(options)
 
   // Enable player buttons
   for (let i = 0; i < 4; i++) {
@@ -40,7 +41,8 @@ export default async (queue: GuildQueue<Interaction>, track: Track) => {
     await addSong(queue.isPlaying(), track)
 
     // Add songs to history component
-    playerHistory.setOptions(await generateHistoryOptions())
+    const { options, songs } = await generateHistoryOptions()
+    playerHistory.setOptions(options)
 
     const buffer = await generateNowPlayingCanvas(tracks)
     await sendMessage(channel, {
