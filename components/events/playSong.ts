@@ -1,17 +1,10 @@
-import { GuildQueue, Track, serialize } from 'discord-player'
+import { GuildQueue, Track } from 'discord-player'
 import { Interaction } from 'discord.js'
 
-import {
-  components,
-  playerButtons,
-  playerButtonsType,
-  playerHistory,
-} from '@constants/messageComponents'
+import { useComponents } from '@constants/messageComponents'
 import { sendMessage } from '@utils/mainMessage'
 import { generateNowPlayingCanvas } from '@utils/nowPlayingCanvas'
-import { generateHistoryOptions, addSong } from '@utils/songHistory'
-
-const playerButtonKeys = Object.keys(playerButtons)
+import { addSong } from '@utils/songHistory'
 
 export default async (queue: GuildQueue<Interaction>, track: Track) => {
   if (!queue.metadata?.channel) {
@@ -19,19 +12,8 @@ export default async (queue: GuildQueue<Interaction>, track: Track) => {
     return
   }
 
+  const components = await useComponents(queue)
   const { channel } = queue.metadata
-
-  // Add songs to history component
-  const { options, songs } = await generateHistoryOptions()
-  playerHistory.setOptions(options)
-
-  // Enable player buttons
-  for (let i = 0; i < 4; i++) {
-    playerButtons[playerButtonKeys[i] as playerButtonsType].setDisabled(false)
-  }
-
-  // Change disconnect button to stop button
-  playerButtons.stop.setEmoji('musicoff:909248235623825439')
 
   if ((queue.tracks.size > 0 || queue.currentTrack) && queue.metadata.channel) {
     const tracks = queue.tracks.toArray()
@@ -39,10 +21,6 @@ export default async (queue: GuildQueue<Interaction>, track: Track) => {
 
     // Write song info into DB (playing [true:false], song)
     await addSong(queue.isPlaying(), track)
-
-    // Add songs to history component
-    const { options, songs } = await generateHistoryOptions()
-    playerHistory.setOptions(options)
 
     const buffer = await generateNowPlayingCanvas(tracks)
     await sendMessage(channel, {

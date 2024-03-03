@@ -2,13 +2,7 @@ import { Interaction } from 'discord.js'
 import { GuildQueue } from 'discord-player'
 
 import { sendMessage } from '@utils/mainMessage'
-import {
-  components,
-  historyActionRow,
-  playerButtons,
-  playerButtonsType,
-  playerHistory,
-} from '@constants/messageComponents'
+import { useComponents } from '@constants/messageComponents'
 
 export default async (queue: GuildQueue<Interaction> | null) => {
   if (!queue) return
@@ -23,12 +17,7 @@ export default async (queue: GuildQueue<Interaction> | null) => {
 
     console.log('[stopButton] Stopped the queue.')
 
-    playerButtons.stop.setEmoji('disconnect:1043629464166355015')
-    playerHistory.setPlaceholder('-- Song History --')
-
-    for (let i = 0; i < 4; i++) {
-      playerButtons[Object.keys(playerButtons)[i] as playerButtonsType].setDisabled(true)
-    }
+    const components = await useComponents(queue)
 
     await sendMessage(channel, {
       content: '🎶 | Previously Played:',
@@ -37,10 +26,12 @@ export default async (queue: GuildQueue<Interaction> | null) => {
     })
   } else {
     queue.delete()
+
+    const components = await useComponents()
     await sendMessage(channel, {
       content: '🎶 | Pick a song below or use </play:991566063068250134>',
       files: [],
-      components: [historyActionRow],
+      components: [components[1]],
     })
     console.log('[stopButton] Disconnected from voice connection.')
   }

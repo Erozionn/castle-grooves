@@ -1,16 +1,12 @@
 import { GuildQueue } from 'discord-player'
 import { Interaction } from 'discord.js'
 
-import { historyActionRow, playerHistory } from '@constants/messageComponents'
+import { useComponents } from '@constants/messageComponents'
 import { sendMessage } from '@utils/mainMessage'
-import { generateHistoryOptions } from '@utils/songHistory'
 
 export default async (queue: GuildQueue<Interaction>) => {
+  const [_, historyActionRow] = await useComponents(queue)
   const { channel } = queue.metadata
-
-  const { options, songs } = await generateHistoryOptions()
-  playerHistory.setOptions(options)
-  playerHistory.setPlaceholder('-- Song History --')
 
   if (!channel) return
   await sendMessage(channel, {

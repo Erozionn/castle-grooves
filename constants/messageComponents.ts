@@ -1,6 +1,16 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } from 'discord.js'
+import { GuildQueue, QueueRepeatMode, useHistory } from 'discord-player'
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonInteraction,
+  ButtonStyle,
+  StringSelectMenuBuilder,
+  StringSelectMenuInteraction,
+} from 'discord.js'
 
-export const playerButtons = {
+import { generateHistoryOptions } from '@utils/songHistory'
+
+const defaultPlayerButtons = {
   back: new ButtonBuilder()
     .setCustomId('back_button')
     .setStyle(ButtonStyle.Primary)
@@ -25,22 +35,77 @@ export const playerButtons = {
     .setCustomId('stop_button')
     .setStyle(ButtonStyle.Danger)
     .setDisabled(false)
-    .setEmoji('disconnect:1043629464166355015'),
+    .setEmoji('musicoff:909248235623825439'),
 }
 
-export type playerButtonsType = keyof typeof playerButtons
+// type playerButtonsType = keyof typeof playerButtons
 
-export const playerHistory = new StringSelectMenuBuilder()
+const defaultPlayerHistory = new StringSelectMenuBuilder()
   .setCustomId('history')
-  .setMaxValues(18)
+  .setMaxValues(24)
   .setPlaceholder('-- Song History --')
 
-export const buttonsActionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-  Object.values(playerButtons)
-)
+export const useComponents = async (queue?: GuildQueue) => {
+  const playerButtons = defaultPlayerButtons
+  const playerHistory = defaultPlayerHistory
 
-export const historyActionRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
-  playerHistory
-)
+  const { options } = await generateHistoryOptions()
+  playerHistory.setOptions(options)
 
-export const components = [buttonsActionRow, historyActionRow]
+  const buttonsActionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    Object.values(playerButtons)
+  )
+
+  const historyActionRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+    playerHistory
+  )
+
+  if (!queue) return [buttonsActionRow, historyActionRow]
+
+  const { customId } = queue.metadata as ButtonInteraction | StringSelectMenuInteraction
+
+  const history = useHistory(queue)
+  playerButtons.back.setDisabled(history?.isEmpty())
+
+  if (queue.isEmpty() && !queue.currentTrack) {
+    playerButtons.skip.setDisabled(true)
+    playerButtons.back.setDisabled(true)
+    playerButtons.playPause.setDisabled(true)
+    playerButtons.recommended.setDisabled(true)
+    playerButtons.stop.setEmoji('disconnect:1043629464166355015')
+  } else {
+    playerButtons.skip.setDisabled(false)
+    playerButtons.back.setDisabled(false)
+    playerButtons.playPause.setDisabled(false)
+    playerButtons.recommended.setDisabled(false)
+    playerButtons.playPause.setStyle(ButtonStyle.Primary)
+    playerButtons.stop.setEmoji('musicoff:909248235623825439')
+  }
+
+  if (queue.repeatMode === QueueRepeatMode.AUTOPLAY) {
+    playerButtons.recommended.setStyle(ButtonStyle.Success)
+  } else {
+    playerButtons.recommended.setStyle(ButtonStyle.Secondary)
+  }
+
+  switch (customId) {
+    case 'stop_button':
+      if (queue.node.isPaused()) {
+        playerButtons.stop.setEmoji('disconnect:1043629464166355015')
+        playerButtons.skip.setDisabled(true)
+        playerButtons.back.setDisabled(true)
+        playerButtons.playPause.setDisabled(true)
+        playerButtons.recommended.setDisabled(true)
+      }
+      break
+    case 'play_pause_button':
+      if (queue.node.isPaused()) {
+        playerButtons.playPause.setStyle(ButtonStyle.Success)
+      }
+      break
+  }
+
+  return [buttonsActionRow, historyActionRow]
+}
+
+// export const components = [buttonsActionRow, historyActionRow]

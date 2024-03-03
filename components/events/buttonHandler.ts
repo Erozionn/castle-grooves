@@ -5,7 +5,6 @@ import {
   stopButtonInteractionHandler,
   skipButtonInteractionHandler,
   playPauseButtonInteractionHandler,
-  repeatButtonInteractionHandler,
   backButtonInteractionHandler,
   historyInteractionHandler,
   recommendedButtonInteractionHandler,
@@ -17,6 +16,8 @@ export default async (interaction: Interaction<CacheType>) => {
 
   const { channel, customId } = interaction
   const queue = useQueue<Interaction>(interaction.guild?.id as string)
+
+  queue?.setMetadata(interaction)
 
   if (!channel) {
     console.log('[buttonHandler] No channel found!')
@@ -35,9 +36,6 @@ export default async (interaction: Interaction<CacheType>) => {
       break
     case 'stop_button':
       stopButtonInteractionHandler(queue)
-      break
-    case 'repeat_button':
-      repeatButtonInteractionHandler(queue)
       break
     case 'recommended_button':
       recommendedButtonInteractionHandler(queue)

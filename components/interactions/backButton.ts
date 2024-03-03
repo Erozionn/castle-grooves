@@ -19,7 +19,11 @@ export default async (queue: GuildQueue<Interaction> | null) => {
     return
   }
 
-  if (history) {
-    await history.previous()
+  if (history && !history?.isEmpty()) {
+    try {
+      await history.previous()
+    } catch (e) {
+      console.error('[backButton]', e)
+    }
   }
 }

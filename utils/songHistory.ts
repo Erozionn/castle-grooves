@@ -1,5 +1,6 @@
 import { Point } from '@influxdata/influxdb-client'
 import { Track, serialize, deserialize, useMainPlayer } from 'discord-player'
+import { formatDistanceToNowStrict } from 'date-fns'
 
 import ENV from '@constants/Env'
 import { parseSongName } from '@utils/utilities'
@@ -14,6 +15,7 @@ type SongHistory = {
   requestedByAvatar: string
   serializedTrack: string
   source: string
+  _time: string
   playing: boolean
 }
 
@@ -32,7 +34,8 @@ const getSongsPlayed = async () => {
     |> filter(fn: (r) => r["playing"] == true)
     |> group()
     |> sort(columns: ["_time"], desc: true)
-    |> limit(n: 24)
+    |> keep(columns: ["_time", "serializedTrack"])
+    |> limit(n: 44)
   `
   // Execute query and receive table metadata and rows.
   const results: SongHistory[] = await queryApi().collectRows(fluxQuery)
@@ -155,21 +158,36 @@ const generateHistoryOptions = async () => {
 
   const songs = history
     .filter((s) => s.serializedTrack)
-    .map((s) => deserialize(player, JSON.parse(s.serializedTrack)) as Track)
-
-  // Prepare song history for the history component
-  const options = songs
-    .map((s, index) => {
-      const { author, title } = s
-
+    .map((s) => {
       return {
-        label: title ? title.substring(0, 95) : author.substring(0, 95),
-        description: title ? author.substring(0, 95) : ' ',
-        emoji: '🎶',
-        value: index.toString(),
+        playedAt: s._time,
+        track: deserialize(player, JSON.parse(s.serializedTrack)) as Track,
       }
     })
+    .slice(0, 24)
     .reverse()
+
+  // Prepare song history for the history component
+  const options = songs.map((s, index) => {
+    // Split artist and title
+    let { author: artist, title } = s.track
+    if (s.track.source === 'youtube') {
+      const titleObj = parseSongName(s.track.title)
+      artist = titleObj.artist
+      if (titleObj.title) title = titleObj.title
+    }
+
+    const lastPlayed = formatDistanceToNowStrict(s.playedAt, {
+      addSuffix: true,
+    })
+
+    return {
+      label: title ? title.substring(0, 95) : artist.substring(0, 95),
+      description: `${title ? artist.substring(0, 95) : ' '} - ${lastPlayed}`,
+      emoji: '🎶',
+      value: index.toString(),
+    }
+  })
 
   return { options, songs }
 }

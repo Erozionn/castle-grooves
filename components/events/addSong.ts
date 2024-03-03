@@ -1,10 +1,9 @@
 import { GuildQueue, Track } from 'discord-player'
 import { Interaction } from 'discord.js'
 
-import { components, playerHistory } from '@constants/messageComponents'
+import { useComponents } from '@constants/messageComponents'
 import { sendMessage } from '@utils/mainMessage'
 import { generateNowPlayingCanvas } from '@utils/nowPlayingCanvas'
-import { generateHistoryOptions } from '@utils/songHistory'
 
 export default async (queue: GuildQueue<Interaction>, track: Track | Track[]) => {
   if (!queue.metadata?.channel) {
@@ -12,6 +11,7 @@ export default async (queue: GuildQueue<Interaction>, track: Track | Track[]) =>
     return
   }
 
+  const components = await useComponents(queue)
   const { channel } = queue.metadata
 
   const log = (track: Track) =>
@@ -24,10 +24,6 @@ export default async (queue: GuildQueue<Interaction>, track: Track | Track[]) =>
   } else {
     log(track)
   }
-
-  // Add songs to history component
-  const { options, songs } = await generateHistoryOptions()
-  playerHistory.setOptions(options)
 
   if (queue.tracks.size + (queue.currentTrack ? 1 : 0) >= 1 && channel) {
     const tracks = queue.tracks.toArray()

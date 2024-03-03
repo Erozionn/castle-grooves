@@ -36,7 +36,7 @@ export default async (
   }
 
   const playSong = async (value: string | Track) => {
-    const track = typeof value === 'string' ? songs[parseInt(value)] : value
+    const track = typeof value === 'string' ? songs[parseInt(value)].track : value
 
     if (queue) {
       queue.player.play(voiceChannel, track, options)
@@ -45,19 +45,10 @@ export default async (
     }
   }
 
-  if (values.length === 1) {
-    playSong(values[0])
-  }
-
-  if (values.length > 1) {
-    const songs = values
-
-    try {
-      const searchResults = await Promise.all(songs.map((song) => player.search(song)))
-      searchResults.forEach((result) => playSong(result.tracks[0]))
-    } catch (e) {
-      console.warn('[history]', e)
-    }
+  try {
+    values.forEach(playSong)
+  } catch (e) {
+    console.warn('[history]', e)
   }
 
   if (queue && queue.node.isPaused()) {

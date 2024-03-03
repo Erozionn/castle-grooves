@@ -5,7 +5,7 @@
   "main": "index.ts",
   "scripts": {
     "start": "node -r dotenv/config build/index.js dotenv_config_path=.env.dev dotenv_config_debug=true",
-    "start:dev": "ts-node-dev -r tsconfig-paths/register -r dotenv/config index.ts --inspect dotenv_config_path=.env.dev dotenv_config_debug=true",
+    "start:dev": "ts-node-dev -r tsconfig-paths/register -r dotenv/config index.ts dotenv_config_path=.env.dev dotenv_config_debug=true",
     "start:prod": "node build/index.js",
     "start:prefill": "NOW_PLAYING_MOCK_DATA=true yarn start:dev",
     "start:docker": "docker run --env-file .env.dev --name castle-grooves castle-grooves:dev",
@@ -32,6 +32,7 @@
     "@discordjs/rest": "^2.2.0",
     "@discordjs/voice": "^0.16.1",
     "@influxdata/influxdb-client": "^1.26.0",
+    "date-fns": "^3.3.1",
     "discord-api-types": "^0.37.70",
     "discord-player": "^6.6.7",
     "discord.js": "^14.14.1",
@@ -45,6 +46,7 @@
     "ytdl-core": "^4.11.5"
   },
   "devDependencies": {
+    "@types/express": "^4.17.21",
     "@types/node": "^20.11.19",
     "@typescript-eslint/eslint-plugin": "^7.0.2",
     "@typescript-eslint/parser": "^7.0.2",

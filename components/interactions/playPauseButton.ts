@@ -1,8 +1,8 @@
-import { ButtonStyle, Interaction } from 'discord.js'
+import { Interaction } from 'discord.js'
 import { GuildQueue } from 'discord-player'
 
 import { getMainMessage, sendMessage } from '@utils/mainMessage'
-import { components, playerButtons } from '@constants/messageComponents'
+import { useComponents } from '@constants/messageComponents'
 
 export default async (queue: GuildQueue<Interaction> | null) => {
   const mainMessage = getMainMessage()
@@ -15,13 +15,13 @@ export default async (queue: GuildQueue<Interaction> | null) => {
 
   if (!channel) return
 
-  if (queue.node.isPaused()) {
+  if (!queue.node.isPaused()) {
     queue.node.pause()
-    playerButtons.playPause.setStyle(ButtonStyle.Success)
   } else {
     queue.node.resume()
-    playerButtons.playPause.setStyle(ButtonStyle.Primary)
   }
 
-  sendMessage(channel, { components })
+  const components = await useComponents(queue)
+
+  await sendMessage(channel, { components })
 }

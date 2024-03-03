@@ -23,11 +23,10 @@ import {
   buttonHandler,
 } from '@components/events'
 import { ClientType } from '@types'
-import { historyActionRow, playerHistory } from '@constants/messageComponents'
+import { useComponents } from '@constants/messageComponents'
 import { getMainMessage, sendMessage, deleteMessage } from '@utils/mainMessage'
 import initApi from '@api'
 import ENV from '@constants/Env'
-import { generateHistoryOptions } from '@utils/songHistory'
 import { recordVoiceStateChange } from '@utils/recordActivity'
 import { commandInteractionHandler } from '@components/interactions'
 import { nowPlayingCanvas, nowPlayingCanvasWithUpNext } from '@utils/nowPlayingCanvas'
@@ -71,7 +70,7 @@ client.player = player
 client.commands = new Collection()
 
 // Initialize the API and webserver.
-initApi(client)
+initApi()
 // Register commands.
 registerCommands()
 
@@ -161,10 +160,8 @@ client.once('ready', async () => {
     })
   })
 
-  // Generate song history and sen d it to the main channel.
-  const { options, songs } = await generateHistoryOptions()
-  playerHistory.setOptions(options)
-  playerHistory.setPlaceholder('-- Song History --')
+  const [_, historyActionRow] = await useComponents()
+
   await sendMessage(defaultTextChannel, {
     content: `🎶 | Pick a song below or use </play:991566063068250134>`,
     components: [historyActionRow],
