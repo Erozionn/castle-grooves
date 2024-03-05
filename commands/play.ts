@@ -2,7 +2,6 @@ import { useMainPlayer, useQueue } from 'discord-player'
 import { AutocompleteInteraction, GuildMember, Interaction, SlashCommandBuilder } from 'discord.js'
 
 import { playerOptions, nodeOptions } from '@constants/PlayerInitOptions'
-import { RequestOptions } from 'https'
 import { parseSongName } from '@utils/utilities'
 
 export default {
