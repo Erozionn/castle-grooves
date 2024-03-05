@@ -11,6 +11,7 @@ import {
   ActivityType,
   TextChannel,
   Message,
+  ApplicationCommand,
 } from 'discord.js'
 import { Player } from 'discord-player'
 
@@ -22,7 +23,7 @@ import {
   songFinishEventHandler,
   buttonHandler,
 } from '@components/events'
-import { ClientType } from '@types'
+import { ClientType, CommandObject } from '@types'
 import { useComponents } from '@constants/messageComponents'
 import { getMainMessage, sendMessage, deleteMessage } from '@utils/mainMessage'
 import initApi from '@api'
@@ -67,7 +68,7 @@ const player = new Player(client, {
 
 client.player = player
 
-client.commands = new Collection()
+client.commands = new Collection<string, CommandObject['default']>()
 
 // Initialize the API and webserver.
 initApi()
@@ -171,11 +172,21 @@ client.once('ready', async () => {
   console.log('[CastleGrooves] Ready!')
 })
 
-client.on('interactionCreate', async (interaction) =>
-  commandInteractionHandler(interaction, client)
-)
+client.on('interactionCreate', async (interaction) => {
+  if (interaction.isAutocomplete()) {
+    const command: CommandObject = client.commands.get(interaction.commandName)
+    if (command.autoComplete) command.autoComplete(interaction)
+  }
 
-client.on('interactionCreate', async (interaction) => await buttonHandler(interaction))
+  if (interaction.isCommand() || interaction.isChatInputCommand()) {
+    commandInteractionHandler(interaction, client)
+  }
+
+  if (interaction.isButton() || interaction.isStringSelectMenu()) {
+    await buttonHandler(interaction)
+  }
+})
+
 // On user join voice channel event
 client.on('voiceStateUpdate', (oldState, newState) => recordVoiceStateChange(oldState, newState))
 

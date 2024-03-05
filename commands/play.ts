@@ -1,15 +1,58 @@
 import { useMainPlayer, useQueue } from 'discord-player'
-import { GuildMember, Interaction, SlashCommandBuilder } from 'discord.js'
+import { AutocompleteInteraction, GuildMember, Interaction, SlashCommandBuilder } from 'discord.js'
 
 import { playerOptions, nodeOptions } from '@constants/PlayerInitOptions'
+import { RequestOptions } from 'https'
+import { parseSongName } from '@utils/utilities'
 
 export default {
   data: new SlashCommandBuilder()
     .setName('play')
     .setDescription('Plays a song.')
     .addStringOption((option) =>
-      option.setName('song').setDescription('The song to play.').setRequired(true)
+      option
+        .setName('song')
+        .setDescription('The song to play.')
+        .setRequired(true)
+        .setAutocomplete(true)
     ),
+  async autoComplete(interaction: AutocompleteInteraction) {
+    const player = useMainPlayer()
+
+    const focusedValue = interaction.options.getFocused()
+
+    if (!focusedValue) {
+      await interaction.respond([])
+      return
+    }
+
+    try {
+      const searchResults = await player.search(focusedValue)
+      const choices = searchResults.tracks.map((track) => {
+        let { author: artist, title } = track
+        if (track.source === 'youtube') {
+          const titleObj = parseSongName(track.title)
+          artist = titleObj.artist
+          if (titleObj.title) title = titleObj.title
+        }
+        return {
+          name: `${artist} - ${title}`.substring(0, 95),
+          value: `${title.substring(0, 40)} ${artist.substring(0, 40)}`,
+        }
+      })
+
+      const splitValue = focusedValue.split(' ')
+
+      // Remove duplicates and filter by search query words
+      const filtered = [...new Map(choices.map((item) => [item['value'], item])).values()].filter(
+        (choice) =>
+          splitValue.some((word) => choice.name.toLowerCase().includes(word.toLowerCase()))
+      )
+      await interaction.respond(filtered)
+    } catch (e) {
+      console.warn('[searchCommand]', e)
+    }
+  },
   async execute(interaction: Interaction) {
     if (!interaction.isCommand()) return
 

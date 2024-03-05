@@ -1,5 +1,11 @@
 import { Player, Track, WithMetadata } from 'discord-player'
-import { Client, Collection } from 'discord.js'
+import {
+  AutocompleteInteraction,
+  Client,
+  Collection,
+  CommandInteraction,
+  SlashCommandBuilder,
+} from 'discord.js'
 
 export type TrackWithYoutubeMetadata = WithMetadata<
   Track,
@@ -74,4 +80,12 @@ export type ClientType = Client & {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   commands: Collection<string, any>
   player: Player
+}
+
+export type CommandObject = {
+  default: {
+    data: SlashCommandBuilder
+  }
+  execute: (interaction: CommandInteraction) => Promise<void>
+  autoComplete?: (interaction: AutocompleteInteraction) => Promise<void>
 }

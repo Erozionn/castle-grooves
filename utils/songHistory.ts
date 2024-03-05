@@ -35,7 +35,7 @@ const getSongsPlayed = async () => {
     |> group()
     |> sort(columns: ["_time"], desc: true)
     |> keep(columns: ["_time", "serializedTrack"])
-    |> limit(n: 44)
+    |> limit(n: 100)
   `
   // Execute query and receive table metadata and rows.
   const results: SongHistory[] = await queryApi().collectRows(fluxQuery)

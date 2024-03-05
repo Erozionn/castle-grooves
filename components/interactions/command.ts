@@ -1,9 +1,11 @@
 import { CacheType, CommandInteraction, Interaction } from 'discord.js'
 
-import { ClientType } from '@types'
+import { ClientType, CommandObject } from '@types'
 
-export default async (interaction: Interaction<CacheType>, client: ClientType) => {
-  const command = client.commands.get((interaction as CommandInteraction).commandName)
+export default async (interaction: CommandInteraction<CacheType>, client: ClientType) => {
+  const command: CommandObject = client.commands.get(
+    (interaction as CommandInteraction).commandName
+  )
 
   if (!command) return
 
