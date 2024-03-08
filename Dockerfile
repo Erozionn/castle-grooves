@@ -5,7 +5,7 @@ ARG port=1337
 
 FROM jrottenberg/ffmpeg:4.1-alpine AS ffmpeg
 
-FROM node:lts-alpine AS builder
+FROM node:21-alpine3.18 AS builder
 
 RUN apk add --no-cache python3 make g++
 
@@ -18,7 +18,7 @@ RUN yarn build
 
 # Final
 
-FROM node:lts-alpine AS final
+FROM node:21-alpine3.18 AS final
 
 COPY --from=ffmpeg / /
 
