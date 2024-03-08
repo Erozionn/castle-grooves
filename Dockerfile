@@ -11,7 +11,7 @@ RUN apk update && apk add --no-cache python3 make g++ fontconfig
 RUN corepack enable && corepack prepare yarn@stable --activate && yarn set version 4
 
 WORKDIR /usr/src/app
-COPY package.json yarn.lock .yarnrc.yml .yarn ./
+COPY package.json yarn.lock .yarnrc.yml ./
 # COPY patches ./patches
 RUN yarn install --immutable
 COPY . .
@@ -29,7 +29,7 @@ RUN corepack enable && corepack prepare yarn@stable --activate && yarn set versi
 ENV NODE_ENV production
 
 WORKDIR /usr/src/app
-COPY package.json yarn.lock .yarnrc.yml .yarn ./
+COPY package.json yarn.lock .yarnrc.yml ./
 # COPY patches ./patches
 
 RUN yarn install --immutable
