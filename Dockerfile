@@ -11,7 +11,7 @@ RUN apk add --no-cache python3 make g++
 
 WORKDIR /usr/src/app
 COPY package.json yarn.lock ./
-COPY patches ./patches
+# COPY patches ./patches
 RUN yarn install --frozen-lockfile
 COPY . .
 RUN yarn build
@@ -28,7 +28,7 @@ ENV NODE_ENV production
 
 WORKDIR /usr/src/app
 COPY package.json yarn.lock ./
-COPY patches ./patches
+# COPY patches ./patches
 
 RUN yarn install --production --frozen-lockfile
 

@@ -38,11 +38,9 @@ const defaultPlayerButtons = {
     .setEmoji('musicoff:909248235623825439'),
 }
 
-// type playerButtonsType = keyof typeof playerButtons
-
 const defaultPlayerHistory = new StringSelectMenuBuilder()
   .setCustomId('history')
-  .setMaxValues(24)
+  .setMaxValues(1)
   .setPlaceholder('-- Song History --')
 
 export const useComponents = async (queue?: GuildQueue) => {
@@ -50,7 +48,26 @@ export const useComponents = async (queue?: GuildQueue) => {
   const playerHistory = defaultPlayerHistory
 
   const { options } = await generateHistoryOptions()
-  playerHistory.setOptions(options)
+
+  if (options.length > 0) {
+    playerHistory
+      .setOptions(options)
+      .setPlaceholder('-- Song History --')
+      .setMaxValues(options.length)
+      .setDisabled(false)
+  } else {
+    playerHistory
+      .setOptions([
+        {
+          label: 'No history',
+          value: 'no_history',
+          emoji: '❌',
+        },
+      ])
+      .setPlaceholder('No history. Play some songs!')
+      .setMaxValues(1)
+      .setDisabled(true)
+  }
 
   const buttonsActionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
     Object.values(playerButtons)
