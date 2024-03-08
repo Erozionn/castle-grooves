@@ -1,38 +1,38 @@
-import { Queue } from 'distube'
-import { ButtonInteraction } from 'discord.js'
+import { Interaction } from 'discord.js'
+import { GuildQueue } from 'discord-player'
 
 import { sendMessage } from '@utils/mainMessage'
-import {
-  components,
-  playerButtons,
-  playerButtonsType,
-  playerHistory,
-} from '@constants/messageComponents'
-import { ClientType } from '@types'
+import { useComponents } from '@constants/messageComponents'
 
-export default async (client: ClientType, interaction: ButtonInteraction, queue?: Queue) => {
-  if (!queue) {
-    client.player.voices.leave(interaction)
-    return
-  }
+export default async (queue: GuildQueue<Interaction> | null) => {
+  if (!queue) return
 
-  if (queue.playing && queue.textChannel) {
-    queue.pause()
-    queue.songs.splice(1)
+  const { channel } = queue.metadata
 
-    playerButtons.stop.setEmoji('disconnect:1043629464166355015')
-    playerHistory.setPlaceholder('-- Song History --')
+  if (!channel) return
 
-    for (let i = 0; i < 4; i++) {
-      playerButtons[Object.keys(playerButtons)[i] as playerButtonsType].setDisabled(true)
-    }
+  if (queue.node.isPlaying() && queue.metadata.channel) {
+    queue.node.pause()
+    queue.removeTrack(0)
 
-    await sendMessage(queue.textChannel, {
+    console.log('[stopButton] Stopped the queue.')
+
+    const components = await useComponents(queue)
+
+    await sendMessage(channel, {
       content: '🎶 | Previously Played:',
       files: [],
       components,
     })
   } else {
-    queue.stop()
+    queue.delete()
+
+    const components = await useComponents()
+    await sendMessage(channel, {
+      content: '🎶 | Pick a song below or use </play:991566063068250134>',
+      files: [],
+      components: [components[1]],
+    })
+    console.log('[stopButton] Disconnected from voice connection.')
   }
 }

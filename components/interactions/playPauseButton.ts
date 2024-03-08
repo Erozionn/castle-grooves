@@ -1,23 +1,27 @@
-import { Queue } from 'distube'
-import { ButtonInteraction, ButtonStyle } from 'discord.js'
+import { Interaction } from 'discord.js'
+import { GuildQueue } from 'discord-player'
 
 import { getMainMessage, sendMessage } from '@utils/mainMessage'
-import { components, playerButtons } from '@constants/messageComponents'
+import { useComponents } from '@constants/messageComponents'
 
-export default async (interaction: ButtonInteraction, queue?: Queue) => {
+export default async (queue: GuildQueue<Interaction> | null) => {
   const mainMessage = getMainMessage()
-
   if (!queue) {
     mainMessage && sendMessage(mainMessage.channel, { content: '❌ | No music is being played!' })
     return
   }
-  if (queue.playing) {
-    queue.pause()
-    playerButtons.playPause.setStyle(ButtonStyle.Success)
+
+  const { channel } = queue.metadata
+
+  if (!channel) return
+
+  if (!queue.node.isPaused()) {
+    queue.node.pause()
   } else {
-    queue.resume()
-    playerButtons.playPause.setStyle(ButtonStyle.Primary)
+    queue.node.resume()
   }
 
-  sendMessage(interaction.message.channel, { components })
+  const components = await useComponents(queue)
+
+  await sendMessage(channel, { components })
 }

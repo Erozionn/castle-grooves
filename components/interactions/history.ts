@@ -1,50 +1,60 @@
-import { Queue } from 'distube'
-import { GuildMember, GuildTextBasedChannel, StringSelectMenuInteraction } from 'discord.js'
+import { GuildMember, StringSelectMenuInteraction } from 'discord.js'
+import { GuildQueue, Track, useMainPlayer } from 'discord-player'
 
-import { ClientType } from '@types'
+import { playerOptions, nodeOptions } from '@constants/PlayerInitOptions'
+import { generateHistoryOptions } from '@utils/songHistory'
 
 export default async (
-  client: ClientType,
-  interaction: StringSelectMenuInteraction,
-  queue?: Queue
+  queue: GuildQueue<StringSelectMenuInteraction> | null,
+  interaction: StringSelectMenuInteraction
 ) => {
-  const member = interaction.member as GuildMember
+  const player = useMainPlayer()
+  const { member, message, values } = interaction
+  const {
+    voice: { channel: voiceChannel },
+  } = member as GuildMember
 
-  if (!member.voice.channelId) {
-    interaction.message.edit('❌ | You need to be in a voice channel!')
+  if (!voiceChannel) {
+    message.edit('❌ | You need to be in a voice channel!')
     return
   }
 
-  if (interaction.values.length === 0) {
-    interaction.message.edit('❌ | You need to select at least one song!')
+  if (values.length === 0) {
+    message.edit('❌ | You need to select at least one song!')
     return
   }
 
-  if (interaction.values.length === 1 && member.voice.channel) {
-    const song = interaction.values[0]
-    client.player.play(member.voice.channel, song, {
-      textChannel: interaction.channel as GuildTextBasedChannel,
-      member: member,
-    })
+  const { songs } = await generateHistoryOptions()
+
+  const options = {
+    ...playerOptions,
+    nodeOptions: {
+      ...nodeOptions,
+      metadata: interaction,
+    },
+    requestedBy: member as GuildMember,
   }
 
-  if (interaction.values.length > 1 && member.voice.channel) {
-    const songs = interaction.values
-    console.log('[history] Adding songs to queue...', songs)
-    const playlist = await client.player.createCustomPlaylist(songs, {
-      member: member,
-      parallel: true,
-    })
-    client.player.play(member.voice.channel, playlist, {
-      textChannel: interaction.channel as GuildTextBasedChannel,
-      member: member,
-    })
-  }
+  const playSong = async (value: string | Track) => {
+    const track = typeof value === 'string' ? songs[parseInt(value)].track : value
 
-  if (queue && queue.paused) {
-    if (queue.songs.length >= 1) {
-      await queue.skip()
+    if (queue) {
+      queue.player.play(voiceChannel, track, options)
+    } else {
+      player.play(voiceChannel, track, options)
     }
-    queue.resume()
+  }
+
+  try {
+    values.forEach(playSong)
+  } catch (e) {
+    console.warn('[history]', e)
+  }
+
+  if (queue && queue.node.isPaused()) {
+    if (queue.tracks.size + (queue.currentTrack ? 1 : 0) >= 1) {
+      await queue.node.skip()
+    }
+    queue.node.resume()
   }
 }

@@ -11,10 +11,9 @@ import {
   ActivityType,
   TextChannel,
   Message,
+  ApplicationCommand,
 } from 'discord.js'
-import { DisTube } from 'distube'
-import { YtDlpPlugin } from '@distube/yt-dlp'
-import { SpotifyPlugin } from '@distube/spotify'
+import { Player } from 'discord-player'
 
 import {
   addSongEventHandler,
@@ -24,16 +23,15 @@ import {
   songFinishEventHandler,
   buttonHandler,
 } from '@components/events'
-import { ClientType } from '@types'
-import { historyActionRow, playerHistory } from '@constants/messageComponents'
+import { ClientType, CommandObject } from '@types'
+import { useComponents } from '@constants/messageComponents'
 import { getMainMessage, sendMessage, deleteMessage } from '@utils/mainMessage'
 import initApi from '@api'
 import ENV from '@constants/Env'
-import { generateHistoryOptions } from '@utils/songHistory'
 import { recordVoiceStateChange } from '@utils/recordActivity'
 import { commandInteractionHandler } from '@components/interactions'
 import { nowPlayingCanvas, nowPlayingCanvasWithUpNext } from '@utils/nowPlayingCanvas'
-import mockSongArray from '@data/dummies/songArray'
+import useMockTracks from '@data/dummies/songArray'
 
 import registerCommands from './deploy-commands'
 
@@ -56,58 +54,36 @@ const client = new Client({
   partials: [Partials.Channel],
 }) as ClientType
 
-if (SPOTIFY.CLIENT_ID && SPOTIFY.CLIENT_SECRET) console.log('[init] Loading with Spotify search')
+// if (SPOTIFY.CLIENT_ID && SPOTIFY.CLIENT_SECRET) console.log('[init] Loading with Spotify search')
 
-const player = new DisTube(client, {
-  emptyCooldown: 300,
-  nsfw: true,
-  searchSongs: 1,
-  youtubeCookie: YOUTUBE_COOKIE,
-  youtubeIdentityToken: YOUTUBE_IDENTITY_TOKEN,
-  plugins: [
-    new YtDlpPlugin(),
-    ...(SPOTIFY && SPOTIFY.CLIENT_ID && SPOTIFY.CLIENT_SECRET
-      ? [
-          new SpotifyPlugin({
-            parallel: true,
-            emitEventsAfterFetching: true,
-            api: {
-              clientId: SPOTIFY.CLIENT_ID,
-              clientSecret: SPOTIFY.CLIENT_SECRET,
-              topTracksCountry: SPOTIFY.COUNTRY,
-            },
-          }),
-        ]
-      : []),
-
-    new SpotifyPlugin({
-      parallel: true,
-      api: {
-        clientId: 'SpotifyAppClientID',
-        clientSecret: 'SpotifyAppClientSecret',
-        topTracksCountry: 'CA',
+const player = new Player(client, {
+  ytdlOptions: {
+    requestOptions: {
+      headers: {
+        cookie: YOUTUBE_COOKIE,
       },
-    }),
-  ],
+    },
+  },
 })
 
 client.player = player
 
-client.commands = new Collection()
+client.commands = new Collection<string, CommandObject['default']>()
 
 // Initialize the API and webserver.
-initApi(client)
+initApi()
 // Register commands.
 registerCommands()
 
 if (NOW_PLAYING_MOCK_DATA) {
   console.log('[nowPlayingMock] Generating mock now playing data...')
+  const mockTracks = useMockTracks()
 
-  nowPlayingCanvasWithUpNext(mockSongArray).then((buffer) => {
+  nowPlayingCanvasWithUpNext(mockTracks).then((buffer) => {
     fs.writeFileSync('mockNowPlayingMulti.png', buffer)
   })
 
-  nowPlayingCanvas(mockSongArray[0]).then((buffer) => {
+  nowPlayingCanvas(mockTracks[0]).then((buffer) => {
     fs.writeFileSync('mockNowPlaying.png', buffer)
   })
 
@@ -136,6 +112,10 @@ commandFiles.forEach(async (file) => {
 })
 
 client.once('ready', async () => {
+  await player.extractors.loadDefault(
+    (ext) => ext === 'YouTubeExtractor' || ext === 'SpotifyExtractor'
+  )
+
   client.user?.setActivity({
     name: '🎶 Music 🎶',
     type: ActivityType.Listening,
@@ -148,7 +128,7 @@ client.once('ready', async () => {
 
   const mainGuild = await client.guilds.cache.get(GUILD_ID)
 
-  if (!mainGuild || !mainGuild) return
+  if (!mainGuild) return
 
   const channels = await mainGuild.channels.fetch()
 
@@ -181,9 +161,8 @@ client.once('ready', async () => {
     })
   })
 
-  // Generate song history and sen d it to the main channel.
-  playerHistory.setOptions(await generateHistoryOptions())
-  playerHistory.setPlaceholder('-- Song History --')
+  const [_, historyActionRow] = await useComponents()
+
   await sendMessage(defaultTextChannel, {
     content: `🎶 | Pick a song below or use </play:991566063068250134>`,
     components: [historyActionRow],
@@ -193,35 +172,63 @@ client.once('ready', async () => {
   console.log('[CastleGrooves] Ready!')
 })
 
-client.on('interactionCreate', async (interaction) =>
-  commandInteractionHandler(interaction, client)
-)
+client.on('interactionCreate', async (interaction) => {
+  if (interaction.isAutocomplete()) {
+    const command: CommandObject = client.commands.get(interaction.commandName)
+    if (command.autoComplete) command.autoComplete(interaction)
+  }
 
-client.on('interactionCreate', async (interaction) => await buttonHandler(interaction, client))
+  if (interaction.isCommand() || interaction.isChatInputCommand()) {
+    commandInteractionHandler(interaction, client)
+  }
+
+  if (interaction.isButton() || interaction.isStringSelectMenu()) {
+    await buttonHandler(interaction)
+  }
+})
+
 // On user join voice channel event
 client.on('voiceStateUpdate', (oldState, newState) => recordVoiceStateChange(oldState, newState))
 
-client.player.on('playSong', playSongEventHandler)
+player.events.on('playerStart', playSongEventHandler)
 
 // On add song event
-client.player.on('addSong', addSongEventHandler)
+player.events.on('audioTrackAdd', addSongEventHandler)
 
 // on add playlist event
-client.player.on('addList', addSongEventHandler)
+player.events.on('audioTracksAdd', addSongEventHandler)
 
 // On bot disconnected from voice channel
-client.player.on('disconnect', disconnectEventHandler)
+player.events.on('disconnect', disconnectEventHandler)
 
 // On voice channel empty
-client.player.on('empty', emptyEventHandler)
+player.events.on('emptyChannel', emptyEventHandler)
 
 // On queue/song finish
-client.player.on('finish', songFinishEventHandler)
+player.events.on('emptyQueue', songFinishEventHandler)
 
 // On error
-client.player.on('error', async (channel, e) => {
+player.events.on('error', async (channel, e) => {
   console.error('[playerError]', e)
 })
+
+player.events.on('playerError', (queue, error) => {
+  // Emitted when the audio player errors while streaming audio track
+  console.log(`Player error event: ${error.message}`)
+  console.log(error)
+})
+
+// player.on('debug', async (message) => {
+//   // Emitted when the player sends debug info
+//   // Useful for seeing what dependencies, extractors, etc are loaded
+//   console.log(`General player debug event: ${message}`)
+// })
+
+// player.events.on('debug', async (queue, message) => {
+//   // Emitted when the player queue sends debug info
+//   // Useful for seeing what state the current queue is at
+//   console.log(`Player debug event: ${message}`)
+// })
 
 // Resets main message if many messages have since been sent in the channel
 let msgResetCount = 0

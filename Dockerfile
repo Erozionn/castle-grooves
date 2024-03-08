@@ -11,7 +11,7 @@ RUN apk add --no-cache python3 make g++
 
 WORKDIR /usr/src/app
 COPY package.json yarn.lock ./
-COPY patches ./patches
+# COPY patches ./patches
 RUN yarn install --frozen-lockfile
 COPY . .
 RUN yarn build
@@ -22,13 +22,13 @@ FROM node:lts-alpine AS final
 
 COPY --from=ffmpeg / /
 
-RUN apk add --no-cache python3 make g++
+RUN apk update && apk add --no-cache python3 make g++ fontconfig
 
 ENV NODE_ENV production
 
 WORKDIR /usr/src/app
 COPY package.json yarn.lock ./
-COPY patches ./patches
+# COPY patches ./patches
 
 RUN yarn install --production --frozen-lockfile
 

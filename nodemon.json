@@ -1,6 +1,0 @@
-{
-  "watch": ["./"],
-  "ext": ".ts,.js",
-  "ignore": ["./build", "./node_modules"],
-  "exec": "node -r tsconfig-paths/register -r ts-node/register -r dotenv/config ./index.ts dotenv_config_path=.env.dev dotenv_config_debug=true"
-}

@@ -1,8 +1,9 @@
-import { Queue } from 'distube'
+import { GuildQueue, useHistory } from 'discord-player'
+import { Interaction } from 'discord.js'
 
 import { getMainMessage, sendMessage } from '@utils/mainMessage'
 
-export default async (queue?: Queue) => {
+export default async (queue: GuildQueue<Interaction> | null) => {
   const mainMessage = getMainMessage()
 
   if (!queue) {
@@ -10,12 +11,19 @@ export default async (queue?: Queue) => {
     return
   }
 
-  if (queue.playing && queue.currentTime > 4) {
-    queue.seek(0)
+  const history = useHistory(queue.metadata.guildId as string)
+  const timestamp = queue.node.getTimestamp() || { current: { value: 0 } }
+
+  if (queue.isPlaying() && timestamp.current.value > 5000) {
+    await queue.node.seek(0)
     return
   }
 
-  if (queue.songs.length > 1) {
-    queue.previous()
+  if (history && !history?.isEmpty()) {
+    try {
+      await history.previous()
+    } catch (e) {
+      console.error('[backButton]', e)
+    }
   }
 }

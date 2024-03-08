@@ -1,43 +1,36 @@
-import { Queue, Song } from 'distube'
+import { GuildQueue, Track } from 'discord-player'
+import { Interaction } from 'discord.js'
 
-import {
-  components,
-  playerButtons,
-  playerButtonsType,
-  playerHistory,
-} from '@constants/messageComponents'
+import { useComponents } from '@constants/messageComponents'
 import { sendMessage } from '@utils/mainMessage'
 import { generateNowPlayingCanvas } from '@utils/nowPlayingCanvas'
-import { generateHistoryOptions, addSong } from '@utils/songHistory'
+import { addSong } from '@utils/songHistory'
 
-const playerButtonKeys = Object.keys(playerButtons)
-
-export default async (queue: Queue, song: Song) => {
-  console.log('[playSong] Playing song...')
-
-  // Set queue volume to 100%
-  queue.setVolume(100)
-
-  // Add songs to history component
-  playerHistory.setOptions(await generateHistoryOptions())
-
-  // Enable player buttons
-  for (let i = 0; i < 4; i++) {
-    playerButtons[playerButtonKeys[i] as playerButtonsType].setDisabled(false)
+export default async (queue: GuildQueue<Interaction>, track: Track) => {
+  if (!queue.metadata?.channel) {
+    console.error('[playSong] Channel not found')
+    return
   }
 
-  // Change disconnect button to stop button
-  playerButtons.stop.setEmoji('musicoff:909248235623825439')
+  const components = await useComponents(queue)
+  const { channel } = queue.metadata
 
-  if (queue.songs.length > 0 && queue.textChannel) {
-    const buffer = await generateNowPlayingCanvas(queue.songs)
-    await sendMessage(queue.textChannel, {
+  if ((queue.tracks.size > 0 || queue.currentTrack) && queue.metadata.channel) {
+    const tracks = queue.tracks.toArray()
+    if (queue.currentTrack) tracks.unshift(queue.currentTrack)
+
+    // Write song info into DB (playing [true:false], song)
+    await addSong(queue.isPlaying(), track)
+
+    const buffer = await generateNowPlayingCanvas(tracks)
+    await sendMessage(channel, {
       content: '',
       files: [buffer],
       components,
     })
   }
 
-  // Write song info into DB (playing [true:false], song)
-  await addSong(queue.playing, song)
+  console.log(
+    `[playSong] Playing song: ${track.title?.substring(0, 90)} ${track.author.substring(0, 90)}`
+  )
 }

@@ -1,5 +1,6 @@
 import { Point } from '@influxdata/influxdb-client'
-import { Song } from 'distube'
+import { Track, serialize, deserialize, useMainPlayer } from 'discord-player'
+import { formatDistanceToNowStrict } from 'date-fns'
 
 import ENV from '@constants/Env'
 import { parseSongName } from '@utils/utilities'
@@ -12,7 +13,9 @@ type SongHistory = {
   requestedById: string
   requestedByUsername: string
   requestedByAvatar: string
+  serializedTrack: string
   source: string
+  _time: string
   playing: boolean
 }
 
@@ -31,7 +34,8 @@ const getSongsPlayed = async () => {
     |> filter(fn: (r) => r["playing"] == true)
     |> group()
     |> sort(columns: ["_time"], desc: true)
-    |>limit(n: 23)
+    |> keep(columns: ["_time", "serializedTrack"])
+    |> limit(n: 34)
   `
   // Execute query and receive table metadata and rows.
   const results: SongHistory[] = await queryApi().collectRows(fluxQuery)
@@ -117,23 +121,24 @@ const getUserTopSongs = async (userId: string, timeRange = 'monthly', limit = 20
   return results
 }
 
-const addSong = (playing: boolean, song?: Song) => {
+const addSong = (playing: boolean, track?: Track) => {
   const point = new Point('song')
   if (playing === false) {
     point.booleanField('playing', false)
-  } else if (song && playing === true) {
-    if (!song.user || !song.name)
+  } else if (track && playing === true) {
+    if (!track.requestedBy || !track.title || !track.author)
       throw new Error('Song user or name is undefined. Cannot add song to DB.')
 
     point
-      .tag('requestedById', song.user.id)
-      .tag('requestedByUsername', song.user.username)
-      .tag('songTitle', song.name)
+      .tag('requestedById', track.requestedBy.id)
+      .tag('requestedByUsername', track.requestedBy.username)
+      .tag('songTitle', `${track.author} - ${track.title}`)
       .booleanField('playing', true)
-      .stringField('songUrl', song.url)
-      .stringField('songThumbnail', song.thumbnail)
-      .stringField('source', song.source)
-      .stringField('requestedByAvatar', song.user.displayAvatarURL())
+      .stringField('songUrl', track.url)
+      .stringField('songThumbnail', track.thumbnail)
+      .stringField('source', track.source)
+      .stringField('serializedTrack', JSON.stringify(serialize(track)))
+      .stringField('requestedByAvatar', track.requestedBy.displayAvatarURL())
   } else {
     console.log('[addSongToDb] Error: playing boolean undefined. Not adding song to DB.')
     return
@@ -143,28 +148,48 @@ const addSong = (playing: boolean, song?: Song) => {
   writeApi()
     .close()
     .catch((e) => {
-      console.log('[addSongToDb]', e)
+      console.warn('[addSongToDb]', e)
     })
 }
 
 const generateHistoryOptions = async () => {
-  // Read song play history
   const history = await getSongsPlayed()
+  const player = useMainPlayer()
 
-  // Prepare song history for the history component
-  const options = history
+  const songs = history
+    .filter((s) => s.serializedTrack)
     .map((s) => {
-      const { artist, title } = parseSongName(s.songTitle)
       return {
-        label: title ? title.substring(0, 95) : artist.substring(0, 95),
-        description: title ? artist.substring(0, 95) : ' ',
-        emoji: '🎶',
-        value: `${s.songUrl.substring(0, 90)}?discord=${Math.floor(Math.random() * 99999)}`,
+        playedAt: s._time,
+        track: deserialize(player, JSON.parse(s.serializedTrack)) as Track,
       }
     })
+    .slice(0, 24)
     .reverse()
 
-  return options
+  // Prepare song history for the history component
+  const options = songs.map((s, index) => {
+    // Split artist and title
+    let { author: artist, title } = s.track
+    if (s.track.source === 'youtube') {
+      const titleObj = parseSongName(s.track.title)
+      artist = titleObj.artist
+      if (titleObj.title) title = titleObj.title
+    }
+
+    const lastPlayed = formatDistanceToNowStrict(s.playedAt, {
+      addSuffix: true,
+    })
+
+    return {
+      label: title ? title.substring(0, 95) : artist.substring(0, 95),
+      description: `${title ? artist.substring(0, 95) : ' '} - ${lastPlayed}`,
+      emoji: '🎶',
+      value: index.toString(),
+    }
+  })
+
+  return { options, songs }
 }
 
 export { getSongsPlayed, getTopSongs, getUserTopSongs, addSong, generateHistoryOptions }

@@ -1,14 +1,19 @@
 import { SlashCommandBuilder, CommandInteraction } from 'discord.js'
+import { useQueue } from 'discord-player'
 
 import { sendMessage } from '@utils/mainMessage'
-import { historyActionRow } from '@constants/messageComponents'
+import { useComponents } from '@constants/messageComponents'
 
 export default {
   data: new SlashCommandBuilder()
     .setName('channel')
     .setDescription('Shows the bot music player on text channel.'),
   async execute(interaction: CommandInteraction) {
+    if (!interaction.guild) return
+
     const { channel } = interaction
+    const queue = useQueue(interaction.guild) || undefined
+    const [_, historyActionRow] = await useComponents(queue)
     await interaction.deferReply()
 
     if (!channel || !channel.isTextBased()) {
