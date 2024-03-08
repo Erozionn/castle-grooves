@@ -29,7 +29,7 @@ function initApi(client) {
     try {
       client.player.play(member.voice.channel, query, { textChannel: channel, member })
     } catch (e) {
-      console.log('interaction', e)
+      console.log('[apiInteraction]', e)
       channel.send({ content: 'Error joining your channel.' })
       res.status(400).json({ message: 'Error joining voice channel.' })
     }

@@ -1,22 +1,42 @@
 # Use Node Version: 16 LTS
-FROM node:16
 
 # Set ARG and ENV variable defaults
 ARG port=1337
-ENV port=$port
 
-# Create a directory for the app
-WORKDIR /usr/src/castle-grooves
+FROM jrottenberg/ffmpeg:4.1-alpine AS ffmpeg
 
-# Install app dependencies
-COPY package*.json ./
+FROM node:lts-alpine AS builder
+
+RUN apk add --no-cache python3 make g++
+
+WORKDIR /usr/src/app
+COPY package.json yarn.lock ./
 COPY patches ./patches
-RUN npm ci --only=production
-
-# Bundle app source
+RUN yarn install --frozen-lockfile
 COPY . .
+RUN yarn build
 
+# Final
+
+FROM node:lts-alpine AS final
+
+COPY --from=ffmpeg / /
+
+RUN apk add --no-cache python3 make g++
+
+ENV NODE_ENV production
+
+WORKDIR /usr/src/app
+COPY package.json yarn.lock ./
+COPY patches ./patches
+
+RUN yarn install --production --frozen-lockfile
+
+COPY --from=builder /usr/src/app/assets ./assets
+COPY --from=builder /usr/src/app/build ./build
+
+ENV port=$port
 # Expose port $port
 EXPOSE $port
 
-CMD [ "node", "index.js" ]
+CMD [ "node", "build/index.js" ]

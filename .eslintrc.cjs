@@ -1,14 +1,16 @@
 module.exports = {
-  extends: ['airbnb', 'prettier', 'plugin:import/recommended'],
-  parserOptions: {
-    ecmaVersion: 11,
-    sourceType: 'module'
-  },
+  extends: [
+    'plugin:@typescript-eslint/recommended',
+    'plugin:import/recommended',
+    'plugin:import/typescript',
+  ],
+  parser: '@typescript-eslint/parser',
+  parserOptions: { ecmaVersion: 2020, sourceType: 'module' },
   env: {
     es6: true,
-    node: true
+    node: true,
   },
-  plugins: ['compat', 'prettier', 'import'],
+  plugins: ['@typescript-eslint', 'import'],
   rules: {
     'no-plusplus': ['error', { allowForLoopAfterthoughts: true }],
     'arrow-parens': ['warn', 'always'],
@@ -21,36 +23,45 @@ module.exports = {
         after: true,
         overrides: {
           return: {
-            after: true
+            after: true,
           },
           throw: {
-            after: true
+            after: true,
           },
           case: {
-            after: true
+            after: true,
           },
           if: {
-            after: true
-          }
-        }
-      }
+            after: true,
+          },
+        },
+      },
     ],
     'no-console': [
       'warn',
       {
-        allow: ['warn', 'error']
-      }
+        allow: ['warn', 'error'],
+      },
     ],
     'no-debugger': ['warn'],
     'no-param-reassign': ['error', { props: true, ignorePropertyModificationsFor: ['state'] }],
-    'no-unused-vars': ['warn'],
-    'import/extensions': 0,
+    '@typescript-eslint/no-unused-vars': ['warn'],
+    'import/extensions': [
+      'error',
+      'always',
+      {
+        js: 'never',
+        jsx: 'never',
+        ts: 'never',
+        tsx: 'never',
+      },
+    ],
     'import/order': [
       'warn',
       {
         groups: ['builtin', 'external', 'internal', ['sibling', 'parent']],
-        'newlines-between': 'always'
-      }
+        'newlines-between': 'always',
+      },
     ],
     'linebreak-style': ['error', process.platform === 'win32' ? 'windows' : 'unix'],
     // 'prettier/prettier': [
@@ -65,16 +76,14 @@ module.exports = {
     //   },
     // ],
     'arrow-body-style': 'off',
-    'prefer-arrow-callback': 'off'
+    'prefer-arrow-callback': 'off',
   },
   settings: {
     'import/resolver': {
-      alias: [
-        ['#utils', './utils'],
-        ['#api', './api/index.js'],
-        ['#commands', './commands'],
-        ['#constants', './constants']
-      ]
-    }
-  }
+      typescript: {
+        alwaysTryTypes: true, // always try to resolve types under `<root>@types` directory even it doesn't contain any source code, like `@types/unist`
+        project: 'tsconfig.json',
+      },
+    },
+  },
 }

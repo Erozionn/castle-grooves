@@ -1,21 +1,23 @@
 // const axios = require('axios')
-import fs from 'fs'
+import path from 'node:path'
 
 import { Canvas, FontLibrary, loadImage } from 'skia-canvas'
 import { getAverageColor } from 'fast-average-color-node'
 
-import { shadeColor, splitAtClosestSpace, parseSongName } from '#utils/utilities.js'
+import { shadeColor, splitAtClosestSpace, parseSongName, truncateString } from '@utils/utilities'
 
 FontLibrary.use([
-  './assets/fonts/Montserrat-Light.ttf',
-  './assets/fonts/Montserrat-Regular.ttf',
-  './assets/fonts/Montserrat-SemiBold.ttf',
-  './assets/fonts/Montserrat-Bold.ttf'
+  path.resolve('./assets/fonts/Poppins-Thin.ttf'),
+  path.resolve('./assets/fonts/Poppins-Light.ttf'),
+  path.resolve('./assets/fonts/Poppins-Regular.ttf'),
+  path.resolve('./assets/fonts/Poppins-Medium.ttf'),
+  path.resolve('./assets/fonts/Poppins-SemiBold.ttf'),
+  path.resolve('./assets/fonts/Poppins-Bold.ttf'),
 ])
 
 const renderMultiLineTitle = (canvas, str, options = {}) => {
   const canvas2D = canvas.getContext('2d')
-  canvas2D.font = options.font || '28px Montserrat'
+  canvas2D.font = options.font || '28px Poppins'
   canvas2D.fillStyle = options.fillStyle || '#ffffff'
   canvas2D.textAlign = options.textAlign || 'center'
   const charsPerLine = options.charsPerLine || 10
@@ -46,7 +48,7 @@ const renderMultiLineTitle = (canvas, str, options = {}) => {
   return lineHeight * multiLineArray.length
 }
 
-const nowPlayingCanvasWithUpNext = async (songs) => {
+export const nowPlayingCanvasWithUpNext = async (songs) => {
   const canvas = new Canvas(700, 394)
   const canv = canvas.getContext('2d')
   const imageCanvas = new Canvas(222, 125)
@@ -61,7 +63,7 @@ const nowPlayingCanvasWithUpNext = async (songs) => {
   const imageBuffer = await imageCanvas.toBuffer()
   const averageColor = await getAverageColor(imageBuffer, {
     defaultColor: [0, 0, 0, 0],
-    ignoredColor: [0, 0, 0, 255]
+    ignoredColor: [0, 0, 0, 255],
   })
   const [r, g, b] = averageColor.value
 
@@ -106,20 +108,28 @@ const nowPlayingCanvasWithUpNext = async (songs) => {
   // Render title
   const songTitleHeight = renderMultiLineTitle(canvas, title || artist, {
     fillStyle: '#ffffff',
-    y: 240,
+    y: 220,
     x: 10,
-    font: 'bold 24px Montserrat'
+    font: '600 24px Poppins',
+    charsPerLine: 15,
   })
 
   // Render artist
   if (title) {
     renderMultiLineTitle(canvas, artist, {
       fillStyle: '#ffffff',
-      y: 240 + songTitleHeight,
+      y: 220 + songTitleHeight,
       x: 10,
-      font: '24px Montserrat'
+      font: '300 20px Poppins',
     })
   }
+
+  // Render requester profile picture pill
+  canv.font = '600 24px Poppins'
+  canv.fillStyle = song.member.displayHexColor
+  canv.measureText(song.member.displayName).width
+  canv.roundRect(6, 344, canv.measureText(song.member.displayName).width + 36, 40, 20)
+  canv.fill()
 
   // Render requester profile picture
   canv.save()
@@ -141,14 +151,15 @@ const nowPlayingCanvasWithUpNext = async (songs) => {
   // Render requester name
   canv.fillStyle = '#ffffff'
   canv.textAlign = 'left'
-  canv.font = 'bold 18px Montserrat'
+  canv.font = '600 18px Poppins'
   canv.fillText(song.member.displayName, 54, 370)
+  canv.fillStyle = '#ffffff'
 
   // Render "Up Next"
   canv.textAlign = 'left'
   canv.fillStyle = averageColor.isDark ? `#ffffff` : shadeColor(averageColor.hex, -200)
-  canv.font = 'bold 28px Montserrat'
-  canv.fillText('Up Next:', 330, 50)
+  canv.font = '22px Poppins'
+  canv.fillText('UP NEXT:', 330, 40)
 
   try {
     const pics = await Promise.all(
@@ -163,28 +174,35 @@ const nowPlayingCanvasWithUpNext = async (songs) => {
       canv.save()
 
       canv.beginPath()
-      canv.arc(674, 30 + 60 * i, 16, 0, Math.PI * 2)
+      canv.arc(674, 30 + 65 * i, 16, 0, Math.PI * 2)
       canv.closePath()
       canv.clip()
-      canv.drawImage(p, 658, 14 + 60 * i, 32, 32)
+      canv.drawImage(p, 658, 14 + 65 * i, 32, 32)
       canv.restore()
     })
   } catch (e) {
     console.warn('[UpNextAvatarError] ', e)
   }
 
-  await songs.slice(1, 7).forEach(async (songObj, index) => {
+  await songs.slice(1, 6).forEach(async (songObj, index) => {
     const i = index + 1
-    canv.font = 'bold 22px Montserrat'
+    canv.fillStyle = averageColor.isDark ? `#ffffff` : shadeColor(averageColor.hex, -200)
+    canv.font = '600 22px Poppins'
     const parsedSong = parseSongName(songObj.name)
     const a = parsedSong.artist
     const s = parsedSong.title
     if (s !== null) {
-      canv.fillText(`${i}. ${s}`, 330, 30 + 60 * i)
-      canv.font = '22px Montserrat'
-      canv.fillText(`${a}`, 358, 55 + 60 * i)
+      canv.fillText(truncateString(`${i}. ${s}`, 25), 330, 26 + 65 * i)
+      canv.font = '300 22px Poppins'
+      canv.fillText(truncateString(`${a}`, 25), 358, 51 + 65 * i)
     } else {
-      canv.fillText(`${i}. ${a}`, 330, 30 + 60 * i)
+      canv.fillText(truncateString(`${i}. ${a}`, 25), 330, 30 + 65 * i)
+    }
+
+    if (i < 5 && songs.length > 2) {
+      canv.fillStyle = 'rgba(255, 255, 255, 0.3)'
+      canv.fillRect(330, 60 + 66 * i, 360, 1)
+      canv.fillStyle = averageColor.isDark ? `#ffffff` : shadeColor(averageColor.hex, -200)
     }
   })
 
@@ -194,7 +212,7 @@ const nowPlayingCanvasWithUpNext = async (songs) => {
   return buffer
 }
 
-const nowPlayingCanvas = async (song) => {
+export const nowPlayingCanvas = async (song) => {
   const canvas = new Canvas(700, 169)
   const canv = canvas.getContext('2d')
   const imageCanvas = new Canvas(222, 125)
@@ -207,7 +225,7 @@ const nowPlayingCanvas = async (song) => {
   const imageBuffer = await imageCanvas.toBuffer()
   const averageColor = await getAverageColor(imageBuffer, {
     defaultColor: [0, 0, 0, 0],
-    ignoredColor: [0, 0, 0, 255]
+    ignoredColor: [0, 0, 0, 255],
   })
   const [r, g, b] = averageColor.value
 
@@ -246,25 +264,43 @@ const nowPlayingCanvas = async (song) => {
   // Render title
   const songTitleHeight = renderMultiLineTitle(canvas, title || artist, {
     fillStyle: '#ffffff',
-    y: 50,
+    y: 44,
     x: 320,
-    font: 'bold 28px Montserrat',
+    font: '600 28px Poppins',
     textAlign: 'start',
-    charsPerLine: 20
+    charsPerLine: 20,
   })
 
   // Render artist
   if (title) {
     renderMultiLineTitle(canvas, artist, {
       fillStyle: '#ffffff',
-      y: 50 + songTitleHeight,
+      y: 48 + songTitleHeight,
       x: 320,
-      font: '28px Montserrat',
+      font: '300 24px Poppins',
       textAlign: 'start',
-      charsPerLine: 20
+      charsPerLine: 20,
     })
   }
 
+  // canv.save()
+
+  // canv.beginPath()
+  // canv.arc(336, 133, 20, 0, Math.PI * 2)
+  // canv.closePath()
+  // canv.clip()
+
+  // canv.fillStyle = song.member.displayHexColor
+  // canv.fillRect(312, 109, 48, 48)
+
+  // canv.restore()
+
+  // Render requester profile picture pill
+  canv.font = '600 28px Poppins'
+  canv.fillStyle = song.member.displayHexColor
+  canv.measureText(song.member.displayName).width
+  canv.roundRect(316, 113, canv.measureText(song.member.displayName).width + 26, 40, 20)
+  canv.fill()
   // Render requester profile picture
   canv.save()
 
@@ -274,7 +310,7 @@ const nowPlayingCanvas = async (song) => {
   canv.clip()
 
   try {
-    const avatar = await loadImage(song.user.displayAvatarURL({ extension: 'png', size: 64 }))
+    const avatar = await loadImage(song.user?.displayAvatarURL({ extension: 'png', size: 64 }))
     canv.drawImage(avatar, 320, 117, 32, 32)
   } catch (e) {
     console.warn('[AvatarError]', e)
@@ -285,8 +321,8 @@ const nowPlayingCanvas = async (song) => {
   // Render requester name
   canv.fillStyle = '#ffffff'
   canv.textAlign = 'left'
-  canv.font = 'bold 18px Montserrat'
-  canv.fillText(song.member.displayName, 362, 140)
+  canv.font = '600 18px Poppins'
+  canv.fillText(song.member.displayName, 362, 139)
 
   // Buffer canvas
   const buffer = await canvas.toBuffer()
