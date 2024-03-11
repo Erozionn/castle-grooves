@@ -183,7 +183,7 @@ const generateHistoryOptions = async () => {
 
     return {
       label: title ? title.substring(0, 95) : artist.substring(0, 95),
-      description: `${title ? artist.substring(0, 95) : ' '} - ${lastPlayed}`,
+      description: `${title ? artist.substring(0, 65) : ' '} - ${lastPlayed}`,
       emoji: '🎶',
       value: index.toString(),
     }
