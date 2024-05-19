@@ -12,7 +12,7 @@ import {
 
 export default async (interaction: Interaction<CacheType>) => {
   if (!interaction.isButton() && !interaction.isStringSelectMenu()) return
-  interaction.deferUpdate()
+  await interaction.deferUpdate()
 
   const { channel, customId } = interaction
   const queue = useQueue<Interaction>(interaction.guild?.id as string)
