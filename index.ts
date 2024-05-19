@@ -43,6 +43,7 @@ const {
   YOUTUBE_IDENTITY_TOKEN,
   NOW_PLAYING_MOCK_DATA,
   SPOTIFY,
+  TS_NODE_DEV,
 } = ENV
 
 const client = new Client({
@@ -102,8 +103,15 @@ if (NOW_PLAYING_MOCK_DATA) {
 }
 
 // Import commands.
-const commandsPath = './build/commands'
-const commandFiles = fs.readdirSync(commandsPath).filter((file) => file.endsWith('.js'))
+let commandsPath: string, commandFiles: string[]
+
+if (TS_NODE_DEV) {
+  commandsPath = 'commands'
+  commandFiles = fs.readdirSync(commandsPath).filter((file) => file.endsWith('.ts'))
+} else {
+  commandsPath = 'build/commands'
+  commandFiles = fs.readdirSync(commandsPath).filter((file) => file.endsWith('.js'))
+}
 
 commandFiles.forEach(async (file) => {
   const filePath = path.resolve(commandsPath, file)

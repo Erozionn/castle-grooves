@@ -12,6 +12,7 @@ export default async (
   const { member, message, values } = interaction
   const {
     voice: { channel: voiceChannel },
+    user: interactionUser,
   } = member as GuildMember
 
   if (!voiceChannel) {
@@ -36,7 +37,12 @@ export default async (
   }
 
   const playSong = async (value: string | Track) => {
-    const track = typeof value === 'string' ? songs[parseInt(value)].track : value
+    let track = value
+    if (typeof value === 'string') {
+      const song = songs[parseInt(value)]
+      track = song.track
+      track.requestedBy = interactionUser
+    }
 
     if (queue) {
       queue.player.play(voiceChannel, track, options)

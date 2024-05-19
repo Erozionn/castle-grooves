@@ -38,8 +38,13 @@ const getSongsPlayed = async () => {
     |> limit(n: 34)
   `
   // Execute query and receive table metadata and rows.
-  const results: SongHistory[] = await queryApi().collectRows(fluxQuery)
-  return results
+  try {
+    const results: SongHistory[] = await queryApi().collectRows(fluxQuery)
+    return results
+  } catch (e) {
+    console.warn('[getSongsPlayed]', e)
+    return []
+  }
 }
 
 const getTopSongs = async (timeRange = 'monthly', limit = 20) => {
@@ -47,6 +52,12 @@ const getTopSongs = async (timeRange = 'monthly', limit = 20) => {
   switch (timeRange) {
     case 'yearly':
       t = '-365d'
+      break
+    case '3-months':
+      t = '-90d'
+      break
+    case '6-months':
+      t = '-180d'
       break
     case 'weekly':
       t = '-7d'
@@ -69,7 +80,7 @@ const getTopSongs = async (timeRange = 'monthly', limit = 20) => {
     |> filter(fn: (r) => r["_measurement"] == "song")
     |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
     |> filter(fn: (r) => r["playing"] == true)
-    |> group(columns: ["songTitle", "songUrl"])
+    |> group(columns: ["songTitle", "songUrl", "serializedTrack"])
     |> count(column: "playing")
     |> rename(columns: {playing: "count"})
     |> group()
@@ -77,8 +88,13 @@ const getTopSongs = async (timeRange = 'monthly', limit = 20) => {
     |> limit(n: ${limit})
   `
   // Execute query and receive table metadata and rows.
-  const results = await queryApi().collectRows(fluxQuery)
-  return results
+  try {
+    const results: (SongHistory & { count: number })[] = await queryApi().collectRows(fluxQuery)
+    return results
+  } catch (e) {
+    console.warn('[getTopSongs]', e)
+    return []
+  }
 }
 
 const getUserTopSongs = async (userId: string, timeRange = 'monthly', limit = 20) => {
@@ -86,6 +102,12 @@ const getUserTopSongs = async (userId: string, timeRange = 'monthly', limit = 20
   switch (timeRange) {
     case 'yearly':
       t = '-365d'
+      break
+    case '3-months':
+      t = '-90d'
+      break
+    case '6-months':
+      t = '-180d'
       break
     case 'weekly':
       t = '-7d'
@@ -109,7 +131,7 @@ const getUserTopSongs = async (userId: string, timeRange = 'monthly', limit = 20
     |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
     |> filter(fn: (r) => r["playing"] == true)
     |> filter(fn: (r) => r["requestedById"] == "${userId}")
-    |> group(columns: ["songTitle", "songUrl"])
+    |> group(columns: ["songTitle", "songUrl", "serializedTrack"])
     |> count(column: "playing")
     |> rename(columns: {playing: "count"})
     |> group()
@@ -117,8 +139,13 @@ const getUserTopSongs = async (userId: string, timeRange = 'monthly', limit = 20
     |> limit(n: ${limit})
   `
   // Execute query and receive table metadata and rows.
-  const results = await queryApi().collectRows(fluxQuery)
-  return results
+  try {
+    const results: (SongHistory & { count: number })[] = await queryApi().collectRows(fluxQuery)
+    return results
+  } catch (e) {
+    console.warn('[getUserTopSongs]', e)
+    return []
+  }
 }
 
 const addSong = (playing: boolean, track?: Track) => {
