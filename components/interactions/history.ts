@@ -32,6 +32,7 @@ export default async (
     nodeOptions: {
       ...nodeOptions,
       metadata: interaction,
+      selfDeaf: false,
     },
     requestedBy: member as GuildMember,
   }

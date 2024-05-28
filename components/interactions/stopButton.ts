@@ -3,6 +3,7 @@ import { GuildQueue } from 'discord-player'
 
 import { sendMessage } from '@utils/mainMessage'
 import { useComponents } from '@constants/messageComponents'
+import { cleanupListen } from '@hooks/useListen'
 
 export default async (queue: GuildQueue<Interaction> | null) => {
   if (!queue) return
@@ -26,6 +27,9 @@ export default async (queue: GuildQueue<Interaction> | null) => {
     })
   } else {
     queue.delete()
+
+    // Cleanup listen hook
+    await cleanupListen(queue)
 
     const components = await useComponents()
     await sendMessage(channel, {

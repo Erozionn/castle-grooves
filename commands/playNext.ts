@@ -48,6 +48,7 @@ export default {
           nodeOptions: {
             ...nodeOptions,
             metadata: interaction,
+            selfDeaf: false,
           },
           requestedBy: member as GuildMember,
         })

@@ -63,8 +63,10 @@ export default {
       voice: { channel: voiceChannel },
     } = member as GuildMember
 
-    const loadingMsg = await interaction.reply({ content: '⏱ | Loading...' })
-    setTimeout(() => loadingMsg.delete(), 1500)
+    if (!interaction.replied) {
+      const loadingMsg = await interaction.editReply({ content: '⏱ | Loading...' })
+      setTimeout(() => loadingMsg.delete(), 1500)
+    }
 
     // await interaction.deferReply()
 
@@ -84,6 +86,7 @@ export default {
         nodeOptions: {
           ...nodeOptions,
           metadata: interaction,
+          selfDeaf: false,
         },
         requestedBy: member as GuildMember,
       })

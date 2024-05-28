@@ -55,6 +55,7 @@ function initApi() {
         ...playerOptions,
         nodeOptions: {
           ...nodeOptions,
+          selfDeaf: false,
         },
         requestedBy: member as GuildMember,
       })

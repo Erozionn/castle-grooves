@@ -35,6 +35,7 @@ const play = async (interaction: Interaction) => {
     nodeOptions: {
       ...nodeOptions,
       metadata: interaction,
+      selfDeaf: false,
     },
     requestedBy: member as GuildMember,
   }

@@ -79,7 +79,11 @@ export type TrackWithSpotifyMetadata = WithMetadata<
 export type ClientType = Client & {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   commands: Collection<string, any>
+  voiceCommands: Collection<unknown, any>
   player: Player
+  listenConnection: Collection<unknown, any>
+  porcupineInstance: Collection<unknown, any>
+  gcSpeechInstance: Collection<unknown, any>
 }
 
 export type CommandObject = {

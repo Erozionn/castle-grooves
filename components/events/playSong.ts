@@ -5,6 +5,7 @@ import { useComponents } from '@constants/messageComponents'
 import { sendMessage } from '@utils/mainMessage'
 import { generateNowPlayingCanvas } from '@utils/nowPlayingCanvas'
 import { addSong } from '@utils/songHistory'
+import useListen from '@hooks/useListen'
 
 export default async (queue: GuildQueue<Interaction>, track: Track) => {
   if (!queue.metadata?.channel) {
@@ -28,6 +29,13 @@ export default async (queue: GuildQueue<Interaction>, track: Track) => {
       files: [buffer],
       components,
     })
+
+    // Listen for voice commands
+    try {
+      await useListen(queue)
+    } catch (e) {
+      console.warn('[listenHook]', e)
+    }
   }
 
   console.log(

@@ -71,6 +71,11 @@ client.player = player
 
 client.commands = new Collection<string, CommandObject['default']>()
 
+client.listenConnection = new Collection()
+client.voiceCommands = new Collection()
+client.porcupineInstance = new Collection()
+client.gcSpeechInstance = new Collection()
+
 // Initialize the API and webserver.
 initApi()
 // Register commands.
@@ -103,20 +108,35 @@ if (NOW_PLAYING_MOCK_DATA) {
 }
 
 // Import commands.
-let commandsPath: string, commandFiles: string[]
+let commandsPath: string,
+  voiceCommandsPath: string,
+  commandFiles: string[],
+  voiceCommandsFiles: string[]
 
 if (TS_NODE_DEV) {
   commandsPath = 'commands'
   commandFiles = fs.readdirSync(commandsPath).filter((file) => file.endsWith('.ts'))
+
+  voiceCommandsPath = 'commands/voice'
+  voiceCommandsFiles = fs.readdirSync(voiceCommandsPath).filter((file) => file.endsWith('.ts'))
 } else {
   commandsPath = 'build/commands'
   commandFiles = fs.readdirSync(commandsPath).filter((file) => file.endsWith('.js'))
+
+  voiceCommandsPath = 'build/commands/voice'
+  voiceCommandsFiles = fs.readdirSync(voiceCommandsPath).filter((file) => file.endsWith('.js'))
 }
 
 commandFiles.forEach(async (file) => {
   const filePath = path.resolve(commandsPath, file)
   const command = await import(filePath)
   client.commands.set(command.default.data.name, command.default)
+})
+
+voiceCommandsFiles.forEach(async (file) => {
+  const filePath = path.resolve(voiceCommandsPath, file)
+  const command = await import(filePath)
+  client.voiceCommands.set(command.default.name, command.default)
 })
 
 client.once('ready', async () => {
