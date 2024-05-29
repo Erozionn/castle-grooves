@@ -46,9 +46,6 @@ export default function createRecognitionStream(
           hotwordDetected = detectHotword(frame, porcupine)
           if (hotwordDetected) {
             detectedBuffer.push(chunk)
-            // const embed = createBasicEmbed('Hotword detected')
-            // interaction.channel!.send({ embeds: [embed] })
-            console.log('hotword detected')
           }
         }
       } else {
@@ -58,10 +55,8 @@ export default function createRecognitionStream(
 
     // once audio stream ends
     decodedStream.on('end', () => {
-      const inputAudio = Buffer.concat(detectedBuffer)
-
       if (hotwordDetected) {
-        hotwordDetected = false
+        const inputAudio = Buffer.concat(detectedBuffer)
         resolve(inputAudio)
       }
 

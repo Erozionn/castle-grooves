@@ -12,8 +12,9 @@ import {
   TextChannel,
   Message,
   ApplicationCommand,
+  Events,
 } from 'discord.js'
-import { Player } from 'discord-player'
+import { Player, useQueue } from 'discord-player'
 
 import {
   addSongEventHandler,
@@ -34,6 +35,8 @@ import { nowPlayingCanvas, nowPlayingCanvasWithUpNext } from '@utils/nowPlayingC
 import useMockTracks from '@data/dummies/songArray'
 
 import registerCommands from './deploy-commands'
+import useOptimalPlaybackHistory from '@hooks/useOptimalPlaybackHistory'
+import useListen, { cleanupListen } from '@hooks/useListen'
 
 const {
   BOT_TOKEN,
@@ -198,6 +201,8 @@ client.once('ready', async () => {
 
   // eslint-disable-next-line no-console
   console.log('[CastleGrooves] Ready!')
+
+  const optimalPlaybackHistory = await useOptimalPlaybackHistory()
 })
 
 client.on('interactionCreate', async (interaction) => {
@@ -216,7 +221,56 @@ client.on('interactionCreate', async (interaction) => {
 })
 
 // On user join voice channel event
-client.on('voiceStateUpdate', (oldState, newState) => recordVoiceStateChange(oldState, newState))
+// client.on('voiceStateUpdate', (oldState, newState) => recordVoiceStateChange(oldState, newState))
+
+client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
+  const bot = await oldState.guild.members.fetchMe()
+
+  oldState.channelId
+
+  recordVoiceStateChange(oldState, newState)
+
+  // IIgnore updates that are not related to the bot
+  if (!(oldState.member?.id === bot.id) || !(newState.member?.id === bot.id)) return
+
+  const left = oldState.channelId && !newState.channelId
+  const channel = left ? oldState.channel : newState.channel
+
+  if (left) {
+    cleanupListen(oldState.guild)
+  }
+
+  if (!left && channel) {
+    const queue = useQueue(newState.guild.id)
+
+    if (!queue) return console.error('[voiceStateUpdate] No queue found')
+
+    useListen(queue)
+  }
+
+  // if (newState.channelId === null) {
+  //   // Bot left channel
+  //   console.log('[voiceStateUpdate] Bot left channel')
+  //   await cleanupListen(oldState.guild)
+  // } else if (oldState.channelId === null) {
+  //   // Bot joined channel
+  //   console.log('[voiceStateUpdate] Bot joined channel')
+  //   const queue = useQueue(newState.guild.id)
+
+  //   if (!queue) return console.error('[voiceStateUpdate] No queue found')
+
+  //   useListen(queue)
+  // } else {
+  //   // Bot moved channels
+  //   console.log('[voiceStateUpdate] Bot moved channels')
+  //   await cleanupListen(oldState.guild)
+  //   const queue = useQueue(newState.guild.id)
+
+  //   if (!queue) return console.error('[voiceStateUpdate] No queue found')
+
+  //   useListen(queue)
+  // }
+})
 
 player.events.on('playerStart', playSongEventHandler)
 

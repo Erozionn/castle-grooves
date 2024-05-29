@@ -5,7 +5,7 @@ import { GuildNodeCreateOptions, PlayerNodeInitializerOptions, QueryType } from 
 export const nodeOptions = {
   leaveOnEnd: false,
   leaveOnStop: false,
-  leaveOnEmptyCooldown: 1800,
+  leaveOnEmptyCooldown: 10000,
 } as GuildNodeCreateOptions
 
 export const playerOptions = {

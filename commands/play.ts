@@ -63,10 +63,8 @@ export default {
       voice: { channel: voiceChannel },
     } = member as GuildMember
 
-    if (!interaction.replied) {
-      const loadingMsg = await interaction.editReply({ content: '⏱ | Loading...' })
-      setTimeout(() => loadingMsg.delete(), 1500)
-    }
+    const loadingMsg = await interaction.reply({ content: '⏱ | Loading...' })
+    setTimeout(() => loadingMsg.delete(), 1500)
 
     // await interaction.deferReply()
 
