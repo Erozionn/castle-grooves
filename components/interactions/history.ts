@@ -39,7 +39,13 @@ export default async (
   const playSong = async (value: string | Track) => {
     let track = value
     if (typeof value === 'string') {
-      const song = songs[parseInt(value)]
+      const url = value.match(/(.*)\?ca=/)?.[1] || value
+      const song = songs.find((s) => s.track.url === url)
+      if (!song) {
+        message.edit('❌ | Unable to find song. Please try again.')
+        return
+      }
+
       track = song.track
       track.requestedBy = interactionUser
     }

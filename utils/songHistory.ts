@@ -197,7 +197,7 @@ const generateHistoryOptions = async () => {
   // Prepare song history for the history component
   const options = songs.map((s, index) => {
     // Split artist and title
-    let { author: artist, title } = s.track
+    let { author: artist, title, url } = s.track
     if (s.track.source === 'youtube') {
       const titleObj = parseSongName(s.track.title)
       artist = titleObj.artist
@@ -212,7 +212,7 @@ const generateHistoryOptions = async () => {
       label: title ? title.substring(0, 95) : artist.substring(0, 95),
       description: `${title ? artist.substring(0, 65) : ' '} - ${lastPlayed}`,
       emoji: '🎶',
-      value: index.toString(),
+      value: `${url}?ca=${s.track.id}`,
     }
   })
 
