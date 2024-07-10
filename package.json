@@ -27,12 +27,11 @@
   "license": "MIT",
   "homepage": "https://github.com/Erozionn/castle-grooves#readme",
   "dependencies": {
-    "@discordjs/opus": "^0.8.0",
-    "@discordjs/rest": "^0.5.0",
-    "@discordjs/voice": "^0.8.0",
-    "@distube/spotify": "^1.5.1",
-    "@distube/yt-dlp": "^1.1.3",
-    "@distube/ytdl-core": "^4.13.2",
+    "@discord-player/extractor": "^4.4.6",
+    "@discordjs/opus": "^0.9.0",
+    "@discordjs/rest": "^2.2.0",
+    "@discordjs/voice": "^0.16.1",
+    "@distube/ytdl-core": "github:soya-daizu/ytdl-core#sig-patch",
     "@influxdata/influxdb-client": "^1.26.0",
     "discord-api-types": "^0.34.0",
     "discord.js": "^14.8.0",
@@ -44,7 +43,8 @@
     "module-alias": "^2.2.3",
     "patch-package": "^6.4.7",
     "skia-canvas": "^1.0.1",
-    "ytdl-core": "^4.11.4"
+    "utf-8-validate": "^6.0.3",
+    "zlib-sync": "^0.1.9"
   },
   "devDependencies": {
     "@types/node": "^20.4.5",
