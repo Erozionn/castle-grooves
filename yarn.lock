@@ -32,7 +32,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@babel/core@npm:^7.24.9":
+"@babel/core@npm:^7.25.2":
   version: 7.25.2
   resolution: "@babel/core@npm:7.25.2"
   dependencies:
@@ -1897,7 +1897,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "crastle-grooves@workspace:."
   dependencies:
-    "@babel/core": "npm:^7.24.9"
+    "@babel/core": "npm:^7.25.2"
     "@discord-player/extractor": "npm:^4.4.6"
     "@discordjs/opus": "npm:^0.9.0"
     "@discordjs/rest": "npm:^2.2.0"
