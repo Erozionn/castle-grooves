@@ -34,15 +34,15 @@ import { nowPlayingCanvas, nowPlayingCanvasWithUpNext } from '@utils/nowPlayingC
 import useMockTracks from '@data/dummies/songArray'
 
 import registerCommands from './deploy-commands'
+import { getYoutubeiInstance, YoutubeiExtractor, YoutubeiOptions } from 'discord-player-youtubei'
+import { BridgeProvider, BridgeSource, SpotifyExtractor } from '@discord-player/extractor'
 
 const {
   BOT_TOKEN,
   GUILD_ID,
   DEFAULT_TEXT_CHANNEL,
-  YOUTUBE_COOKIE,
-  YOUTUBE_IDENTITY_TOKEN,
+  YOUTUBE_AUTH_TOKEN,
   NOW_PLAYING_MOCK_DATA,
-  SPOTIFY,
   TS_NODE_DEV,
 } = ENV
 
@@ -57,15 +57,11 @@ const client = new Client({
 
 // if (SPOTIFY.CLIENT_ID && SPOTIFY.CLIENT_SECRET) console.log('[init] Loading with Spotify search')
 
-const player = new Player(client, {
-  ytdlOptions: {
-    requestOptions: {
-      headers: {
-        cookie: YOUTUBE_COOKIE,
-      },
-    },
-  },
-})
+const player = new Player(client)
+
+player.extractors.register(YoutubeiExtractor, {
+  authentication: YOUTUBE_AUTH_TOKEN,
+} as YoutubeiOptions)
 
 client.player = player
 
@@ -120,9 +116,11 @@ commandFiles.forEach(async (file) => {
 })
 
 client.once('ready', async () => {
-  await player.extractors.loadDefault(
-    (ext) => ext === 'YouTubeExtractor' || ext === 'SpotifyExtractor'
-  )
+  // await player.extractors.loadDefault(
+  //   (ext) => !['YouTubeExtractor', 'SpotifyExtractor'].includes(ext)
+  // )
+  await player.extractors.loadDefault((ext) => ['YouTubeiExtractor'].includes(ext))
+  console.log(`discord-player loaded dependencies:\n${player.scanDeps()}`)
 
   client.user?.setActivity({
     name: '🎶 Music 🎶',
