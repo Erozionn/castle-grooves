@@ -7,6 +7,14 @@ import {
   SlashCommandBuilder,
 } from 'discord.js'
 
+export type TrackWithYoutubeiMetadata = WithMetadata<
+  Track,
+  {
+    duration_ms: number
+    live: boolean
+  }
+>
+
 export type TrackWithYoutubeMetadata = WithMetadata<
   Track,
   {

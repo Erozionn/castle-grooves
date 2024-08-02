@@ -3,8 +3,14 @@ import path from 'node:path'
 import { Canvas, FontLibrary, loadImage } from 'skia-canvas'
 import { Track } from 'discord-player'
 
-import { capitalize, parseSongName, splitAtClosestSpace, truncateString } from '@utils/utilities'
-import { TrackWithSpotifyMetadata, TrackWithYoutubeMetadata } from '@types'
+import {
+  capitalize,
+  getYoutubeVideoId,
+  parseSongName,
+  splitAtClosestSpace,
+  truncateString,
+} from '@utils/utilities'
+import { TrackWithSpotifyMetadata, TrackWithYoutubeiMetadata } from '@types'
 
 FontLibrary.use([
   path.resolve('./assets/fonts/Poppins-Thin.ttf'),
@@ -17,7 +23,7 @@ FontLibrary.use([
 
 const getThumbnailUrl = (song: Track) => {
   if (song.source === 'youtube') {
-    return `https://img.youtube.com/vi/${(song as TrackWithYoutubeMetadata).metadata.id}/mqdefault.jpg`
+    return `https://img.youtube.com/vi/${getYoutubeVideoId((song as TrackWithYoutubeiMetadata).url)}/mqdefault.jpg`
   } else if (song.source === 'spotify') {
     return (song as TrackWithSpotifyMetadata).metadata?.source?.thumbnail || song.thumbnail
   }

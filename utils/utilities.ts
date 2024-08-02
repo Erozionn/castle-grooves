@@ -40,4 +40,9 @@ export const truncateString = (str: string, num: number) => {
   return str.slice(0, num) + '…'
 }
 
+export const getYoutubeVideoId = (url: string) => {
+  const regex = /(youtu.*be.*)\/(watch\?v=|embed\/|v|shorts|)(.*?((?=[&#?])|$))/gm
+  return regex.exec(url)?.[3]
+}
+
 export { splitAtClosestSpace, shadeColor, parseSongName }
