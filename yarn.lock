@@ -1914,7 +1914,7 @@ __metadata:
     date-fns: "npm:^3.3.1"
     discord-api-types: "npm:^0.37.70"
     discord-player: "npm:^6.6.7"
-    discord-player-youtubei: "npm:^1.2.4"
+    discord-player-youtubei: "npm:^1.2.5"
     discord.js: "npm:^14.14.1"
     dotenv: "npm:^16.4.5"
     eslint: "npm:^8.56.0"
@@ -2199,15 +2199,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"discord-player-youtubei@npm:^1.2.4":
-  version: 1.2.4
-  resolution: "discord-player-youtubei@npm:1.2.4"
+"discord-player-youtubei@npm:^1.2.5":
+  version: 1.2.5
+  resolution: "discord-player-youtubei@npm:1.2.5"
   dependencies:
-    undici: "npm:^6.19.2"
+    tiny-typed-emitter: "npm:^2.1.0"
     youtubei.js: "npm:^10.3.0"
   bin:
     discord-player-youtubei: bin/index.js
-  checksum: 10c0/ef3cacc351e63ac0054eb3b5ce91bc5927f290f3cbc19a9edee17fa7ae114b24c10115163680736050adcc599df61b9826c17d1174e61430bda64d6a483ddd83
+  checksum: 10c0/b18259d4dbe1d89d89615dd2593efb5f4922cca19bcb611a7b0064acf9320b7e52e28710f2b54c5607aaaae9a7c4a4cc4b14dcc8f02ed249751ef15707c021df
   languageName: node
   linkType: hard
 
@@ -6149,6 +6149,13 @@ __metadata:
   version: 0.2.0
   resolution: "text-table@npm:0.2.0"
   checksum: 10c0/02805740c12851ea5982686810702e2f14369a5f4c5c40a836821e3eefc65ffeec3131ba324692a37608294b0fd8c1e55a2dd571ffed4909822787668ddbee5c
+  languageName: node
+  linkType: hard
+
+"tiny-typed-emitter@npm:^2.1.0":
+  version: 2.1.0
+  resolution: "tiny-typed-emitter@npm:2.1.0"
+  checksum: 10c0/522bed4c579ee7ee16548540cb693a3d098b137496110f5a74bff970b54187e6b7343a359b703e33f77c5b4b90ec6cebc0d0ec3dbdf1bd418723c5c3ce36d8a2
   languageName: node
   linkType: hard
 
