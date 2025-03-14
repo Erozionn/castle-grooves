@@ -12,19 +12,19 @@ RUN apk update && apk add --no-cache python3 make g++ fontconfig
 
 WORKDIR /usr/src/app
 
-# Copy only yarn-related files first
-COPY .yarnrc.yml ./
-COPY .yarn ./.yarn
-COPY package.json yarn.lock ./
+# Copy package files first
+COPY package.json yarn.lock .yarnrc.yml ./
 
-# Enable yarn
-RUN corepack enable
+# Set up Yarn
+RUN corepack enable && corepack prepare yarn@stable --activate
+
+# Copy source files
+COPY . .
 
 # Install dependencies
 RUN yarn install --immutable
 
-# Copy the rest of the source code
-COPY . .
+# Build
 RUN yarn build
 
 # Final stage
@@ -37,13 +37,14 @@ RUN apk update && apk add --no-cache python3 make g++ fontconfig
 
 WORKDIR /usr/src/app
 
-# Copy only yarn-related files first
-COPY .yarnrc.yml ./
-COPY .yarn ./.yarn
-COPY package.json yarn.lock ./
+# Copy package files first
+COPY package.json yarn.lock .yarnrc.yml ./
 
-# Enable yarn
-RUN corepack enable
+# Set up Yarn
+RUN corepack enable && corepack prepare yarn@stable --activate
+
+# Copy source files
+COPY . .
 
 # Install dependencies
 RUN yarn install --immutable
