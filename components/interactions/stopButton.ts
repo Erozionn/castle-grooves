@@ -19,6 +19,8 @@ export default async (queue: GuildQueue<Interaction> | null) => {
 
     const components = await useComponents(queue)
 
+    if (!channel || !channel.isTextBased() || !('guild' in channel)) return
+
     await sendMessage(channel, {
       content: '🎶 | Previously Played:',
       files: [],
@@ -26,6 +28,8 @@ export default async (queue: GuildQueue<Interaction> | null) => {
     })
   } else {
     queue.delete()
+
+    if (!channel || !channel.isTextBased() || !('guild' in channel)) return
 
     const components = await useComponents()
     await sendMessage(channel, {

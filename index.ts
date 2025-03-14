@@ -251,6 +251,8 @@ client.on('messageCreate', (msg) => {
 
   if (msgResetCount > 0) {
     deleteMessage()
+
+    if (!channel || !channel.isTextBased() || !('guild' in channel)) return
     sendMessage(channel, { content, components, files: attachments.map((a) => a.url) })
     msgResetCount = 0
   }

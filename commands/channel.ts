@@ -27,6 +27,8 @@ export default {
       })
       .then((msg) => msg.delete())
 
+    if (!channel || !channel.isTextBased() || !('guild' in channel)) return
+
     await sendMessage(channel, {
       content: `🎶 | Pick a song below or use </play:991566063068250134>`,
       components: [historyActionRow],

@@ -11,7 +11,7 @@ export default async (queue: GuildQueue<Interaction>) => {
 
   addSong(false)
 
-  if (!channel) return
+  if (!channel || !channel.isTextBased() || !('guild' in channel)) return
 
   await sendMessage(channel, {
     content: '✅ | Queue finished!',

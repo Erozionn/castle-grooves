@@ -1,10 +1,11 @@
 import {
+  BaseGuildTextChannel,
   BaseMessageOptions,
-  GuildTextBasedChannel,
   Message,
   MessageCreateOptions,
   MessageEditOptions,
   MessagePayload,
+  PartialGroupDMChannel,
   TextBasedChannel,
 } from 'discord.js'
 
@@ -18,7 +19,7 @@ const deleteMessage = () => {
 }
 
 const sendMessage = async (
-  channel: TextBasedChannel | GuildTextBasedChannel,
+  channel: Exclude<TextBasedChannel, PartialGroupDMChannel> | BaseGuildTextChannel,
   options: string | MessagePayload | MessageCreateOptions | MessageEditOptions
 ) => {
   if (mainMessage && channel.id === mainMessage?.channel.id) {

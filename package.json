@@ -28,17 +28,17 @@
   "homepage": "https://github.com/Erozionn/castle-grooves#readme",
   "dependencies": {
     "@discord-player/extractor": "^4.4.6",
-    "@discordjs/opus": "^0.9.0",
+    "@discordjs/opus": "^0.10.0",
     "@discordjs/rest": "^2.2.0",
     "@discordjs/voice": "^0.16.1",
-    "@distube/ytdl-core": "^4.13.7",
+    "@distube/ytdl-core": "^4.15.9",
     "@influxdata/influxdb-client": "^1.26.0",
     "bufferutil": "^4.0.8",
     "date-fns": "^3.3.1",
     "discord-api-types": "^0.37.70",
     "discord-player": "^6.6.7",
     "discord-player-youtubei": "^1.2.5",
-    "discord.js": "^14.14.1",
+    "discord.js": "^14.18.0",
     "dotenv": "^16.4.5",
     "express": "^4.18.1",
     "libsodium-wrappers": "^0.7.13",
@@ -89,5 +89,5 @@
     "@hooks": "hooks",
     "@data": "data"
   },
-  "packageManager": "yarn@4.1.1"
+  "packageManager": "yarn@4.5.1"
 }

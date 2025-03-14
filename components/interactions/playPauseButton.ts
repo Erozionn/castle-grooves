@@ -7,6 +7,8 @@ import { useComponents } from '@constants/messageComponents'
 export default async (queue: GuildQueue<Interaction> | null) => {
   const mainMessage = getMainMessage()
   if (!queue) {
+    if (!mainMessage || !mainMessage.channel.isTextBased() || !('guild' in mainMessage.channel))
+      return
     mainMessage && sendMessage(mainMessage.channel, { content: '❌ | No music is being played!' })
     return
   }
@@ -22,6 +24,8 @@ export default async (queue: GuildQueue<Interaction> | null) => {
   }
 
   const components = await useComponents(queue)
+
+  if (!channel || !channel.isTextBased() || !('guild' in channel)) return
 
   await sendMessage(channel, { components })
 }

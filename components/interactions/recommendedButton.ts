@@ -19,5 +19,7 @@ export default async (queue: GuildQueue<Interaction> | null) => {
 
   const components = await useComponents(queue)
 
+  if (!channel || !channel.isTextBased() || !('guild' in channel)) return
+
   await sendMessage(channel, { components })
 }

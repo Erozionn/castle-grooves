@@ -8,7 +8,7 @@ export default async (queue: GuildQueue<Interaction>) => {
   const [_, historyActionRow] = await useComponents(queue)
   const { channel } = queue.metadata
 
-  if (!channel) return
+  if (!channel || !channel.isTextBased() || !('guild' in channel)) return
   await sendMessage(channel, {
     content: '🎶 | Pick a song below or use </play:991566063068250134>',
     files: [],
