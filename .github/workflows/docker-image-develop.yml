@@ -21,6 +21,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
 
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Set up Yarn
+        run: corepack prepare yarn@4.5.1 --activate
+
       - name: Install dependencies
         run: |
           yarn install
