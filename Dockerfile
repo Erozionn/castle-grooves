@@ -21,7 +21,7 @@ RUN yarn build
 
 FROM node:lts-alpine AS final
 
-COPY --from=ffmpeg / /
+COPY --from=ffmpeg /usr/local /usr/local
 
 RUN apk update && apk add --no-cache python3 make g++ fontconfig
 RUN corepack enable && corepack prepare yarn@stable --activate && yarn set version 4
