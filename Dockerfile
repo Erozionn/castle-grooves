@@ -13,10 +13,10 @@ RUN apk update && apk add --no-cache python3 make g++ fontconfig
 WORKDIR /usr/src/app
 
 # Copy package files first
-COPY package.json yarn.lock .yarnrc.yml ./
+COPY package.json yarn.lock ./
 
-# Set up Yarn
-RUN corepack enable && corepack prepare yarn@stable --activate
+# Set up Yarn without using local binary
+RUN corepack enable && yarn set version stable
 
 # Copy source files
 COPY . .
@@ -38,10 +38,10 @@ RUN apk update && apk add --no-cache python3 make g++ fontconfig
 WORKDIR /usr/src/app
 
 # Copy package files first
-COPY package.json yarn.lock .yarnrc.yml ./
+COPY package.json yarn.lock ./
 
-# Set up Yarn
-RUN corepack enable && corepack prepare yarn@stable --activate
+# Set up Yarn without using local binary
+RUN corepack enable && yarn set version stable
 
 # Copy source files
 COPY . .
