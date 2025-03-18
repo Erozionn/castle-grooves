@@ -14,6 +14,8 @@ import {
   ApplicationCommand,
 } from 'discord.js'
 import { Player } from 'discord-player'
+import { getYoutubeiInstance, YoutubeiExtractor, YoutubeiOptions } from 'discord-player-youtubei'
+import { BridgeProvider, BridgeSource, SpotifyExtractor } from '@discord-player/extractor'
 
 import {
   addSongEventHandler,
@@ -34,8 +36,6 @@ import { nowPlayingCanvas, nowPlayingCanvasWithUpNext } from '@utils/nowPlayingC
 import useMockTracks from '@data/dummies/songArray'
 
 import registerCommands from './deploy-commands'
-import { getYoutubeiInstance, YoutubeiExtractor, YoutubeiOptions } from 'discord-player-youtubei'
-import { BridgeProvider, BridgeSource, SpotifyExtractor } from '@discord-player/extractor'
 
 const {
   BOT_TOKEN,
@@ -44,6 +44,7 @@ const {
   YOUTUBE_AUTH_TOKEN,
   NOW_PLAYING_MOCK_DATA,
   TS_NODE_DEV,
+  INNERTUBE_CLIENT,
 } = ENV
 
 const client = new Client({
@@ -61,6 +62,9 @@ const player = new Player(client)
 
 player.extractors.register(YoutubeiExtractor, {
   authentication: YOUTUBE_AUTH_TOKEN,
+  streamOptions: {
+    useClient: INNERTUBE_CLIENT,
+  },
 } as YoutubeiOptions)
 
 client.player = player

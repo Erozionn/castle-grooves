@@ -12,6 +12,7 @@ declare global {
       INFLUX_TOKEN?: string
       WEBSERVER_PORT?: string
       NOW_PLAYING_MOCK_DATA?: string
+      INNERTUBE_CLIENT?: string
     }
   }
 }
