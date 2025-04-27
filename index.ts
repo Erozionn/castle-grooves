@@ -11,11 +11,10 @@ import {
   ActivityType,
   TextChannel,
   Message,
-  ApplicationCommand,
 } from 'discord.js'
 import { Player } from 'discord-player'
 import { getYoutubeiInstance, YoutubeiExtractor, YoutubeiOptions } from 'discord-player-youtubei'
-import { BridgeProvider, BridgeSource, SpotifyExtractor } from '@discord-player/extractor'
+import { SpotifyExtractor } from 'discord-player-spotify'
 
 import {
   addSongEventHandler,
@@ -60,12 +59,17 @@ const client = new Client({
 
 const player = new Player(client)
 
-player.extractors.register(YoutubeiExtractor, {
-  authentication: YOUTUBE_AUTH_TOKEN,
-  streamOptions: {
-    useClient: INNERTUBE_CLIENT,
-  },
-} as YoutubeiOptions)
+player.extractors.loadDefault((ext) => ext === 'YouTubeExtractor')
+
+player.extractors.register(SpotifyExtractor, {})
+
+// player.extractors.register(YoutubeiExtractor, {
+//   authentication: YOUTUBE_AUTH_TOKEN,
+//   // cookie,
+//   // streamOptions: {
+//   //   useClient: INNERTUBE_CLIENT,
+//   // },
+// } as YoutubeiOptions)
 
 client.player = player
 

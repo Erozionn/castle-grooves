@@ -425,18 +425,18 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@distube/ytdl-core@npm:^4.16.4":
-  version: 4.16.4
-  resolution: "@distube/ytdl-core@npm:4.16.4"
+"@distube/ytdl-core@npm:^4.16.6":
+  version: 4.16.9
+  resolution: "@distube/ytdl-core@npm:4.16.9"
   dependencies:
-    http-cookie-agent: "npm:^6.0.8"
+    http-cookie-agent: "npm:^7.0.1"
     https-proxy-agent: "npm:^7.0.6"
     m3u8stream: "npm:^0.8.6"
     miniget: "npm:^4.2.3"
     sax: "npm:^1.4.1"
-    tough-cookie: "npm:^5.1.0"
-    undici: "npm:^7.3.0"
-  checksum: 10c0/cdafb689966162e11e8f9ddacff1c4748d092cfcbe9191408c30a5534c5260132125f2cf151305cb15ae8f42f405ec9a93933fda5ee1fa401419378a9b1ba80f
+    tough-cookie: "npm:^5.1.2"
+    undici: "npm:^7.8.0"
+  checksum: 10c0/22d029b4cdd9d540408f28fd6705f6abef3b4203dba80c7451b6dd64891911941e1efc777ac9fbee936ba8f6b7a5742e859aaacfcd11d07b501b90a02fde00ee
   languageName: node
   linkType: hard
 
@@ -803,6 +803,13 @@ __metadata:
   version: 5.7.3
   resolution: "@mdn/browser-compat-data@npm:5.7.3"
   checksum: 10c0/a630301c646deb11b3ea75056b5e71976da0e0935b21248e8cfa10c3cb03555b1561b998e4eea1a1f0a4820449b16bc8d0f220cc9b98741192c45dc1efd054d8
+  languageName: node
+  linkType: hard
+
+"@noble/hashes@npm:1.7.1":
+  version: 1.7.1
+  resolution: "@noble/hashes@npm:1.7.1"
+  checksum: 10c0/2f8ec0338ccc92b576a0f5c16ab9c017a3a494062f1fbb569ae641c5e7eab32072f9081acaa96b5048c0898f972916c818ea63cbedda707886a4b5ffcfbf94e3
   languageName: node
   linkType: hard
 
@@ -1990,7 +1997,7 @@ __metadata:
     "@discordjs/opus": "npm:^0.10.0"
     "@discordjs/rest": "npm:^2.4.3"
     "@discordjs/voice": "npm:^0.16.1"
-    "@distube/ytdl-core": "npm:^4.16.4"
+    "@distube/ytdl-core": "npm:^4.16.6"
     "@influxdata/influxdb-client": "npm:^1.26.0"
     "@types/babel__core": "npm:^7"
     "@types/express": "npm:^4.17.21"
@@ -2003,7 +2010,8 @@ __metadata:
     date-fns: "npm:^3.6.0"
     discord-api-types: "npm:^0.37.119"
     discord-player: "npm:^6.7.1"
-    discord-player-youtubei: "npm:^1.4.3"
+    discord-player-spotify: "npm:^1.1.2"
+    discord-player-youtubei: "npm:^1.4.5"
     discord.js: "npm:^14.18.0"
     dotenv: "npm:^16.4.5"
     eslint: "npm:^8.56.0"
@@ -2289,9 +2297,19 @@ __metadata:
   languageName: node
   linkType: hard
 
-"discord-player-youtubei@npm:^1.4.3":
-  version: 1.4.3
-  resolution: "discord-player-youtubei@npm:1.4.3"
+"discord-player-spotify@npm:^1.1.2":
+  version: 1.1.2
+  resolution: "discord-player-spotify@npm:1.1.2"
+  dependencies:
+    node-html-parser: "npm:^7.0.1"
+    otpauth: "npm:^9.3.6"
+  checksum: 10c0/a85aa91c31cc13dd1f83c9469a8282db8e22ba282fac6d3e67c2c4e6e982f3eb8f2f47512ee03d222f59ce0340568c19aecb430418316961317c6f1ec2e509c0
+  languageName: node
+  linkType: hard
+
+"discord-player-youtubei@npm:^1.4.5":
+  version: 1.4.5
+  resolution: "discord-player-youtubei@npm:1.4.5"
   dependencies:
     jsdom: "npm:^26.0.0"
     tiny-typed-emitter: "npm:^2.1.0"
@@ -2299,7 +2317,7 @@ __metadata:
     youtubei.js: "npm:^13.2.0"
   bin:
     discord-player-youtubei: bin/index.js
-  checksum: 10c0/bc35868b452996159550bdbefd4c197c7912c9c2b816258632c5d0390388b7d5db6e49d0a35db53ce5d71b52d890c7aeacd6d590b2377ff6d60048a29d2f9b36
+  checksum: 10c0/3ac05cc0d3e762a0c7fc809b5fea2300cdf82dddd44ce2340b4d366729b44e1cf1d6be32a30f889acc175510f0bf331a4e0ed55745a0e864d4aad81aa710d8a9
   languageName: node
   linkType: hard
 
@@ -3754,18 +3772,18 @@ __metadata:
   languageName: node
   linkType: hard
 
-"http-cookie-agent@npm:^6.0.8":
-  version: 6.0.8
-  resolution: "http-cookie-agent@npm:6.0.8"
+"http-cookie-agent@npm:^7.0.1":
+  version: 7.0.1
+  resolution: "http-cookie-agent@npm:7.0.1"
   dependencies:
     agent-base: "npm:^7.1.3"
   peerDependencies:
     tough-cookie: ^4.0.0 || ^5.0.0
-    undici: ^5.11.0 || ^6.0.0
+    undici: ^7.0.0
   peerDependenciesMeta:
     undici:
       optional: true
-  checksum: 10c0/d1931431982f5946e10cd67cd035d510119acce046db9588e38c3d37385b40b5fa4a757fd97d79e457f2a91546d3b95743511ac99e9fc6b825d1063299b04b58
+  checksum: 10c0/d89b44247a00a38891ffd8398b5ba57e891cd8ac638eff57d2b11cbff525dad207f3058dbfff9d19678e646c891252195f90ef8f61e7ddcfbfae6a1b97b2be5e
   languageName: node
   linkType: hard
 
@@ -4997,6 +5015,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"node-html-parser@npm:^7.0.1":
+  version: 7.0.1
+  resolution: "node-html-parser@npm:7.0.1"
+  dependencies:
+    css-select: "npm:^5.1.0"
+    he: "npm:1.2.0"
+  checksum: 10c0/70a4d6db83340e1c93be3c9d28b924e8a2d8c53e085805d9a4916132c56e76e105fedc2201682ff20e0af0468893d0f77ecaa69865b78206b02982d0b4a649a4
+  languageName: node
+  linkType: hard
+
 "node-releases@npm:^2.0.19":
   version: 2.0.19
   resolution: "node-releases@npm:2.0.19"
@@ -5177,6 +5205,15 @@ __metadata:
   version: 1.0.2
   resolution: "os-tmpdir@npm:1.0.2"
   checksum: 10c0/f438450224f8e2687605a8dd318f0db694b6293c5d835ae509a69e97c8de38b6994645337e5577f5001115470414638978cc49da1cdcc25106dad8738dc69990
+  languageName: node
+  linkType: hard
+
+"otpauth@npm:^9.3.6":
+  version: 9.4.0
+  resolution: "otpauth@npm:9.4.0"
+  dependencies:
+    "@noble/hashes": "npm:1.7.1"
+  checksum: 10c0/5774e7ae90ea1bd535c7957a37e8b2904843e2d83fe180310bda901a0ec6527602971d27240d9e7b667acd11496b0fa227e93dbb730987751bd28f139baa2dbe
   languageName: node
   linkType: hard
 
@@ -6525,7 +6562,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"tough-cookie@npm:^5.0.0, tough-cookie@npm:^5.1.0":
+"tough-cookie@npm:^5.0.0, tough-cookie@npm:^5.1.2":
   version: 5.1.2
   resolution: "tough-cookie@npm:5.1.2"
   dependencies:
@@ -6839,10 +6876,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"undici@npm:^7.1.0, undici@npm:^7.3.0":
+"undici@npm:^7.1.0":
   version: 7.5.0
   resolution: "undici@npm:7.5.0"
   checksum: 10c0/07e1c984ff1d83516c02a716bb81abfa05087201e511c78147822073440365d2b8e875876804fb4e45857c11c412b46599c961f52aa5bdd2df481fa823e8b629
+  languageName: node
+  linkType: hard
+
+"undici@npm:^7.8.0":
+  version: 7.8.0
+  resolution: "undici@npm:7.8.0"
+  checksum: 10c0/7141f63ea405208a88120d211d83d77bf21327b16b451d3149fb266c28884fbcf78ec370ac2d3412a0e68ba6132ab85265ba85a2f4fde24cb47dc77f5c5a158c
   languageName: node
   linkType: hard
 
