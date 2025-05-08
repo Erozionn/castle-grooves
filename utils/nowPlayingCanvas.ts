@@ -168,7 +168,7 @@ export const nowPlayingCanvasWithUpNext = async (songs: Track[]) => {
     // Render "Up Next"
     canv.textAlign = 'left'
     canv.fillStyle = `#ffffff`
-    canv.font = '22px Poppins'
+    canv.font = '18px Poppins'
     canv.fillText('UP NEXT:', 345, 40)
 
     try {
@@ -198,37 +198,42 @@ export const nowPlayingCanvasWithUpNext = async (songs: Track[]) => {
     }
   }
 
-  await songs
-    .slice(1, 6)
-    // .reverse()
-    .forEach(async (songObj, index) => {
-      const i = index + 1
-      canv.fillStyle = `#ffffff`
-      canv.font = '600 22px Poppins'
-      canv.textAlign = 'left'
-      let { author: artist, title } = songObj
-      if (songObj.source === 'youtube') {
-        const titleObj = parseSongName(songObj.title)
-        artist = titleObj.artist
-        if (titleObj.title) title = titleObj.title
-      }
-      canv.fillText(`${i}`, 345, 36 + 65 * i)
-      if (title !== null) {
-        canv.font = '600 22px Poppins'
-        canv.fillText(truncateString(title, 20), 370, 26 + 65 * i)
-        canv.font = '300 22px Poppins'
-        canv.fillText(truncateString(artist, 20), 370, 51 + 65 * i)
-      } else {
-        canv.font = '600 22px Poppins'
-        canv.fillText(truncateString(artist, 20), 370, 30 + 65 * i)
-      }
+  await songs.slice(1, 6).forEach(async (songObj, index) => {
+    const i = index + 1
+    canv.fillStyle = `#ffffff`
+    canv.font = '300 22px Poppins'
+    canv.textAlign = 'left'
+    let { author: artist, title } = songObj
+    if (songObj.source === 'youtube') {
+      const titleObj = parseSongName(songObj.title)
+      artist = titleObj.artist
+      if (titleObj.title) title = titleObj.title
+    }
 
-      // if (i < 5 && songs.length > 2) {
-      //   canv.fillStyle = 'rgba(255, 255, 255, 0.3)'
-      //   canv.fillRect(345, 60 + 66 * i, 325, 1)
-      //   canv.fillStyle = `#ffffff`
-      // }
-    })
+    canv.fillText(`${i}`, 345, 36 + 65 * i)
+
+    // Fade out long titles
+    const gradient = canv.createLinearGradient(550, 0, 638, 0)
+    gradient.addColorStop(0, '#ffffff')
+    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)')
+    canv.fillStyle = gradient
+
+    if (title !== null) {
+      canv.font = '600 22px Poppins'
+      canv.fillText(title, 375, 26 + 65 * i)
+      canv.font = '300 22px Poppins'
+      canv.fillText(artist, 375, 51 + 65 * i)
+    } else {
+      canv.font = '600 22px Poppins'
+      canv.fillText(artist, 375, 30 + 65 * i)
+    }
+
+    // if (i < 5 && songs.length > 2) {
+    //   canv.fillStyle = 'rgba(255, 255, 255, 0.3)'
+    //   canv.fillRect(345, 60 + 66 * i, 325, 1)
+    //   canv.fillStyle = `#ffffff`
+    // }
+  })
 
   // Buffer canvas
   return await canvas.toBuffer('image/png')
@@ -332,7 +337,7 @@ let debounceTimeout: NodeJS.Timeout | null = null
 
 export const generateNowPlayingCanvas = async (tracks: Track[]): Promise<Buffer> => {
   const now = Date.now()
-  const cooldown = 3000
+  const cooldown = 1000
 
   if (now - lastExecutionTime < cooldown) {
     if (debounceTimeout) clearTimeout(debounceTimeout)
