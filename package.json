@@ -1,11 +1,11 @@
 {
-  "name": "crastle-grooves",
+  "name": "castle-grooves",
   "version": "0.2.0",
   "description": "Castle Grooves music bot.",
   "main": "index.ts",
   "scripts": {
     "start": "node -r dotenv/config build/index.js dotenv_config_path=.env.dev dotenv_config_debug=true",
-    "start:dev": "ts-node-dev -r tsconfig-paths/register -r dotenv/config index.ts dotenv_config_path=.env.dev dotenv_config_debug=true",
+    "start:dev": "ts-node-dev --inspect -r tsconfig-paths/register -r dotenv/config index.ts dotenv_config_path=.env.dev dotenv_config_debug=true",
     "start:prod": "node build/index.js",
     "start:prefill": "NOW_PLAYING_MOCK_DATA=true yarn start:dev",
     "start:docker": "docker run --env-file .env.dev --name castle-grooves castle-grooves:dev",
@@ -27,8 +27,7 @@
   "license": "MIT",
   "homepage": "https://github.com/Erozionn/castle-grooves#readme",
   "dependencies": {
-    "@discord-player/extractor": "^4.5.1",
-    "@discordjs/opus": "^0.10.0",
+    "@discord-player/extractor": "^7.1.0",
     "@discordjs/rest": "^2.4.3",
     "@discordjs/voice": "^0.16.1",
     "@distube/ytdl-core": "^4.16.6",
@@ -37,13 +36,16 @@
     "bufferutil": "^4.0.9",
     "date-fns": "^3.6.0",
     "discord-api-types": "^0.37.119",
-    "discord-player": "^6.7.1",
+    "discord-player": "^7.1.0",
+    "discord-player-soundcloud": "^1.0.7",
     "discord-player-spotify": "^1.1.2",
     "discord-player-youtubei": "^1.4.5",
     "discord.js": "^14.18.0",
     "dotenv": "^16.4.5",
     "express": "^4.18.1",
+    "ffmpeg-static": "^5.2.0",
     "libsodium-wrappers": "^0.7.13",
+    "mediaplex": "^1.0.0",
     "module-alias": "^2.2.3",
     "patch-package": "^8.0.0",
     "sharp": "^0.33.2",
@@ -91,5 +93,5 @@
     "@hooks": "hooks",
     "@data": "data"
   },
-  "packageManager": "yarn@4.8.0"
+  "packageManager": "yarn@4.9.1"
 }

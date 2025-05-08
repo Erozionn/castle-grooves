@@ -14,10 +14,24 @@
 
     {
       "name": "Launch Program",
-      "program": "${workspaceFolder}/build/index.js",
+      "program": "${workspaceFolder}/index.ts",
       "request": "launch",
-      "skipFiles": ["<node_internals>/**"],
-      "type": "node"
+      "skipFiles": ["<node_internals>/**", "node_modules/**"],
+      "runtimeArgs": ["--enable-source-maps"],
+      "sourceMaps": true,
+      "type": "node",
+      "outFiles": ["${workspaceFolder}/build/**/*.js"]
+    },
+    {
+      "type": "node",
+      "request": "attach",
+      "name": "Attach to ts-node-dev",
+      "skipFiles": [
+        "<node_internals>/**", // Skip Node.js internals
+        "node_modules/**" // Skip external libraries
+      ],
+      "port": 9229, // Default debugging port for Node.js
+      "restart": true
     }
   ]
 }

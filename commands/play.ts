@@ -1,8 +1,9 @@
-import { useMainPlayer, useQueue } from 'discord-player'
+import { onBeforeCreateStream, QueryType, useMainPlayer, useQueue } from 'discord-player'
 import { AutocompleteInteraction, GuildMember, Interaction, SlashCommandBuilder } from 'discord.js'
 
 import { playerOptions, nodeOptions } from '@constants/PlayerInitOptions'
 import { parseSongName } from '@utils/utilities'
+import onBeforeCreateStreamHandler from '@components/events/onBeforeCreateStream'
 
 export default {
   data: new SlashCommandBuilder()
@@ -16,6 +17,8 @@ export default {
         .setAutocomplete(true)
     ),
   async autoComplete(interaction: AutocompleteInteraction) {
+    if (!interaction.isAutocomplete()) return
+
     const player = useMainPlayer()
 
     const focusedValue = interaction.options.getFocused()
@@ -43,10 +46,11 @@ export default {
       const splitValue = focusedValue.split(' ')
 
       // Remove duplicates and filter by search query words
-      const filtered = [...new Map(choices.map((item) => [item['value'], item])).values()].filter(
-        (choice) =>
+      const filtered = [...new Map(choices.map((item) => [item['value'], item])).values()]
+        .filter((choice) =>
           splitValue.some((word) => choice.name.toLowerCase().includes(word.toLowerCase()))
-      )
+        )
+        .slice(0, 25)
       await interaction.respond(filtered)
     } catch (e) {
       console.warn('[searchCommand]', e)
@@ -63,11 +67,6 @@ export default {
       voice: { channel: voiceChannel },
     } = member as GuildMember
 
-    const loadingMsg = await interaction.reply({ content: '⏱ | Loading...' })
-    setTimeout(() => loadingMsg.delete(), 1500)
-
-    // await interaction.deferReply()
-
     if (!voiceChannel) {
       const errMsg = await interaction.editReply({
         content: '❌ | You need to be in a voice channel!',
@@ -75,6 +74,11 @@ export default {
       setTimeout(() => errMsg.delete(), 3000)
       return
     }
+
+    const loadingMsg = await interaction.reply({ content: '⏱ | Loading...' })
+    setTimeout(() => loadingMsg.delete(), 1500)
+
+    // await interaction.deferReply()
 
     const songName = interaction.options.get('song')?.value as string
 

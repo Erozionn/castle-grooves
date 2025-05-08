@@ -122,7 +122,8 @@
       "@constants/*": ["constants/*"],
       "@types/*": ["types/*"],
       "@hooks/*": ["hooks/*"],
-      "@data/*": ["data/*"]
+      "@data/*": ["data/*"],
+      "@extractors/*": ["extractors/*"]
     }
   },
   "include": ["**/*.**"],

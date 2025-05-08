@@ -1,3 +1,5 @@
+import crypto from 'crypto'
+
 const splitAtClosestSpace = (str: string, charsPerLine: number) => {
   const c = charsPerLine || 10
   const regex = new RegExp(`.{${c}}\\S*\\s+`, 'g')
@@ -43,6 +45,10 @@ export const truncateString = (str: string, num: number) => {
 export const getYoutubeVideoId = (url: string) => {
   const regex = /(youtu.*be.*)\/(watch\?v=|embed\/|v|shorts|)(.*?((?=[&#?])|$))/gm
   return regex.exec(url)?.[3]
+}
+
+export const hashURL = (url: string) => {
+  return crypto.createHash('md5').update(url).digest('hex')
 }
 
 export { splitAtClosestSpace, shadeColor, parseSongName }

@@ -1,4 +1,5 @@
-import { CacheType, CommandInteraction, Interaction } from 'discord.js'
+import { CacheType, CommandInteraction } from 'discord.js'
+import { useMainPlayer } from 'discord-player'
 
 import { ClientType, CommandObject } from '@types'
 
@@ -7,10 +8,16 @@ export default async (interaction: CommandInteraction<CacheType>, client: Client
     (interaction as CommandInteraction).commandName
   )
 
-  if (!command) return
+  if (!command || !interaction.guild) return
+
+  const player = useMainPlayer()
+
+  const data = {
+    guild: interaction.guild,
+  }
 
   try {
-    await command.execute(interaction)
+    await player.context.provide(data, () => command.execute(interaction))
   } catch (error) {
     console.error('[commandInteraction]', error)
 

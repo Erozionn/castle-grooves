@@ -88,6 +88,7 @@ export type ClientType = Client & {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   commands: Collection<string, any>
   player: Player
+  unsubscribeStreamInterceptor: () => void
 }
 
 export type CommandObject = {
