@@ -40,6 +40,10 @@ const onBeforeCreateStreamHandler: OnBeforeCreateStreamHandler = async (track, s
 
   if (fileExists) {
     console.log('Local file exists, creating read stream:', filePath)
+    track.setMetadata({
+      ...(typeof track.metadata === 'object' && track.metadata !== null ? track.metadata : {}),
+      isLocal: true,
+    })
     return createReadStream(filePath)
   }
 
