@@ -1,6 +1,6 @@
 import path from 'node:path'
 
-import { Canvas, FontLibrary, loadImage } from 'skia-canvas'
+import { Canvas, GlobalFonts, loadImage } from '@napi-rs/canvas'
 import { Track } from 'discord-player'
 
 import {
@@ -12,14 +12,15 @@ import {
 } from '@utils/utilities'
 import { TrackWithSpotifyMetadata, TrackWithYoutubeiMetadata } from '@types'
 
-FontLibrary.use([
-  path.resolve('./assets/fonts/Poppins-Thin.ttf'),
-  path.resolve('./assets/fonts/Poppins-Light.ttf'),
-  path.resolve('./assets/fonts/Poppins-Regular.ttf'),
-  path.resolve('./assets/fonts/Poppins-Medium.ttf'),
+GlobalFonts.registerFromPath(path.resolve('./assets/fonts/Poppins-Thin.ttf'), 'Poppins-Thin')
+GlobalFonts.registerFromPath(path.resolve('./assets/fonts/Poppins-Light.ttf'), 'Poppins-Light')
+GlobalFonts.registerFromPath(path.resolve('./assets/fonts/Poppins-Regular.ttf'), 'Poppins-Regular')
+GlobalFonts.registerFromPath(path.resolve('./assets/fonts/Poppins-Medium.ttf'), 'Poppins-Medium')
+GlobalFonts.registerFromPath(
   path.resolve('./assets/fonts/Poppins-SemiBold.ttf'),
-  path.resolve('./assets/fonts/Poppins-Bold.ttf'),
-])
+  'Poppins-SemiBold'
+)
+GlobalFonts.registerFromPath(path.resolve('./assets/fonts/Poppins-Bold.ttf'), 'Poppins-Bold')
 
 const getThumbnailUrl = (song: Track) => {
   if (song.source === 'youtube') {
@@ -230,7 +231,7 @@ export const nowPlayingCanvasWithUpNext = async (songs: Track[]) => {
     })
 
   // Buffer canvas
-  return await canvas.toBuffer('png')
+  return await canvas.toBuffer('image/png')
 }
 
 export const nowPlayingCanvas = async (song: Track) => {
@@ -277,7 +278,7 @@ export const nowPlayingCanvas = async (song: Track) => {
     x: _width + 25,
     font: '600 28px Poppins',
     textAlign: 'start',
-    charsPerLine: 14,
+    charsPerLine: 20,
   })
 
   // Render artist
@@ -323,10 +324,35 @@ export const nowPlayingCanvas = async (song: Track) => {
   }
 
   // Buffer canvas
-  return await canvas.toBuffer('png')
+  return await canvas.toBuffer('image/png')
 }
 
-export const generateNowPlayingCanvas = async (tracks: Track[]) => {
+let lastExecutionTime = 0
+let debounceTimeout: NodeJS.Timeout | null = null
+
+export const generateNowPlayingCanvas = async (tracks: Track[]): Promise<Buffer> => {
+  const now = Date.now()
+  const cooldown = 3000
+
+  if (now - lastExecutionTime < cooldown) {
+    if (debounceTimeout) clearTimeout(debounceTimeout)
+
+    return new Promise((resolve) => {
+      debounceTimeout = setTimeout(
+        async () => {
+          lastExecutionTime = Date.now()
+          resolve(await processTracks(tracks))
+        },
+        cooldown - (now - lastExecutionTime)
+      )
+    })
+  }
+
+  lastExecutionTime = now
+  return await processTracks(tracks)
+}
+
+const processTracks = async (tracks: Track[]): Promise<Buffer> => {
   if (!tracks || tracks.length < 1)
     throw Error('Error: Cannot generate now playing canvas without songs')
   if (tracks.length > 1) {

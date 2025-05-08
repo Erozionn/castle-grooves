@@ -22,6 +22,17 @@ const doesFileExist = async (path: string) => {
 }
 
 const getYoutubeUrl = async (track: Track) => {
+  const isYoutube: boolean = [
+    QueryType.YOUTUBE,
+    QueryType.YOUTUBE_PLAYLIST,
+    QueryType.YOUTUBE_VIDEO,
+    QueryType.YOUTUBE_SEARCH,
+  ].some((t: SearchQueryType) => t === track.source)
+
+  if (isYoutube) {
+    return track.url // Already a YouTube URL
+  }
+
   const searchResult = await track.player.search(`${track.title} ${track.author}`, {
     searchEngine: QueryType.YOUTUBE,
   })
@@ -35,7 +46,14 @@ const getYoutubeUrl = async (track: Track) => {
 const onBeforeCreateStreamHandler: OnBeforeCreateStreamHandler = async (track, source, queue) => {
   console.log(`[onBeforeCreateStream] Preparing stream for track: ${track.title}`)
 
-  const filePath = join(recordingsDir, `${hashURL(track.url)}.mp3`)
+  const url = await getYoutubeUrl(track)
+
+  if (!url) {
+    console.warn('No URL found for the track:', track.title, 'Source:', source)
+    return null
+  }
+
+  const filePath = join(recordingsDir, `${hashURL(url)}.mp3`)
   const fileExists = await doesFileExist(filePath)
 
   if (fileExists) {
@@ -51,19 +69,7 @@ const onBeforeCreateStreamHandler: OnBeforeCreateStreamHandler = async (track, s
     ? resolve('./utils/recorder.ts')
     : resolve('./build/utils/recorder.js')
 
-  const isYoutube: boolean = [
-    QueryType.YOUTUBE,
-    QueryType.YOUTUBE_PLAYLIST,
-    QueryType.YOUTUBE_VIDEO,
-    QueryType.YOUTUBE_SEARCH,
-  ].some((t: SearchQueryType) => t === source)
-
-  const url = isYoutube ? track.url : await getYoutubeUrl(track)
-
-  if (!url) {
-    console.warn('No URL found for the track:', track.title, 'Source:', source)
-    return null
-  }
+  console.log('Starting subprocess to record:', track.title, url)
 
   const subprocess = fork(recorderPath, [url, recordingsDir], {
     execArgv: ['-r', 'ts-node/register'],
