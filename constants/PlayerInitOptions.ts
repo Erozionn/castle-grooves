@@ -2,10 +2,14 @@ import { RequestOptions } from 'https'
 
 import { GuildNodeCreateOptions, PlayerNodeInitializerOptions, QueryType } from 'discord-player'
 
+import onBeforeCreateStreamHandler from '@components/events/onBeforeCreateStream'
+
 export const nodeOptions = {
   leaveOnEnd: false,
   leaveOnStop: false,
   leaveOnEmptyCooldown: 1800,
+  enableStreamInterceptor: true,
+  onBeforeCreateStream: onBeforeCreateStreamHandler,
 } as GuildNodeCreateOptions
 
 export const playerOptions = {

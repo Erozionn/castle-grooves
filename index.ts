@@ -13,8 +13,9 @@ import {
   Message,
 } from 'discord.js'
 import { Player } from 'discord-player'
-import { getYoutubeiInstance, YoutubeiExtractor, YoutubeiOptions } from 'discord-player-youtubei'
-import { SpotifyExtractor } from 'discord-player-spotify'
+import { YoutubeiExtractor, YoutubeiOptions } from 'discord-player-youtubei'
+import { DefaultExtractors } from '@discord-player/extractor'
+import { SoundcloudExtractor } from 'discord-player-soundcloud'
 
 import {
   addSongEventHandler,
@@ -59,17 +60,21 @@ const client = new Client({
 
 const player = new Player(client)
 
-player.extractors.loadDefault((ext) => ext === 'YouTubeExtractor')
+player.extractors.register(SoundcloudExtractor, {})
 
-player.extractors.register(SpotifyExtractor, {})
+player.extractors.register(YoutubeiExtractor, {
+  //   // authentication: YOUTUBE_AUTH_TOKEN,
+  //   // cookie,
+  //   // streamOptions: {
+  //   //   useClient: INNERTUBE_CLIENT,
+  //   // },
+} as YoutubeiOptions)
 
-// player.extractors.register(YoutubeiExtractor, {
-//   authentication: YOUTUBE_AUTH_TOKEN,
-//   // cookie,
-//   // streamOptions: {
-//   //   useClient: INNERTUBE_CLIENT,
-//   // },
-// } as YoutubeiOptions)
+// const interceptor = player.createStreamInterceptor({
+//   async shouldIntercept(queue, track, format, stream) {
+//     return true
+//   },
+// })
 
 client.player = player
 
@@ -124,10 +129,7 @@ commandFiles.forEach(async (file) => {
 })
 
 client.once('ready', async () => {
-  // await player.extractors.loadDefault(
-  //   (ext) => !['YouTubeExtractor', 'SpotifyExtractor'].includes(ext)
-  // )
-  await player.extractors.loadDefault((ext) => ['YouTubeiExtractor'].includes(ext))
+  // await player.extractors.loadMulti(DefaultExtractors)
   console.log(`discord-player loaded dependencies:\n${player.scanDeps()}`)
 
   client.user?.setActivity({

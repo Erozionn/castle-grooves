@@ -82,6 +82,7 @@ export const nowPlayingCanvasWithUpNext = async (songs: Track[]) => {
   const song = songs[0]
   const { requestedBy } = song
   const thumbnailUrl = getThumbnailUrl(song)
+  const isLocal = (song.metadata as { isLocal?: boolean })?.isLocal
 
   try {
     if (thumbnailUrl) {
@@ -150,6 +151,11 @@ export const nowPlayingCanvasWithUpNext = async (songs: Track[]) => {
     }
 
     canv.restore()
+
+    if (isLocal) {
+      const isLocalIcon = await loadImage('./assets/icons/downloaded.png')
+      canv.drawImage(isLocalIcon, 320 - 32 - 20, 343)
+    }
 
     // Render requester name
     canv.fillStyle = '#ffffff'
@@ -232,6 +238,7 @@ export const nowPlayingCanvas = async (song: Track) => {
   const canv = canvas.getContext('2d')
   const { requestedBy } = song
   const thumbnailUrl = getThumbnailUrl(song)
+  const isLocal = (song.metadata as { isLocal?: boolean })?.isLocal
 
   let _width = 0
 
@@ -270,7 +277,7 @@ export const nowPlayingCanvas = async (song: Track) => {
     x: _width + 25,
     font: '600 28px Poppins',
     textAlign: 'start',
-    charsPerLine: 20,
+    charsPerLine: 14,
   })
 
   // Render artist
@@ -308,6 +315,11 @@ export const nowPlayingCanvas = async (song: Track) => {
     canv.textAlign = 'left'
     canv.font = '600 18px Poppins'
     canv.fillText(capitalize(requestedBy.displayName), _width + 25 + 32 + 12, 139)
+
+    if (isLocal) {
+      const isLocalIcon = await loadImage('./assets/icons/downloaded.png')
+      canv.drawImage(isLocalIcon, 700 - 32 - 20, 117)
+    }
   }
 
   // Buffer canvas

@@ -35,6 +35,7 @@ const track = {
   query_type: 'spotifySong',
   extractor: 'com.discord-player.spotifyextractor',
   metadata: {
+    isLocal: true,
     source: {
       title: 'FUNKONAUT',
       duration: 210666,
