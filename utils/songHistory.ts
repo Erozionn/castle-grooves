@@ -149,6 +149,8 @@ const getUserTopSongs = async (userId: string, timeRange = 'monthly', limit = 20
 }
 
 const addSong = (playing: boolean, track?: Track) => {
+  if (ENV.TS_NODE_DEV) return // Don't add song to DB in dev mode
+
   const point = new Point('song')
   if (playing === false) {
     point.booleanField('playing', false)

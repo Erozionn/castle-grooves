@@ -14,7 +14,7 @@ import {
 } from 'discord.js'
 import { Player } from 'discord-player'
 import { YoutubeiExtractor, YoutubeiOptions } from 'discord-player-youtubei'
-import { DefaultExtractors } from '@discord-player/extractor'
+import { SpotifyExtractor } from 'discord-player-spotify'
 import { SoundcloudExtractor } from 'discord-player-soundcloud'
 
 import {
@@ -61,6 +61,8 @@ const client = new Client({
 const player = new Player(client)
 
 player.extractors.register(SoundcloudExtractor, {})
+
+player.extractors.register(SpotifyExtractor, {})
 
 player.extractors.register(YoutubeiExtractor, {
   //   // authentication: YOUTUBE_AUTH_TOKEN,

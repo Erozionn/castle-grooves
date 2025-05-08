@@ -1,6 +1,6 @@
 import path from 'node:path'
 
-import { Canvas, FontLibrary, loadImage } from 'skia-canvas'
+import { Canvas, GlobalFonts, loadImage } from '@napi-rs/canvas'
 import { Track } from 'discord-player'
 
 import {
@@ -12,14 +12,15 @@ import {
 } from '@utils/utilities'
 import { TrackWithSpotifyMetadata, TrackWithYoutubeiMetadata } from '@types'
 
-FontLibrary.use([
-  path.resolve('./assets/fonts/Poppins-Thin.ttf'),
-  path.resolve('./assets/fonts/Poppins-Light.ttf'),
-  path.resolve('./assets/fonts/Poppins-Regular.ttf'),
-  path.resolve('./assets/fonts/Poppins-Medium.ttf'),
+GlobalFonts.registerFromPath(path.resolve('./assets/fonts/Poppins-Thin.ttf'), 'Poppins-Thin')
+GlobalFonts.registerFromPath(path.resolve('./assets/fonts/Poppins-Light.ttf'), 'Poppins-Light')
+GlobalFonts.registerFromPath(path.resolve('./assets/fonts/Poppins-Regular.ttf'), 'Poppins-Regular')
+GlobalFonts.registerFromPath(path.resolve('./assets/fonts/Poppins-Medium.ttf'), 'Poppins-Medium')
+GlobalFonts.registerFromPath(
   path.resolve('./assets/fonts/Poppins-SemiBold.ttf'),
-  path.resolve('./assets/fonts/Poppins-Bold.ttf'),
-])
+  'Poppins-SemiBold'
+)
+GlobalFonts.registerFromPath(path.resolve('./assets/fonts/Poppins-Bold.ttf'), 'Poppins-Bold')
 
 const getThumbnailUrl = (song: Track) => {
   if (song.source === 'youtube') {
@@ -167,7 +168,7 @@ export const nowPlayingCanvasWithUpNext = async (songs: Track[]) => {
     // Render "Up Next"
     canv.textAlign = 'left'
     canv.fillStyle = `#ffffff`
-    canv.font = '22px Poppins'
+    canv.font = '18px Poppins'
     canv.fillText('UP NEXT:', 345, 40)
 
     try {
@@ -197,40 +198,45 @@ export const nowPlayingCanvasWithUpNext = async (songs: Track[]) => {
     }
   }
 
-  await songs
-    .slice(1, 6)
-    // .reverse()
-    .forEach(async (songObj, index) => {
-      const i = index + 1
-      canv.fillStyle = `#ffffff`
-      canv.font = '600 22px Poppins'
-      canv.textAlign = 'left'
-      let { author: artist, title } = songObj
-      if (songObj.source === 'youtube') {
-        const titleObj = parseSongName(songObj.title)
-        artist = titleObj.artist
-        if (titleObj.title) title = titleObj.title
-      }
-      canv.fillText(`${i}`, 345, 36 + 65 * i)
-      if (title !== null) {
-        canv.font = '600 22px Poppins'
-        canv.fillText(truncateString(title, 20), 370, 26 + 65 * i)
-        canv.font = '300 22px Poppins'
-        canv.fillText(truncateString(artist, 20), 370, 51 + 65 * i)
-      } else {
-        canv.font = '600 22px Poppins'
-        canv.fillText(truncateString(artist, 20), 370, 30 + 65 * i)
-      }
+  await songs.slice(1, 6).forEach(async (songObj, index) => {
+    const i = index + 1
+    canv.fillStyle = `#ffffff`
+    canv.font = '300 22px Poppins'
+    canv.textAlign = 'left'
+    let { author: artist, title } = songObj
+    if (songObj.source === 'youtube') {
+      const titleObj = parseSongName(songObj.title)
+      artist = titleObj.artist
+      if (titleObj.title) title = titleObj.title
+    }
 
-      // if (i < 5 && songs.length > 2) {
-      //   canv.fillStyle = 'rgba(255, 255, 255, 0.3)'
-      //   canv.fillRect(345, 60 + 66 * i, 325, 1)
-      //   canv.fillStyle = `#ffffff`
-      // }
-    })
+    canv.fillText(`${i}`, 345, 36 + 65 * i)
+
+    // Fade out long titles
+    const gradient = canv.createLinearGradient(550, 0, 638, 0)
+    gradient.addColorStop(0, '#ffffff')
+    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)')
+    canv.fillStyle = gradient
+
+    if (title !== null) {
+      canv.font = '600 22px Poppins'
+      canv.fillText(title, 375, 26 + 65 * i)
+      canv.font = '300 22px Poppins'
+      canv.fillText(artist, 375, 51 + 65 * i)
+    } else {
+      canv.font = '600 22px Poppins'
+      canv.fillText(artist, 375, 30 + 65 * i)
+    }
+
+    // if (i < 5 && songs.length > 2) {
+    //   canv.fillStyle = 'rgba(255, 255, 255, 0.3)'
+    //   canv.fillRect(345, 60 + 66 * i, 325, 1)
+    //   canv.fillStyle = `#ffffff`
+    // }
+  })
 
   // Buffer canvas
-  return await canvas.toBuffer('png')
+  return await canvas.toBuffer('image/png')
 }
 
 export const nowPlayingCanvas = async (song: Track) => {
@@ -277,7 +283,7 @@ export const nowPlayingCanvas = async (song: Track) => {
     x: _width + 25,
     font: '600 28px Poppins',
     textAlign: 'start',
-    charsPerLine: 14,
+    charsPerLine: 20,
   })
 
   // Render artist
@@ -323,10 +329,35 @@ export const nowPlayingCanvas = async (song: Track) => {
   }
 
   // Buffer canvas
-  return await canvas.toBuffer('png')
+  return await canvas.toBuffer('image/png')
 }
 
-export const generateNowPlayingCanvas = async (tracks: Track[]) => {
+let lastExecutionTime = 0
+let debounceTimeout: NodeJS.Timeout | null = null
+
+export const generateNowPlayingCanvas = async (tracks: Track[]): Promise<Buffer> => {
+  const now = Date.now()
+  const cooldown = 1000
+
+  if (now - lastExecutionTime < cooldown) {
+    if (debounceTimeout) clearTimeout(debounceTimeout)
+
+    return new Promise((resolve) => {
+      debounceTimeout = setTimeout(
+        async () => {
+          lastExecutionTime = Date.now()
+          resolve(await processTracks(tracks))
+        },
+        cooldown - (now - lastExecutionTime)
+      )
+    })
+  }
+
+  lastExecutionTime = now
+  return await processTracks(tracks)
+}
+
+const processTracks = async (tracks: Track[]): Promise<Buffer> => {
   if (!tracks || tracks.length < 1)
     throw Error('Error: Cannot generate now playing canvas without songs')
   if (tracks.length > 1) {
