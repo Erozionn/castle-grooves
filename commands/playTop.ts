@@ -4,7 +4,6 @@ import {
   GuildMember,
   Interaction,
   SlashCommandBuilder,
-  User,
   bold,
   inlineCode,
 } from 'discord.js'

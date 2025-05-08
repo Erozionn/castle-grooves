@@ -1,9 +1,8 @@
-import { onBeforeCreateStream, QueryType, useMainPlayer, useQueue } from 'discord-player'
+import { useMainPlayer, useQueue } from 'discord-player'
 import { AutocompleteInteraction, GuildMember, Interaction, SlashCommandBuilder } from 'discord.js'
 
 import { playerOptions, nodeOptions } from '@constants/PlayerInitOptions'
 import { parseSongName } from '@utils/utilities'
-import onBeforeCreateStreamHandler from '@components/events/onBeforeCreateStream'
 
 export default {
   data: new SlashCommandBuilder()

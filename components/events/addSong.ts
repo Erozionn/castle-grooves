@@ -30,7 +30,6 @@ export default async (queue: GuildQueue<Interaction>, track: Track | Track[]) =>
     if (queue.currentTrack) tracks.unshift(queue.currentTrack)
 
     const buffer = await generateNowPlayingCanvas(tracks)
-
     if (!channel || !channel.isTextBased() || !('guild' in channel)) return
 
     await sendMessage(channel, {
