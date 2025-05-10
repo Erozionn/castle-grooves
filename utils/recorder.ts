@@ -21,15 +21,20 @@ const outputPath = path.join(outputDir, `${hashed}.mp3`)
 // Ensure the output directory exists
 if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true })
 
-const stream = ytdl(url, { quality: 'highestaudio', filter: 'audioonly' })
+try {
+  const stream = ytdl(url, { quality: 'highestaudio', filter: 'audioonly' })
 
-stream
-  .pipe(fs.createWriteStream(outputPath))
-  .on('finish', () => {
-    console.log('Download and save complete:', outputPath)
-    process.exit(0)
-  })
-  .on('error', (err) => {
-    console.error('Error during download:', err)
-    process.exit(1)
-  })
+  stream
+    .pipe(fs.createWriteStream(outputPath))
+    .on('finish', () => {
+      console.log('Download and save complete:', outputPath)
+      process.exit(0)
+    })
+    .on('error', (err) => {
+      console.error('Error during download:', err)
+      process.exit(1)
+    })
+} catch (error) {
+  console.error('Error:', error)
+  process.exit(1)
+}

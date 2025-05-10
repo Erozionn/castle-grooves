@@ -15,7 +15,7 @@ export const nodeOptions = {
 export const playerOptions = {
   nodeOptions,
   searchEngine: QueryType.AUTO,
-  fallbackSearchEngine: QueryType.YOUTUBE_SEARCH,
+  fallbackSearchEngine: QueryType.AUTO,
   requestOptions: {
     timeout: 10000,
   } as RequestOptions,

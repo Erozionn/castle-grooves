@@ -44,10 +44,16 @@ export default async (
       track.requestedBy = interactionUser
     }
 
-    if (queue) {
-      queue.player.play(voiceChannel, track, options)
-    } else {
-      player.play(voiceChannel, track, options)
+    try {
+      if (queue) {
+        queue.player.play(voiceChannel, track, options)
+      } else {
+        player.play(voiceChannel, track, options)
+      }
+    } catch (e) {
+      console.warn('[history]', e)
+      message.edit('❌ | An error occurred while playing the song!')
+      return
     }
   }
 

@@ -236,6 +236,10 @@ player.events.on('playerError', (queue, error) => {
   console.log(error)
 })
 
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection:', reason)
+})
+
 // player.on('debug', async (message) => {
 //   // Emitted when the player sends debug info
 //   // Useful for seeing what dependencies, extractors, etc are loaded
