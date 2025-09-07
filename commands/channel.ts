@@ -13,7 +13,7 @@ export default {
 
     const { channel } = interaction
     const queue = useQueue(interaction.guild) || undefined
-    const [_, historyActionRow] = await useComponents(queue)
+    const components = await useComponents(queue)
     await interaction.deferReply()
 
     if (!channel || !channel.isTextBased()) {
@@ -31,7 +31,7 @@ export default {
 
     await sendMessage(channel, {
       content: `🎶 | Pick a song below or use </play:991566063068250134>`,
-      components: [historyActionRow],
+      components,
     })
   },
 }

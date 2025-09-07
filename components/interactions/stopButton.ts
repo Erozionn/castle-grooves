@@ -35,7 +35,7 @@ export default async (queue: GuildQueue<Interaction> | null) => {
     await sendMessage(channel, {
       content: '🎶 | Pick a song below or use </play:991566063068250134>',
       files: [],
-      components: [components[1]],
+      components,
     })
     console.log('[stopButton] Disconnected from voice connection.')
   }

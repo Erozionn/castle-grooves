@@ -14,23 +14,23 @@ const defaultPlayerButtons = {
   back: new ButtonBuilder()
     .setCustomId('back_button')
     .setStyle(ButtonStyle.Primary)
-    .setDisabled(false)
+    .setDisabled(true)
     .setEmoji('skipprevious:909248269236981761'),
   playPause: new ButtonBuilder()
     .setCustomId('play_pause_button')
     .setStyle(ButtonStyle.Primary)
-    .setDisabled(false)
+    .setDisabled(true)
     .setEmoji('playpause:909248294406987806'),
   skip: new ButtonBuilder()
     .setCustomId('skip_button')
     .setStyle(ButtonStyle.Primary)
-    .setDisabled(false)
+    .setDisabled(true)
     .setEmoji('skipnext:909248255915868160'),
   recommended: new ButtonBuilder()
     .setCustomId('recommended_button')
     .setStyle(ButtonStyle.Secondary)
     .setDisabled(false)
-    .setEmoji('recommended:1182536446914076702'),
+    .setEmoji('lightning:1414112607933304973'),
   stop: new ButtonBuilder()
     .setCustomId('stop_button')
     .setStyle(ButtonStyle.Danger)
@@ -43,9 +43,26 @@ const defaultPlayerHistory = new StringSelectMenuBuilder()
   .setMaxValues(1)
   .setPlaceholder('-- Song History --')
 
+// Simple function to reset buttons to default state
+const resetToDefaults = () => {
+  defaultPlayerButtons.back.setStyle(ButtonStyle.Primary).setDisabled(true)
+  defaultPlayerButtons.playPause.setStyle(ButtonStyle.Primary).setDisabled(true)
+  defaultPlayerButtons.skip.setStyle(ButtonStyle.Primary).setDisabled(true)
+  defaultPlayerButtons.recommended
+    .setStyle(ButtonStyle.Secondary)
+    .setDisabled(false)
+    .setEmoji('lightning:1414112607933304973')
+  defaultPlayerButtons.stop
+    .setStyle(ButtonStyle.Danger)
+    .setDisabled(false)
+    .setEmoji('musicoff:909248235623825439')
+}
+
 export const useComponents = async (queue?: GuildQueue) => {
   const playerButtons = defaultPlayerButtons
   const playerHistory = defaultPlayerHistory
+
+  resetToDefaults()
 
   const { options } = await generateHistoryOptions()
 
@@ -84,35 +101,42 @@ export const useComponents = async (queue?: GuildQueue) => {
   const history = useHistory(queue)
   playerButtons.back.setDisabled(history?.isEmpty())
 
-  if (queue.isEmpty() && !queue.currentTrack) {
+  // Handle recommended button logic based on queue state
+  const isQueueEmpty = queue.isEmpty() && !queue.currentTrack
+  if (isQueueEmpty) {
+    // Queue is empty - show lightning emoji for smart recommendation
+    playerButtons.recommended
+      .setEmoji('lightning:1414112607933304973')
+      .setStyle(ButtonStyle.Secondary)
+  } else {
+    // Queue has music - show autoplay emoji and handle autoplay state
+    playerButtons.recommended.setEmoji('recommended:1182536446914076702')
+    if (queue.repeatMode === QueueRepeatMode.AUTOPLAY) {
+      playerButtons.recommended.setStyle(ButtonStyle.Success)
+    } else {
+      playerButtons.recommended.setStyle(ButtonStyle.Secondary)
+    }
+  }
+
+  // Handle other buttons based on queue state
+  if (isQueueEmpty) {
     playerButtons.skip.setDisabled(true)
     playerButtons.back.setDisabled(true)
     playerButtons.playPause.setDisabled(true)
-    playerButtons.recommended.setDisabled(true)
     playerButtons.stop.setEmoji('disconnect:1043629464166355015')
   } else {
     playerButtons.skip.setDisabled(false)
     playerButtons.back.setDisabled(false)
     playerButtons.playPause.setDisabled(false)
-    playerButtons.recommended.setDisabled(false)
     playerButtons.playPause.setStyle(ButtonStyle.Primary)
     playerButtons.stop.setEmoji('musicoff:909248235623825439')
-  }
-
-  if (queue.repeatMode === QueueRepeatMode.AUTOPLAY) {
-    playerButtons.recommended.setStyle(ButtonStyle.Success)
-  } else {
-    playerButtons.recommended.setStyle(ButtonStyle.Secondary)
   }
 
   switch (customId) {
     case 'stop_button':
       if (queue.node.isPaused()) {
+        resetToDefaults()
         playerButtons.stop.setEmoji('disconnect:1043629464166355015')
-        playerButtons.skip.setDisabled(true)
-        playerButtons.back.setDisabled(true)
-        playerButtons.playPause.setDisabled(true)
-        playerButtons.recommended.setDisabled(true)
       }
       break
     case 'play_pause_button':

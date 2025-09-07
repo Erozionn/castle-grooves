@@ -1,4 +1,4 @@
-import { CacheType, Interaction, StringSelectMenuInteraction } from 'discord.js'
+import { ButtonInteraction, CacheType, Interaction, StringSelectMenuInteraction } from 'discord.js'
 import { GuildQueue, useQueue } from 'discord-player'
 
 import {
@@ -38,7 +38,10 @@ export default async (interaction: Interaction<CacheType>) => {
       stopButtonInteractionHandler(queue)
       break
     case 'recommended_button':
-      recommendedButtonInteractionHandler(queue)
+      recommendedButtonInteractionHandler(
+        queue as GuildQueue<ButtonInteraction> | null,
+        interaction as ButtonInteraction
+      )
       break
     case 'history':
       historyInteractionHandler(

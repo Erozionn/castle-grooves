@@ -5,7 +5,7 @@ import { useComponents } from '@constants/messageComponents'
 import { sendMessage } from '@utils/mainMessage'
 
 export default async (queue: GuildQueue<Interaction>) => {
-  const [_, historyActionRow] = await useComponents(queue)
+  const components = await useComponents(queue)
   const { channel } = queue.metadata
 
   if (!channel || !channel.isTextBased() || !('guild' in channel)) return
@@ -13,6 +13,6 @@ export default async (queue: GuildQueue<Interaction>) => {
   await sendMessage(channel, {
     content: '🎶 | Previously Played:',
     files: [],
-    components: [historyActionRow],
+    components,
   })
 }

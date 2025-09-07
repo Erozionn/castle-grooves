@@ -179,11 +179,11 @@ client.once('ready', async () => {
     })
   })
 
-  const [_, historyActionRow] = await useComponents()
+  const components = await useComponents()
 
   await sendMessage(defaultTextChannel, {
     content: `🎶 | Pick a song below or use </play:991566063068250134>`,
-    components: [historyActionRow],
+    components,
   })
 
   // eslint-disable-next-line no-console
