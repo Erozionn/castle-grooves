@@ -1,7 +1,7 @@
 import { SlashCommandBuilder, CommandInteraction } from 'discord.js'
 import { useQueue } from 'discord-player'
 
-import { sendMessage } from '@utils/mainMessage'
+import { moveMainMessage, sendMessage } from '@utils/mainMessage'
 import { useComponents } from '@constants/messageComponents'
 
 export default {
@@ -29,9 +29,6 @@ export default {
 
     if (!channel || !channel.isTextBased() || !('guild' in channel)) return
 
-    await sendMessage(channel, {
-      content: `🎶 | Pick a song below or use </play:991566063068250134>`,
-      components,
-    })
+    moveMainMessage(channel, queue)
   },
 }

@@ -406,9 +406,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@distube/ytdl-core@npm:^4.16.10":
-  version: 4.16.10
-  resolution: "@distube/ytdl-core@npm:4.16.10"
+"@distube/ytdl-core@npm:^4.16.12":
+  version: 4.16.12
+  resolution: "@distube/ytdl-core@npm:4.16.12"
   dependencies:
     http-cookie-agent: "npm:^7.0.1"
     https-proxy-agent: "npm:^7.0.6"
@@ -417,7 +417,7 @@ __metadata:
     sax: "npm:^1.4.1"
     tough-cookie: "npm:^5.1.2"
     undici: "npm:^7.8.0"
-  checksum: 10c0/b43690dada836d2679bfe40f92e82afbfe241da61b24dd24ae2e5053e18510433a81dd139a115bcd05a7b82c2875543451e2bd2e12f1769110f35f7cc405cb2e
+  checksum: 10c0/f9a7e51b4961c05f60070a490fc6368f12557e65dc98e694560d396d5caeb250f8c98a9b3485a2d720aba406bc5dec94bd04056d5f637aec4f0a08169573e7ff
   languageName: node
   linkType: hard
 
@@ -2387,7 +2387,7 @@ __metadata:
     "@discord-player/extractor": "npm:^7.1.0"
     "@discordjs/rest": "npm:^2.4.3"
     "@discordjs/voice": "npm:^0.16.1"
-    "@distube/ytdl-core": "npm:^4.16.10"
+    "@distube/ytdl-core": "npm:^4.16.12"
     "@influxdata/influxdb-client": "npm:^1.26.0"
     "@napi-rs/canvas": "npm:^0.1.70"
     "@types/babel__core": "npm:^7"
@@ -2402,7 +2402,7 @@ __metadata:
     discord-api-types: "npm:^0.37.119"
     discord-player: "npm:^7.1.0"
     discord-player-soundcloud: "npm:^1.0.7"
-    discord-player-spotify: "npm:^1.1.2"
+    discord-player-spotify: "npm:^1.1.7"
     discord-player-youtubei: "npm:^1.5.0"
     discord.js: "npm:^14.18.0"
     dotenv: "npm:^16.4.5"
@@ -2848,13 +2848,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"discord-player-spotify@npm:^1.1.2":
-  version: 1.1.2
-  resolution: "discord-player-spotify@npm:1.1.2"
+"discord-player-spotify@npm:^1.1.7":
+  version: 1.1.7
+  resolution: "discord-player-spotify@npm:1.1.7"
   dependencies:
     node-html-parser: "npm:^7.0.1"
     otpauth: "npm:^9.3.6"
-  checksum: 10c0/a85aa91c31cc13dd1f83c9469a8282db8e22ba282fac6d3e67c2c4e6e982f3eb8f2f47512ee03d222f59ce0340568c19aecb430418316961317c6f1ec2e509c0
+  checksum: 10c0/85f83e00ce0a4f7287c40fea030aea83b9a6a357eb47b0fd67b4413f376a34b6d6b9989c07246c56c915ca8b7140d3c45a6acb96e7f327b834d3f010640ee341
   languageName: node
   linkType: hard
 
