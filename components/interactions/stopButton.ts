@@ -12,21 +12,27 @@ export default async (queue: GuildQueue<Interaction> | null) => {
   if (!channel) return
 
   if (queue.node.isPlaying() && queue.metadata.channel) {
-    queue.node.pause()
-    queue.removeTrack(0)
+    try {
+      queue.node.skip()
+      queue.node.pause()
+      // queue.removeTrack(0)
+      queue.clear()
 
-    console.log('[stopButton] Stopped the queue.')
-
-    const components = await useComponents(queue)
+      console.log('[stopButton] Stopped playback and cleared queue, staying in voice channel.')
+    } catch (error) {
+      console.error('[stopButton] Error stopping playback:', error)
+    }
 
     if (!channel || !channel.isTextBased() || !('guild' in channel)) return
 
+    const components = await useComponents(queue)
     await sendMessage(channel, {
       content: '🎶 | Previously Played:',
       files: [],
       components,
     })
   } else {
+    // If not playing, delete the queue entirely
     queue.delete()
 
     if (!channel || !channel.isTextBased() || !('guild' in channel)) return

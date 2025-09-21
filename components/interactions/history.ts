@@ -37,11 +37,13 @@ export default async (
   }
 
   const playSong = async (value: string | Track) => {
-    let track = value
+    let track: Track
     if (typeof value === 'string') {
       const song = songs[parseInt(value)]
       track = song.track
       track.requestedBy = interactionUser
+    } else {
+      track = value
     }
 
     try {

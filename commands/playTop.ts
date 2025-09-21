@@ -13,6 +13,27 @@ import { getUserTopSongs, getTopSongs } from '@utils/songHistory'
 import { parseSongName } from '@utils/utilities'
 import { nodeOptions, playerOptions } from '@constants/PlayerInitOptions'
 
+// Type definition for song data returned from database
+type TopSong = {
+  songTitle: string
+  songUrl: string
+  songThumbnail: string
+  requestedById: string
+  requestedByUsername: string
+  requestedByAvatar: string
+  serializedTrack: string
+  source: string
+  _time: string
+  playing: boolean
+  count: number
+}
+
+// Type for transformed song data used in playback
+type TransformedSong = {
+  playedAt: string
+  track: Track | string
+}
+
 const play = async (interaction: Interaction) => {
   if (!interaction.isCommand()) return
 
@@ -51,7 +72,7 @@ const play = async (interaction: Interaction) => {
     : await getTopSongs(timeRange, limit)
 
   const songs = topSongs
-    .map((s) => {
+    .map((s: TopSong) => {
       return {
         playedAt: s._time,
         track: s.serializedTrack
@@ -95,7 +116,7 @@ const play = async (interaction: Interaction) => {
   }
 
   try {
-    songs.forEach((s) => playSong(s))
+    songs.forEach((s: TransformedSong) => playSong(s))
   } catch (e) {
     console.warn('[history]', e)
   }
@@ -131,7 +152,7 @@ const list = async (interaction: Interaction) => {
   }
 
   const songList = topSongs
-    .map((song, index) => {
+    .map((song: TopSong, index: number) => {
       const { artist, title } = parseSongName(song.songTitle.replace('*', ''))
       return `${bold((index + 1).toString())}. ${
         title ? `${bold(artist)} - ${title}` : bold(artist)
