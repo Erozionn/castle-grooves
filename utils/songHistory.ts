@@ -392,8 +392,6 @@ const buildSongQuery = (
       const escapedUserIds = userIds.map((id) => id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
       const userFilter = escapedUserIds.join('|')
 
-      console.log(`[buildSongQuery] Multi-user filter: /^(${userFilter})$/`)
-
       return `${baseQuery}
     |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
     |> filter(fn: (r) => r["playing"] == true)
@@ -463,9 +461,6 @@ const getTopSongs = async (timeRange = 'monthly', limit = 20) => {
       buildSongQuery(timeRange, limit, undefined, 'topSongs')
     )
     const queryDuration = performance.now() - queryStart
-    console.log(
-      `[getTopSongs] DB query completed in ${queryDuration.toFixed(2)}ms, ${results.length} results`
-    )
 
     // Simple shuffle for variety
     const shuffledResults = results.sort(() => Math.random() - 0.5)
@@ -491,9 +486,6 @@ const getUserTopSongs = async (userId: string, timeRange = 'monthly', limit = 20
       buildSongQuery(timeRange, limit, userId, 'userTopSongs')
     )
     const queryDuration = performance.now() - queryStart
-    console.log(
-      `[getUserTopSongs] DB query completed in ${queryDuration.toFixed(2)}ms, ${results.length} results`
-    )
 
     // Simple shuffle for variety
     const shuffledResults = results.sort(() => Math.random() - 0.5)
@@ -521,8 +513,6 @@ const getMultiUserTopSongs = async (userIds: string[], timeRange = 'monthly', li
     // Debug logging for the query
     const query = buildSongQuery(timeRange, limit, userIds, 'multiUserTopSongs')
     console.log(`[getMultiUserTopSongs] Executing query for users: [${userIds.join(', ')}]`)
-    console.log(`[getMultiUserTopSongs] Time range: ${timeRange}, Limit: ${limit}`)
-    console.log(`[getMultiUserTopSongs] Query:\n${query}`)
 
     // Single database query for all users
     const results: (SongHistory & { count: number; requestedById: string })[] =
@@ -559,24 +549,16 @@ const getMultiUserTopSongs = async (userIds: string[], timeRange = 'monthly', li
       }))
       .sort(() => Math.random() - 0.5)
 
-    console.log(`[getMultiUserTopSongs] Processed ${processedResults.length} unique songs`)
-
     // If no results from multi-user query, fall back to combining individual user queries
     if (processedResults.length === 0) {
       console.log(
         `[getMultiUserTopSongs] Multi-user query returned no results, falling back to individual user queries...`
       )
 
-      // Debug database data first
-      await debugDatabaseData(timeRange)
-
       const individualResults = []
       for (const userId of userIds) {
         try {
           const userSongs = await getUserTopSongs(userId, timeRange, Math.min(limit, 10))
-          console.log(
-            `[getMultiUserTopSongs] User ${userId} individual query returned ${userSongs.length} songs`
-          )
           individualResults.push(
             ...userSongs.map((song: SongHistory & { count: number }) => ({
               ...song,
@@ -605,9 +587,6 @@ const getMultiUserTopSongs = async (userIds: string[], timeRange = 'monthly', li
       })
 
       processedResults = Array.from(combinedMap.values()).sort(() => Math.random() - 0.5)
-      console.log(
-        `[getMultiUserTopSongs] Fallback processed ${processedResults.length} unique songs from individual queries`
-      )
     }
 
     setCachedQuery(cacheKey, processedResults)
@@ -660,12 +639,6 @@ const getSmartSongRecommendation = async (
         ]
       : baseHistoryStrategies
 
-  if (timeProximity.proximity === 'far') {
-    console.log(
-      `[getSmartSongRecommendation] Not close to any time window, excluding time-window strategy`
-    )
-  }
-
   // Add more variety in strategy selection when track is playing
   const allStrategies = guildQueue?.currentTrack
     ? [
@@ -678,10 +651,6 @@ const getSmartSongRecommendation = async (
 
   // If we're in or close to a time window, heavily prioritize time-window strategy
   if (timeProximity.isInWindow || timeProximity.proximity === 'close') {
-    console.log(
-      `[getSmartSongRecommendation] Time proximity detected: ${timeProximity.proximity} to ${timeProximity.description}${timeProximity.minutesAway ? ` (${timeProximity.minutesAway} minutes away)` : ''}`
-    )
-
     // Heavily weight time-window strategy when close
     const timeWindowWeight = timeProximity.isInWindow ? 8 : 4 // Very high priority if in window, high if close
     const timeWindowStrategies = Array(timeWindowWeight).fill('time-window')
@@ -717,9 +686,6 @@ const getSmartSongRecommendation = async (
         availableStrategies.includes('time-window')
       ) {
         strategy = 'time-window'
-        console.log(
-          `[getSmartSongRecommendation] Prioritizing time-window strategy due to proximity to ${timeProximity.description}`
-        )
       } else {
         strategy = selectDiverseStrategy(availableStrategies, primaryUserId, guildQueue)
       }
@@ -735,7 +701,10 @@ const getSmartSongRecommendation = async (
 
       if (recommendation && isValidRecommendation(recommendation, avoidTitles)) {
         trackUserRecommendation(primaryUserId, recommendation)
-        logSuccess(strategy, recommendation, startTime, attempt)
+        const duration = performance.now() - startTime
+        console.log(
+          `[getSmartSongRecommendation] ✅ Found: "${recommendation.songTitle}" using ${strategy} (attempt ${attempt + 1}, ${duration.toFixed(2)}ms)`
+        )
         return recommendation
       }
     } catch (error) {
@@ -809,18 +778,6 @@ const trackUserRecommendation = (userId: string, recommendation: SongRecommendat
 
 const isYouTubeError = (error: any): boolean => {
   return error instanceof Error && error.message?.includes('YOUTUBEJS')
-}
-
-const logSuccess = (
-  strategy: string,
-  recommendation: SongRecommendation,
-  startTime: number,
-  attempt: number
-) => {
-  const duration = performance.now() - startTime
-  console.log(
-    `[getSmartSongRecommendation] ✅ Found: "${recommendation.songTitle}" using ${strategy} (attempt ${attempt + 1}, ${duration.toFixed(2)}ms)`
-  )
 }
 
 const getFallbackRecommendation = async (
@@ -1020,25 +977,12 @@ const getTimeWindowRecommendation = async (
         const distanceToEnd = Math.abs(currentMinutes - windowEndMinutes)
         return Math.min(distanceToStart, distanceToEnd) <= 10 // Within 10 minutes
       })
-
-      if (timeWindow) {
-        console.log(
-          `[getTimeWindowRecommendation] Using current/close time window: ${timeWindow.description}`
-        )
-      }
     }
 
     // If no close time window found, randomly select one
     if (!timeWindow) {
       timeWindow = timeWindows[Math.floor(Math.random() * timeWindows.length)]
-      console.log(
-        `[getTimeWindowRecommendation] Randomly selected time window: ${timeWindow.description}`
-      )
     }
-
-    console.log(
-      `[getTimeWindowRecommendation] Searching for songs played during ${timeWindow.description}`
-    )
 
     // Build Flux query for time window filtering
     const fluxQuery = `
@@ -1069,9 +1013,6 @@ const getTimeWindowRecommendation = async (
     const result: any[] = await queryApi().collectRows(fluxQuery)
 
     if (!result || result.length === 0) {
-      console.log(
-        `[getTimeWindowRecommendation] No songs found for time window ${timeWindow.description}`
-      )
       return null
     }
 
@@ -1085,18 +1026,11 @@ const getTimeWindowRecommendation = async (
     )
 
     if (validSongs.length === 0) {
-      console.log(
-        `[getTimeWindowRecommendation] No valid songs found for time window ${timeWindow.description}`
-      )
       return null
     }
 
     // Select a random song from the results
     const selectedSong: any = validSongs[Math.floor(Math.random() * validSongs.length)]
-
-    console.log(
-      `[getTimeWindowRecommendation] Selected "${selectedSong.songTitle}" (${selectedSong._value} plays during ${timeWindow.description})`
-    )
 
     // Get the full song details from a recent play
     const songDetailsQuery = `
@@ -1113,9 +1047,6 @@ const getTimeWindowRecommendation = async (
     const songDetails: any[] = await queryApi().collectRows(songDetailsQuery)
 
     if (!songDetails || songDetails.length === 0) {
-      console.log(
-        `[getTimeWindowRecommendation] Could not find song details for "${selectedSong.songTitle}"`
-      )
       return null
     }
 
