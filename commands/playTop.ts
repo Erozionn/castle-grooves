@@ -12,6 +12,7 @@ import { deserialize, QueryType, Track, useMainPlayer, useQueue } from 'discord-
 import { getUserTopSongs, getTopSongs } from '@utils/songHistory'
 import { parseSongName } from '@utils/utilities'
 import { nodeOptions, playerOptions } from '@constants/PlayerInitOptions'
+import { SongHistory } from '@types'
 
 // Type definition for song data returned from database
 type TopSong = {
@@ -72,7 +73,7 @@ const play = async (interaction: Interaction) => {
     : await getTopSongs(timeRange, limit)
 
   const songs = topSongs
-    .map((s: TopSong) => {
+    .map((s: SongHistory) => {
       return {
         playedAt: s._time,
         track: s.serializedTrack
@@ -152,11 +153,11 @@ const list = async (interaction: Interaction) => {
   }
 
   const songList = topSongs
-    .map((song: TopSong, index: number) => {
+    .map((song: SongHistory, index: number) => {
       const { artist, title } = parseSongName(song.songTitle.replace('*', ''))
       return `${bold((index + 1).toString())}. ${
         title ? `${bold(artist)} - ${title}` : bold(artist)
-      } ${inlineCode(`(Played ${song.count} times)`)}`
+      } ${inlineCode(`(Played ${(song as any).count} times)`)}`
     })
     .join('\n')
 

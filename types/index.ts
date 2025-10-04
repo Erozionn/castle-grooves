@@ -84,6 +84,26 @@ export type TrackWithSpotifyMetadata = WithMetadata<
   }
 >
 
+export type SongHistory = {
+  songTitle: string
+  songUrl: string
+  songThumbnail: string
+  requestedById: string
+  requestedByUsername: string
+  requestedByAvatar: string
+  serializedTrack: string
+  source: string
+  _time: string
+  playing: boolean
+}
+
+export type SongRecommendation = SongHistory & {
+  count: number
+  selectedTimeRange: string
+  timeRangeDescription: string
+  strategy: string
+}
+
 export type ClientType = Client & {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   commands: Collection<string, any>

@@ -3,14 +3,21 @@ import { createReadStream } from 'fs'
 import { join, resolve } from 'path'
 import { fork } from 'child_process'
 
-import { OnBeforeCreateStreamHandler, QueryType, SearchQueryType, Track } from 'discord-player'
+import {
+  GuildQueue,
+  OnBeforeCreateStreamHandler,
+  QueryType,
+  SearchQueryType,
+  Track,
+} from 'discord-player'
 
 import { hashURL } from '@utils/utilities'
 import ENV from '@constants/Env'
+import { YoutubeiExtractor } from '@node_modules/discord-player-youtubei/dist'
 
 const recordingsDir = './recordings'
 
-const { TS_NODE_DEV } = ENV
+const { TS_NODE_DEV, SAVE_LOCAL_RECORDINGS } = ENV
 
 const doesFileExist = async (path: string) => {
   try {
@@ -21,20 +28,21 @@ const doesFileExist = async (path: string) => {
   }
 }
 
-const getYoutubeUrl = async (track: Track) => {
+const getYoutubeUrl = async (track: Track, queue: GuildQueue) => {
   const isYoutube: boolean = [
     QueryType.YOUTUBE,
     QueryType.YOUTUBE_PLAYLIST,
     QueryType.YOUTUBE_VIDEO,
     QueryType.YOUTUBE_SEARCH,
-  ].some((t: SearchQueryType) => t === track.source)
+    `ext:${YoutubeiExtractor.identifier}`,
+  ].some((t) => t === track.source)
 
   if (isYoutube) {
     return track.url // Already a YouTube URL
   }
 
-  const searchResult = await track.player.search(`${track.title} ${track.author}`, {
-    searchEngine: QueryType.YOUTUBE,
+  const searchResult = await queue.player.search(`${track.title} ${track.author}`, {
+    searchEngine: `ext:${YoutubeiExtractor.identifier}`,
   })
   if (searchResult.isEmpty()) {
     console.warn('No YouTube URL found for track:', track.title)
@@ -44,16 +52,20 @@ const getYoutubeUrl = async (track: Track) => {
 }
 
 const onBeforeCreateStreamHandler: OnBeforeCreateStreamHandler = async (track, source, queue) => {
+  if (!SAVE_LOCAL_RECORDINGS) {
+    return null
+  }
+
   console.log(`[onBeforeCreateStream] Preparing stream for track: ${track.title}`)
 
-  const url = await getYoutubeUrl(track)
+  const url = await getYoutubeUrl(track, queue)
 
   if (!url) {
     console.warn('No URL found for the track:', track.title, 'Source:', source)
     return null
   }
 
-  const filePath = join(recordingsDir, `${hashURL(url)}.mp3`)
+  const filePath = join(recordingsDir, `${hashURL(url)}.webm`)
   const fileExists = await doesFileExist(filePath)
 
   if (fileExists) {

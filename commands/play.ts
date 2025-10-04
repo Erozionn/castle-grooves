@@ -1,8 +1,10 @@
-import { useMainPlayer, useQueue } from 'discord-player'
+import { deserialize, Track, useMainPlayer, useQueue } from 'discord-player'
 import { AutocompleteInteraction, GuildMember, Interaction, SlashCommandBuilder } from 'discord.js'
+import { SpotifyExtractor } from 'discord-player-spotify'
 
 import { playerOptions, nodeOptions } from '@constants/PlayerInitOptions'
 import { parseSongName } from '@utils/utilities'
+import { getRandomSongsFromCache, getTopSongs } from '@utils/songHistory'
 
 export default {
   data: new SlashCommandBuilder()
@@ -22,13 +24,26 @@ export default {
 
     const focusedValue = interaction.options.getFocused()
 
-    if (!focusedValue) {
-      await interaction.respond([])
-      return
+    let recentSongs = getRandomSongsFromCache(15)
+
+    if (recentSongs.length === 0) {
+      recentSongs = await getTopSongs('weekly', 15)
+      if (recentSongs.length === 0) {
+        recentSongs = await getTopSongs('monthly', 15)
+      }
     }
 
+    const randomSong = deserialize(
+      player,
+      JSON.parse(recentSongs[Math.floor(Math.random() * recentSongs.length)].serializedTrack)
+    ) as Track
     try {
-      const searchResults = await player.search(focusedValue)
+      const searchResults = await player.search(
+        focusedValue || randomSong.author || randomSong.title,
+        {
+          searchEngine: playerOptions.searchEngine,
+        }
+      )
       const choices = searchResults.tracks.map((track) => {
         let { author: artist, title } = track
         if (track.source === 'youtube') {

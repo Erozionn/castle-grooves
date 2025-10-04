@@ -7,31 +7,15 @@ import ENV from '@constants/Env'
 import { parseSongName } from '@utils/utilities'
 import { queryApi, writeApi } from '@hooks/InfluxDb'
 import { getRandomTrackRecommendation } from '@utils/trackRecommendations'
-
-type SongHistory = {
-  songTitle: string
-  songUrl: string
-  songThumbnail: string
-  requestedById: string
-  requestedByUsername: string
-  requestedByAvatar: string
-  serializedTrack: string
-  source: string
-  _time: string
-  playing: boolean
-}
-
-type SongRecommendation = SongHistory & {
-  count: number
-  selectedTimeRange: string
-  timeRangeDescription: string
-  strategy: string
-}
+import { SongHistory, SongRecommendation } from '@types'
 
 const { INFLUX_BUCKET } = ENV
 
 // Enhanced in-memory cache for database results with smart cleanup
-const queryCache = new Map<string, { data: any; expiry: number; hits: number }>()
+const queryCache = new Map<
+  string,
+  { data: SongHistory[] | SongRecommendation[]; expiry: number; hits: number }
+>()
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 const MAX_CACHE_SIZE = 100
 
@@ -111,7 +95,7 @@ const debugDatabaseData = async (timeRange = 'monthly') => {
     console.log(`[debugDatabaseData] Total songs in ${timeRange}: ${totalCount}`)
 
     // Check recent songs
-    const recentSongs = await getSongsPlayed(timeRange, 5, true)
+    const recentSongs = await getSongsPlayed(timeRange, 5)
     console.log(`[debugDatabaseData] Recent ${recentSongs.length} songs:`)
     recentSongs.forEach((song: SongHistory, index: number) => {
       console.log(
@@ -122,9 +106,9 @@ const debugDatabaseData = async (timeRange = 'monthly') => {
     // Check top songs
     const topSongs = await getTopSongs(timeRange, 5)
     console.log(`[debugDatabaseData] Top ${topSongs.length} songs:`)
-    topSongs.forEach((song: SongHistory & { count: number }, index: number) => {
+    topSongs.forEach((song, index: number) => {
       console.log(
-        `  ${index + 1}. "${song.songTitle}" (${song.count} plays) by user ${song.requestedById}`
+        `  ${index + 1}. "${song.songTitle}" (${(song as any).count || 0} plays) by user ${song.requestedById}`
       )
     })
   } catch (error) {
@@ -560,7 +544,7 @@ const getMultiUserTopSongs = async (userIds: string[], timeRange = 'monthly', li
         try {
           const userSongs = await getUserTopSongs(userId, timeRange, Math.min(limit, 10))
           individualResults.push(
-            ...userSongs.map((song: SongHistory & { count: number }) => ({
+            ...userSongs.map((song) => ({
               ...song,
               userId,
               userCount: 1,
@@ -644,7 +628,6 @@ const getSmartSongRecommendation = async (
     ? [
         // Reduce track-based dominance and add more variety
         'track-based',
-        'track-based', // Still prefer track-based but not as heavily
         ...historyStrategies, // Duplicate history strategies for more variety
       ]
     : historyStrategies
@@ -815,6 +798,7 @@ const getFallbackRecommendation = async (
 
       return {
         ...song,
+        count: (song as any).count || 1,
         selectedTimeRange: timeRange,
         timeRangeDescription: `Fallback from ${timeRange}`,
         strategy: 'fallback',
@@ -1163,7 +1147,7 @@ const addSong = (playing: boolean, track?: Track) => {
 
 const generateHistoryOptions = async () => {
   // Always get fresh data for history options (bypass cache)
-  const history = await getSongsPlayed('monthly', 34, true)
+  const history = await getSongsPlayed('monthly', 34)
   const player = useMainPlayer()
 
   const songs = history
@@ -1215,6 +1199,78 @@ const getTotalSongsPlayedCount = async (timeRange = 'yearly') => {
   }
 }
 
+// Preload function to warm cache at startup
+const preloadSongData = async () => {
+  console.log('[preloadSongData] Starting cache warm-up...')
+  const startTime = performance.now()
+
+  try {
+    // Preload key data that's commonly requested
+    const preloadPromises = [
+      // Popular time ranges for autocomplete and recommendations
+      getTopSongs('weekly', 5),
+      getTopSongs('monthly', 10),
+      getTopSongs('yearly', 50),
+
+      // Recent songs for various features
+      getSongsPlayed('weekly', 10),
+    ]
+
+    await Promise.allSettled(preloadPromises)
+
+    const duration = performance.now() - startTime
+    const cacheStats = getCacheStats()
+
+    console.log(`[preloadSongData] Cache warm-up completed in ${duration.toFixed(2)}ms`)
+    console.log(
+      `[preloadSongData] Cache entries: ${cacheStats.activeEntries}, Memory: ${cacheStats.memoryUsage}`
+    )
+  } catch (error) {
+    console.error('[preloadSongData] Error during cache warm-up:', error)
+  }
+}
+
+// Get random songs directly from cache without database calls
+const getRandomSongsFromCache = (limit = 20): SongHistory[] => {
+  // Look for cached top songs data
+  const cacheKeys = Array.from(queryCache.keys())
+  const topSongsCacheKeys = cacheKeys.filter((key) => key.startsWith('topSongs-'))
+
+  if (topSongsCacheKeys.length === 0) {
+    return [] // No cached data available
+  }
+
+  // Randomly select from available cache keys
+  const selectedKey =
+    topSongsCacheKeys.length > 0
+      ? topSongsCacheKeys[Math.floor(Math.random() * topSongsCacheKeys.length)]
+      : null
+
+  if (!selectedKey) {
+    return []
+  }
+
+  const cached = getCachedQuery(selectedKey)
+  if (!cached || !Array.isArray(cached)) {
+    return []
+  }
+
+  // Remove duplicates based on songTitle and songUrl
+  const seen = new Set<string>()
+  const unique = cached.filter((song: any) => {
+    const key = `${song.songTitle}-${song.songUrl}`
+    if (seen.has(key)) {
+      return false
+    }
+    seen.add(key)
+    return true
+  })
+
+  // Return a shuffled subset
+  const shuffled = [...unique].sort(() => Math.random() - 0.5)
+  return shuffled.slice(0, limit)
+}
+
 export {
   getSongsPlayed,
   getTopSongs,
@@ -1229,4 +1285,6 @@ export {
   clearCache,
   debugDatabaseData,
   getCurrentTimeProximityToWindows,
+  preloadSongData,
+  getRandomSongsFromCache,
 }

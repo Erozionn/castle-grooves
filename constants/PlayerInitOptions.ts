@@ -3,6 +3,7 @@ import { RequestOptions } from 'https'
 import { GuildNodeCreateOptions, PlayerNodeInitializerOptions, QueryType } from 'discord-player'
 
 import onBeforeCreateStreamHandler from '@components/events/onBeforeCreateStream'
+import { SpotifyExtractor } from 'discord-player-spotify'
 
 export const nodeOptions = {
   leaveOnEnd: false,
@@ -14,8 +15,8 @@ export const nodeOptions = {
 
 export const playerOptions = {
   nodeOptions,
-  searchEngine: QueryType.AUTO,
-  fallbackSearchEngine: QueryType.AUTO,
+  searchEngine: `ext:${SpotifyExtractor.identifier}`,
+  // fallbackSearchEngine: QueryType.AUTO,
   requestOptions: {
     timeout: 10000,
   } as RequestOptions,
