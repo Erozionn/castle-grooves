@@ -30,7 +30,6 @@
     "@discord-player/extractor": "^7.1.0",
     "@discordjs/rest": "^2.4.3",
     "@discordjs/voice": "^0.16.1",
-    "@distube/ytdl-core": "^4.16.12",
     "@influxdata/influxdb-client": "^1.26.0",
     "@napi-rs/canvas": "^0.1.70",
     "bgutils-js": "^3.2.0",

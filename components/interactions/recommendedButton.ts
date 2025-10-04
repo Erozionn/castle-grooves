@@ -1,5 +1,5 @@
 import { ButtonInteraction, GuildMember, Interaction } from 'discord.js'
-import { GuildQueue, QueueRepeatMode, useMainPlayer, deserialize } from 'discord-player'
+import { GuildQueue, QueueRepeatMode, useMainPlayer, deserialize, Track } from 'discord-player'
 
 import { sendMessage } from '@utils/mainMessage'
 import { useComponents } from '@constants/messageComponents'
@@ -30,6 +30,22 @@ export default async (
     return
   }
 
+  // Only toggle repeat mode if queue is active (has current track or queued tracks)
+  if (queue && (queue.currentTrack || queue.tracks.size > 0)) {
+    if (queue.repeatMode !== QueueRepeatMode.AUTOPLAY) {
+      queue.setRepeatMode(QueueRepeatMode.AUTOPLAY)
+    } else {
+      queue.setRepeatMode(QueueRepeatMode.OFF)
+    }
+
+    if (channel && channel.isTextBased() && 'guild' in channel) {
+      await sendMessage(channel, {
+        components: await useComponents(queue),
+      })
+    }
+    return
+  }
+
   try {
     // Show loading message
     let loadingMessage = null
@@ -51,7 +67,7 @@ export default async (
       console.log(`[recommendedButton] Found recommendation: "${recommendation.songTitle}"`)
 
       const player = useMainPlayer()
-      const track = deserialize(player, JSON.parse(recommendation.serializedTrack))
+      const track = deserialize(player, JSON.parse(recommendation.serializedTrack)) as Track
 
       if (track) {
         console.log(`[recommendedButton] Deserialized track: "${track.title}" by ${track.author}`)
@@ -65,6 +81,8 @@ export default async (
             requestedBy: member as GuildMember,
           })
         }
+
+        track.requestedBy = (member as GuildMember).user
 
         const { queue: updatedQueue } = await player.play(voiceChannel, track, {
           ...playerOptions,

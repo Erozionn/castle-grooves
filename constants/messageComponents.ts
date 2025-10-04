@@ -118,6 +118,12 @@ export const useComponents = async (queue?: GuildQueue) => {
     playerButtons.recommended.setEmoji('lightning:1414112607933304973')
   }
 
+  if (queue?.repeatMode === QueueRepeatMode.AUTOPLAY) {
+    playerButtons.recommended.setStyle(ButtonStyle.Success)
+  } else {
+    playerButtons.recommended.setStyle(ButtonStyle.Secondary)
+  }
+
   switch (customId) {
     case 'stop_button':
       if (queue.node.isPaused()) {

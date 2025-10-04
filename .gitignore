@@ -117,3 +117,5 @@ mockNowPlaying.png
 mockNowPlayingMulti.png
 
 recordings/**
+
+*-player-script.js

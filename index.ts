@@ -28,6 +28,7 @@ import {
 import { ClientType, CommandObject } from '@types'
 import { useComponents } from '@constants/messageComponents'
 import { getMainMessage, sendMessage, deleteMessage } from '@utils/mainMessage'
+import { preloadSongData } from '@utils/songHistory'
 import initApi from '@api'
 import ENV from '@constants/Env'
 import { recordVoiceStateChange } from '@utils/recordActivity'
@@ -45,6 +46,10 @@ const {
   NOW_PLAYING_MOCK_DATA,
   TS_NODE_DEV,
   INNERTUBE_CLIENT,
+  PRELOAD_SONG_DATA,
+  SPOTIFY_CLIENT_ID,
+  SPOTIFY_CLIENT_SECRET,
+  SPOTIFY_MARKET,
 } = ENV
 
 const client = new Client({
@@ -62,15 +67,30 @@ const player = new Player(client)
 
 player.extractors.register(SoundcloudExtractor, {})
 
-player.extractors.register(SpotifyExtractor, {})
+player.extractors.register(SpotifyExtractor, {
+  clientId: SPOTIFY_CLIENT_ID,
+  clientSecret: SPOTIFY_CLIENT_SECRET,
+  market: SPOTIFY_MARKET,
+})
+
+// player.extractors.register(YoutubeiExtractor, {
+//   //   // authentication: YOUTUBE_AUTH_TOKEN,
+//   //   // cookie,
+//   //   // streamOptions: {
+//   //   //   useClient: INNERTUBE_CLIENT,
+//   //   // },
+// } as YoutubeiOptions)
 
 player.extractors.register(YoutubeiExtractor, {
-  //   // authentication: YOUTUBE_AUTH_TOKEN,
-  //   // cookie,
-  //   // streamOptions: {
-  //   //   useClient: INNERTUBE_CLIENT,
-  //   // },
-} as YoutubeiOptions)
+  streamOptions: {
+    useClient: 'WEB_EMBEDDED',
+  },
+  innertubeConfigRaw: {
+    player_id: '0004de42',
+  },
+  generateWithPoToken: true,
+  useServerAbrStream: false,
+})
 
 // const interceptor = player.createStreamInterceptor({
 //   async shouldIntercept(queue, track, format, stream) {
@@ -185,6 +205,11 @@ client.once('ready', async () => {
     content: `🎶 | Pick a song below or use </play:991566063068250134>`,
     components,
   })
+
+  // Preload song data to warm cache if enabled
+  if (PRELOAD_SONG_DATA) {
+    preloadSongData()
+  }
 
   // eslint-disable-next-line no-console
   console.log('[CastleGrooves] Ready!')
