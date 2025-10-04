@@ -13,7 +13,7 @@ import {
 
 import { hashURL } from '@utils/utilities'
 import ENV from '@constants/Env'
-import { YoutubeiExtractor } from '@node_modules/discord-player-youtubei/dist'
+import { YoutubeiExtractor } from 'discord-player-youtubei'
 
 const recordingsDir = './recordings'
 
