@@ -5,7 +5,7 @@ import { SpotifyExtractor } from 'discord-player-spotify'
 import { playerOptions, nodeOptions } from '@constants/PlayerInitOptions'
 import { isSpotifyUrl, isUrl, isYouTubeUrl, parseSongName } from '@utils/utilities'
 import { getRandomSongsFromCache, getTopSongs } from '@utils/songHistory'
-import { YoutubeiExtractor } from '@node_modules/discord-player-youtubei/dist'
+import { YoutubeiExtractor } from 'discord-player-youtubei'
 
 export default {
   data: new SlashCommandBuilder()
