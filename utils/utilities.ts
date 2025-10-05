@@ -51,4 +51,19 @@ export const hashURL = (url: string) => {
   return crypto.createHash('md5').update(url).digest('hex')
 }
 
+export const isYouTubeUrl = (url: string) => {
+  const pattern = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/
+  return pattern.test(url)
+}
+
+export const isSpotifyUrl = (url: string) => {
+  const pattern = /(?:open\.spotify\.com\/track\/|spotify:track:)([a-zA-Z0-9]+)/
+  return pattern.test(url)
+}
+
+export const isUrl = (str: string) => {
+  const pattern = /^(https?:\/\/[^\s$.?#].[^\s]*)$/gm
+  return pattern.test(str)
+}
+
 export { splitAtClosestSpace, shadeColor, parseSongName }

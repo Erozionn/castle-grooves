@@ -30,11 +30,10 @@ export default async (
     return
   }
 
-  // Only toggle repeat mode if queue is active (has current track or queued tracks)
-  if (queue && (queue.currentTrack || queue.tracks.size > 0)) {
-    if (queue.repeatMode !== QueueRepeatMode.AUTOPLAY) {
+  if (queue && (queue.isPlaying() || queue.currentTrack || queue.tracks.size > 0)) {
+    if (queue && queue.repeatMode !== QueueRepeatMode.AUTOPLAY) {
       queue.setRepeatMode(QueueRepeatMode.AUTOPLAY)
-    } else {
+    } else if (queue) {
       queue.setRepeatMode(QueueRepeatMode.OFF)
     }
 

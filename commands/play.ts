@@ -1,10 +1,11 @@
-import { deserialize, Track, useMainPlayer, useQueue } from 'discord-player'
+import { deserialize, SearchOptions, Track, useMainPlayer, useQueue } from 'discord-player'
 import { AutocompleteInteraction, GuildMember, Interaction, SlashCommandBuilder } from 'discord.js'
 import { SpotifyExtractor } from 'discord-player-spotify'
 
 import { playerOptions, nodeOptions } from '@constants/PlayerInitOptions'
-import { parseSongName } from '@utils/utilities'
+import { isSpotifyUrl, isUrl, isYouTubeUrl, parseSongName } from '@utils/utilities'
 import { getRandomSongsFromCache, getTopSongs } from '@utils/songHistory'
+import { YoutubeiExtractor } from '@node_modules/discord-player-youtubei/dist'
 
 export default {
   data: new SlashCommandBuilder()
@@ -24,6 +25,12 @@ export default {
 
     const focusedValue = interaction.options.getFocused()
 
+    // If user typed a URL, don't provide autocomplete suggestions
+    if (isUrl(focusedValue)) {
+      await interaction.respond([])
+      return
+    }
+
     let recentSongs = getRandomSongsFromCache(15)
 
     if (recentSongs.length === 0) {
@@ -38,12 +45,11 @@ export default {
       JSON.parse(recentSongs[Math.floor(Math.random() * recentSongs.length)].serializedTrack)
     ) as Track
     try {
-      const searchResults = await player.search(
-        focusedValue || randomSong.author || randomSong.title,
-        {
-          searchEngine: playerOptions.searchEngine,
-        }
-      )
+      const searchQuery = focusedValue || randomSong.author || randomSong.title
+
+      const searchResults = await player.search(searchQuery, {
+        searchEngine: `ext:${SpotifyExtractor.identifier}`,
+      })
       const choices = searchResults.tracks.map((track) => {
         let { author: artist, title } = track
         if (track.source === 'youtube') {
@@ -53,7 +59,7 @@ export default {
         }
         return {
           name: `${artist} - ${title}`.substring(0, 95),
-          value: `${title.substring(0, 40)} ${artist.substring(0, 40)}`,
+          value: `${artist} ${title}`.substring(0, 100),
         }
       })
 
@@ -65,6 +71,7 @@ export default {
           splitValue.some((word) => choice.name.toLowerCase().includes(word.toLowerCase()))
         )
         .slice(0, 25)
+
       await interaction.respond(filtered)
     } catch (e) {
       console.warn('[searchCommand]', e)
@@ -96,15 +103,40 @@ export default {
 
     const songName = interaction.options.get('song')?.value as string
 
+    console.log(`[playCommand] Playing: "${songName}"`)
+
     try {
-      player.play(voiceChannel, songName, {
+      // Determine the right search engine based on input
+      let searchEngine: SearchOptions['searchEngine']
+      if (isUrl(songName)) {
+        if (isYouTubeUrl(songName)) {
+          searchEngine = `ext:${YoutubeiExtractor.identifier}`
+        } else if (isSpotifyUrl(songName)) {
+          searchEngine = `ext:${SpotifyExtractor.identifier}`
+        } else {
+          searchEngine = 'auto'
+        }
+      } else {
+        searchEngine = playerOptions.searchEngine || 'auto'
+      }
+
+      // Use appropriate search format based on input type
+      const searchQuery = isUrl(songName) ? songName.trim() : `"${songName.trim()}"`
+      const searchResults = await player.search(searchQuery, {
+        searchEngine,
+      })
+
+      const { queue: newQueue, track } = await player.play(voiceChannel, searchQuery, {
         ...playerOptions,
+        searchEngine,
         nodeOptions: {
           ...nodeOptions,
           metadata: interaction,
         },
         requestedBy: member as GuildMember,
       })
+
+      console.log(`[playCommand] Now playing: "${track?.title}" by "${track?.author}")`)
 
       if (queue && queue.node.isPaused()) {
         if (queue.tracks.size + (queue.currentTrack ? 1 : 0) >= 1) {
