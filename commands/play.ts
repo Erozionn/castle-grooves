@@ -1,11 +1,11 @@
 import { deserialize, SearchOptions, Track, useMainPlayer, useQueue } from 'discord-player'
 import { AutocompleteInteraction, GuildMember, Interaction, SlashCommandBuilder } from 'discord.js'
 import { SpotifyExtractor } from 'discord-player-spotify'
+import { YoutubeiExtractor } from 'discord-player-youtubei'
 
 import { playerOptions, nodeOptions } from '@constants/PlayerInitOptions'
 import { isSpotifyUrl, isUrl, isYouTubeUrl, parseSongName } from '@utils/utilities'
 import { getRandomSongsFromCache, getTopSongs } from '@utils/songHistory'
-import { YoutubeiExtractor } from 'discord-player-youtubei'
 
 export default {
   data: new SlashCommandBuilder()
@@ -122,9 +122,6 @@ export default {
 
       // Use appropriate search format based on input type
       const searchQuery = isUrl(songName) ? songName.trim() : `"${songName.trim()}"`
-      const searchResults = await player.search(searchQuery, {
-        searchEngine,
-      })
 
       const { queue: newQueue, track } = await player.play(voiceChannel, searchQuery, {
         ...playerOptions,

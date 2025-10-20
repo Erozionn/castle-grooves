@@ -22,7 +22,7 @@ const MAX_CACHE_SIZE = 100
 const getCachedQuery = (cacheKey: string) => {
   const cached = queryCache.get(cacheKey)
   if (cached && cached.expiry > Date.now()) {
-    cached.hits++
+    cached.hits += 1
     return cached.data
   }
   queryCache.delete(cacheKey)
@@ -439,12 +439,10 @@ const getTopSongs = async (timeRange = 'monthly', limit = 20) => {
     return cached
   }
 
-  const queryStart = performance.now()
   try {
     const results: (SongHistory & { count: number })[] = await queryApi().collectRows(
       buildSongQuery(timeRange, limit, undefined, 'topSongs')
     )
-    const queryDuration = performance.now() - queryStart
 
     // Simple shuffle for variety
     const shuffledResults = results.sort(() => Math.random() - 0.5)
@@ -1214,6 +1212,7 @@ const preloadSongData = async () => {
 
       // Recent songs for various features
       getSongsPlayed('weekly', 10),
+      getSongsPlayed('monthly', 10),
     ]
 
     await Promise.allSettled(preloadPromises)
@@ -1234,17 +1233,14 @@ const preloadSongData = async () => {
 const getRandomSongsFromCache = (limit = 20): SongHistory[] => {
   // Look for cached top songs data
   const cacheKeys = Array.from(queryCache.keys())
-  const topSongsCacheKeys = cacheKeys.filter((key) => key.startsWith('topSongs-'))
 
-  if (topSongsCacheKeys.length === 0) {
+  if (cacheKeys.length === 0) {
     return [] // No cached data available
   }
 
   // Randomly select from available cache keys
   const selectedKey =
-    topSongsCacheKeys.length > 0
-      ? topSongsCacheKeys[Math.floor(Math.random() * topSongsCacheKeys.length)]
-      : null
+    cacheKeys.length > 0 ? cacheKeys[Math.floor(Math.random() * cacheKeys.length)] : null
 
   if (!selectedKey) {
     return []

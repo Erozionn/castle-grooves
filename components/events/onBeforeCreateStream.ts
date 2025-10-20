@@ -10,10 +10,10 @@ import {
   SearchQueryType,
   Track,
 } from 'discord-player'
+import { YoutubeiExtractor } from 'discord-player-youtubei'
 
 import { hashURL } from '@utils/utilities'
 import ENV from '@constants/Env'
-import { YoutubeiExtractor } from 'discord-player-youtubei'
 
 const recordingsDir = './recordings'
 

@@ -1,9 +1,9 @@
 import { RequestOptions } from 'https'
 
 import { GuildNodeCreateOptions, PlayerNodeInitializerOptions, QueryType } from 'discord-player'
+import { SpotifyExtractor } from 'discord-player-spotify'
 
 import onBeforeCreateStreamHandler from '@components/events/onBeforeCreateStream'
-import { SpotifyExtractor } from 'discord-player-spotify'
 
 export const nodeOptions = {
   leaveOnEnd: false,

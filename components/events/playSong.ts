@@ -5,8 +5,12 @@ import { useComponents } from '@constants/messageComponents'
 import { sendMessage } from '@utils/mainMessage'
 import { generateNowPlayingCanvas } from '@utils/nowPlayingCanvas'
 import { addSong } from '@utils/songHistory'
+import { triggerSongStart } from '@utils/djTriggers'
 
 export default async (queue: GuildQueue<Interaction>, track: Track) => {
+  // Trigger DJ event for song start
+  triggerSongStart(queue, track)
+
   if (!queue.metadata?.channel) {
     console.error('[playSong] Channel not found')
     return

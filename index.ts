@@ -12,8 +12,8 @@ import {
   TextChannel,
   Message,
 } from 'discord.js'
-import { Player } from 'discord-player'
-import { YoutubeiExtractor, YoutubeiOptions } from 'discord-player-youtubei'
+import { GuildQueueEvent, Player } from 'discord-player'
+import { YoutubeiExtractor } from 'discord-player-youtubei'
 import { SpotifyExtractor } from 'discord-player-spotify'
 import { SoundcloudExtractor } from 'discord-player-soundcloud'
 
@@ -23,6 +23,7 @@ import {
   emptyEventHandler,
   playSongEventHandler,
   songFinishEventHandler,
+  queueCreatedEventHandler,
   buttonHandler,
 } from '@components/events'
 import { ClientType, CommandObject } from '@types'
@@ -42,10 +43,8 @@ const {
   BOT_TOKEN,
   GUILD_ID,
   DEFAULT_TEXT_CHANNEL,
-  YOUTUBE_AUTH_TOKEN,
   NOW_PLAYING_MOCK_DATA,
   TS_NODE_DEV,
-  INNERTUBE_CLIENT,
   PRELOAD_SONG_DATA,
   SPOTIFY_CLIENT_ID,
   SPOTIFY_CLIENT_SECRET,
@@ -249,6 +248,8 @@ player.events.on('emptyChannel', emptyEventHandler)
 
 // On queue/song finish
 player.events.on('emptyQueue', songFinishEventHandler)
+
+player.events.on(GuildQueueEvent.QueueCreate, queueCreatedEventHandler)
 
 // On error
 player.events.on('error', async (channel, e) => {

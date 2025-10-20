@@ -9,6 +9,7 @@ import {
 } from 'discord.js'
 
 import { generateHistoryOptions } from '@utils/songHistory'
+import { useDJMode } from '@hooks/useDJMode'
 
 const defaultPlayerButtons = {
   back: new ButtonBuilder()
@@ -28,6 +29,11 @@ const defaultPlayerButtons = {
     .setEmoji('skipnext:909248255915868160'),
   recommended: new ButtonBuilder()
     .setCustomId('recommended_button')
+    .setStyle(ButtonStyle.Secondary)
+    .setDisabled(false)
+    .setEmoji('lightninganimated:1418830322996351027'),
+  dj: new ButtonBuilder()
+    .setCustomId('dj_button')
     .setStyle(ButtonStyle.Secondary)
     .setDisabled(false)
     .setEmoji('lightninganimated:1418830322996351027'),
@@ -56,6 +62,11 @@ const resetToDefaults = () => {
     .setStyle(ButtonStyle.Danger)
     .setDisabled(false)
     .setEmoji('musicoff:909248235623825439')
+  defaultPlayerButtons.dj
+    .setCustomId('dj_button')
+    .setStyle(ButtonStyle.Secondary)
+    .setDisabled(false)
+    .setEmoji('lightninganimated:1418830322996351027')
 }
 
 export const useComponents = async (queue?: GuildQueue) => {
@@ -86,19 +97,25 @@ export const useComponents = async (queue?: GuildQueue) => {
       .setDisabled(true)
   }
 
-  const buttonsActionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    Object.values(playerButtons)
+  const buttonsActionRow1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    playerButtons.back,
+    playerButtons.playPause,
+    playerButtons.skip,
+    // playerButtons.recommended,
+    playerButtons.dj,
+    playerButtons.stop
   )
 
   const historyActionRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
     playerHistory
   )
 
-  if (!queue) return [buttonsActionRow, historyActionRow]
+  if (!queue) return [buttonsActionRow1, historyActionRow]
 
   const { customId } = queue.metadata as ButtonInteraction | StringSelectMenuInteraction
 
   const history = useHistory(queue)
+  const { isDJModeActive } = useDJMode(queue)
   playerButtons.back.setDisabled(history?.isEmpty())
 
   const isQueueEmpty = queue.isEmpty() && !queue.currentTrack
@@ -116,6 +133,12 @@ export const useComponents = async (queue?: GuildQueue) => {
     playerButtons.playPause.setStyle(ButtonStyle.Primary)
     playerButtons.stop.setEmoji('musicoff:909248235623825439')
     playerButtons.recommended.setEmoji('lightning:1414112607933304973')
+
+    if (isDJModeActive()) {
+      playerButtons.dj.setStyle(ButtonStyle.Success).setEmoji('vibe:997624946492711006')
+    } else {
+      playerButtons.dj.setStyle(ButtonStyle.Secondary).setEmoji('djmode:1426691624922251445')
+    }
   }
 
   if (queue?.repeatMode === QueueRepeatMode.AUTOPLAY) {
@@ -138,7 +161,7 @@ export const useComponents = async (queue?: GuildQueue) => {
       break
   }
 
-  return [buttonsActionRow, historyActionRow]
+  return [buttonsActionRow1, historyActionRow]
 }
 
 // export const components = [buttonsActionRow, historyActionRow]

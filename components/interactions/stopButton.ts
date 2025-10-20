@@ -3,6 +3,7 @@ import { GuildQueue } from 'discord-player'
 
 import { sendMessage } from '@utils/mainMessage'
 import { useComponents } from '@constants/messageComponents'
+import { useDJMode } from '@hooks/useDJMode'
 
 export default async (queue: GuildQueue<Interaction> | null) => {
   if (!queue) return
@@ -11,12 +12,15 @@ export default async (queue: GuildQueue<Interaction> | null) => {
 
   if (!channel) return
 
-  if (queue.node.isPlaying() && queue.metadata.channel) {
+  const { stopDJMode } = useDJMode(queue)
+
+  stopDJMode()
+
+  if ((queue.isPlaying() || queue.currentTrack || queue.tracks.size > 0) && channel) {
     try {
-      queue.node.skip()
-      queue.node.pause()
-      // queue.removeTrack(0)
+      queue.node.stop()
       queue.clear()
+      queue.history.clear()
 
       console.log('[stopButton] Stopped playback and cleared queue, staying in voice channel.')
     } catch (error) {

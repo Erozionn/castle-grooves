@@ -4,8 +4,12 @@ import { Interaction } from 'discord.js'
 import { useComponents } from '@constants/messageComponents'
 import { sendMessage } from '@utils/mainMessage'
 import { generateNowPlayingCanvas } from '@utils/nowPlayingCanvas'
+import { triggerTrackAdd } from '@utils/djTriggers'
 
 export default async (queue: GuildQueue<Interaction>, track: Track | Track[]) => {
+  // Trigger DJ event for track add
+  triggerTrackAdd(queue, track)
+
   if (!queue.metadata?.channel) {
     console.error('[addSong] Channel not found')
     return

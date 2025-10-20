@@ -126,16 +126,16 @@ const moveMainMessage = async (
     // Update the queue metadata with new message info (if queue and metadata exist)
     if (queue) {
       if (queue.metadata && typeof queue.metadata === 'object') {
-        queue.metadata = {
+        queue.setMetadata({
           ...queue.metadata,
           messageId: newMessage.id,
           textChannelId: newChannel.id,
-        }
+        })
       } else {
-        queue.metadata = {
+        queue.setMetadata({
           messageId: newMessage.id,
           textChannelId: newChannel.id,
-        }
+        })
       }
     }
 
