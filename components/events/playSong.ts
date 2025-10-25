@@ -16,6 +16,8 @@ export default async (queue: GuildQueue<Interaction>, track: Track) => {
     return
   }
 
+  console.log('LOOK HERE metadata', queue.currentTrack?.author, queue.currentTrack?.title)
+
   const components = await useComponents(queue)
   const { channel } = queue.metadata
 

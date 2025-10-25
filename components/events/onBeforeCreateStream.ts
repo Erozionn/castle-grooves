@@ -10,7 +10,7 @@ import {
   SearchQueryType,
   Track,
 } from 'discord-player'
-import { YoutubeiExtractor } from 'discord-player-youtubei'
+import { YoutubeSabrExtractor } from '@extractors/youtubei/youtubeiExtractor'
 
 import { hashURL } from '@utils/utilities'
 import ENV from '@constants/Env'
@@ -34,7 +34,7 @@ const getYoutubeUrl = async (track: Track, queue: GuildQueue) => {
     QueryType.YOUTUBE_PLAYLIST,
     QueryType.YOUTUBE_VIDEO,
     QueryType.YOUTUBE_SEARCH,
-    `ext:${YoutubeiExtractor.identifier}`,
+    `ext:${YoutubeSabrExtractor.identifier}`,
   ].some((t) => t === track.source)
 
   if (isYoutube) {
@@ -42,7 +42,7 @@ const getYoutubeUrl = async (track: Track, queue: GuildQueue) => {
   }
 
   const searchResult = await queue.player.search(`${track.title} ${track.author}`, {
-    searchEngine: `ext:${YoutubeiExtractor.identifier}`,
+    searchEngine: `ext:${YoutubeSabrExtractor.identifier}`,
   })
   if (searchResult.isEmpty()) {
     console.warn('No YouTube URL found for track:', track.title)

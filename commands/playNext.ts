@@ -1,5 +1,5 @@
 import { useMainPlayer, useQueue } from 'discord-player'
-import { GuildMember, Interaction, SlashCommandBuilder } from 'discord.js'
+import { GuildMember, ChatInputCommandInteraction, SlashCommandBuilder } from 'discord.js'
 
 import { playerOptions, nodeOptions } from '@constants/PlayerInitOptions'
 
@@ -10,8 +10,8 @@ export default {
     .addStringOption((option) =>
       option.setName('song').setDescription('The song to play.').setRequired(true)
     ),
-  async execute(interaction: Interaction) {
-    if (!interaction.isCommand()) return
+  async execute(interaction: ChatInputCommandInteraction) {
+    if (!interaction.isChatInputCommand()) return
 
     const player = useMainPlayer()
     const queue = useQueue(interaction.guild?.id as string)

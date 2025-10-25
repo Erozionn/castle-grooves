@@ -1,11 +1,11 @@
-import { CacheType, CommandInteraction } from 'discord.js'
+import { CacheType, ChatInputCommandInteraction } from 'discord.js'
 import { useMainPlayer } from 'discord-player'
 
 import { ClientType, CommandObject } from '@types'
 
-export default async (interaction: CommandInteraction<CacheType>, client: ClientType) => {
+export default async (interaction: ChatInputCommandInteraction<CacheType>, client: ClientType) => {
   const command: CommandObject = client.commands.get(
-    (interaction as CommandInteraction).commandName
+    (interaction as ChatInputCommandInteraction).commandName
   )
 
   if (!command || !interaction.guild) return

@@ -13,10 +13,11 @@ import {
   Message,
 } from 'discord.js'
 import { GuildQueueEvent, Player } from 'discord-player'
-import { YoutubeiExtractor } from 'discord-player-youtubei'
+import { DeezerExtractor } from 'discord-player-deezer'
 import { SpotifyExtractor } from 'discord-player-spotify'
 import { SoundcloudExtractor } from 'discord-player-soundcloud'
 
+import { YoutubeSabrExtractor } from '@extractors/youtubei/youtubeiExtractor'
 import {
   addSongEventHandler,
   disconnectEventHandler,
@@ -49,6 +50,8 @@ const {
   SPOTIFY_CLIENT_ID,
   SPOTIFY_CLIENT_SECRET,
   SPOTIFY_MARKET,
+  DEEZER_ARL,
+  DEEZER_KEY,
 } = ENV
 
 const client = new Client({
@@ -66,30 +69,7 @@ const player = new Player(client)
 
 player.extractors.register(SoundcloudExtractor, {})
 
-player.extractors.register(SpotifyExtractor, {
-  clientId: SPOTIFY_CLIENT_ID,
-  clientSecret: SPOTIFY_CLIENT_SECRET,
-  market: SPOTIFY_MARKET,
-})
-
-// player.extractors.register(YoutubeiExtractor, {
-//   //   // authentication: YOUTUBE_AUTH_TOKEN,
-//   //   // cookie,
-//   //   // streamOptions: {
-//   //   //   useClient: INNERTUBE_CLIENT,
-//   //   // },
-// } as YoutubeiOptions)
-
-player.extractors.register(YoutubeiExtractor, {
-  streamOptions: {
-    useClient: 'WEB_EMBEDDED',
-  },
-  innertubeConfigRaw: {
-    player_id: '0004de42',
-  },
-  generateWithPoToken: true,
-  useServerAbrStream: false,
-})
+// Set high priority to prefer YoutubeSabr extractor over others
 
 // const interceptor = player.createStreamInterceptor({
 //   async shouldIntercept(queue, track, format, stream) {
@@ -150,6 +130,40 @@ commandFiles.forEach(async (file) => {
 })
 
 client.once('ready', async () => {
+  const spotifyExt = await player.extractors.register(SpotifyExtractor, {
+    clientId: SPOTIFY_CLIENT_ID,
+    clientSecret: SPOTIFY_CLIENT_SECRET,
+    market: SPOTIFY_MARKET,
+  })
+
+  if (spotifyExt) {
+    spotifyExt.priority = 10 // Set high priority to prefer Spotify extractor over others
+  }
+
+  const deezerExt = await player.extractors.register(DeezerExtractor, {
+    decryptionKey: DEEZER_KEY,
+    arl: DEEZER_ARL,
+  })
+
+  if (deezerExt) {
+    deezerExt.priority = 9 // Set high priority to prefer Deezer extractor over others
+  }
+
+  const ytExt = await player.extractors.register(YoutubeSabrExtractor, {
+    streamOptions: {
+      useClient: 'WEB_EMBEDDED',
+    },
+    innertubeConfigRaw: {
+      player_id: '0004de42',
+    },
+    generateWithPoToken: true,
+    useServerAbrStream: false,
+  })
+
+  if (ytExt) {
+    ytExt.priority = 8
+  }
+
   // await player.extractors.loadMulti(DefaultExtractors)
   console.log(`discord-player loaded dependencies:\n${player.scanDeps()}`)
 
@@ -220,7 +234,7 @@ client.on('interactionCreate', async (interaction) => {
     if (command.autoComplete) command.autoComplete(interaction)
   }
 
-  if (interaction.isCommand() || interaction.isChatInputCommand()) {
+  if (interaction.isChatInputCommand()) {
     commandInteractionHandler(interaction, client)
   }
 

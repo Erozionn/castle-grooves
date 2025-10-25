@@ -2,7 +2,7 @@ import {
   CommandInteractionOptionResolver,
   EmbedBuilder,
   GuildMember,
-  Interaction,
+  ChatInputCommandInteraction,
   SlashCommandBuilder,
   bold,
   inlineCode,
@@ -35,8 +35,8 @@ type TransformedSong = {
   track: Track | string
 }
 
-const play = async (interaction: Interaction) => {
-  if (!interaction.isCommand()) return
+const play = async (interaction: ChatInputCommandInteraction) => {
+  if (!interaction.isChatInputCommand()) return
 
   const player = useMainPlayer()
   const queue = useQueue(interaction.guild?.id as string)
@@ -133,8 +133,8 @@ const play = async (interaction: Interaction) => {
   setTimeout(() => loadingMsg.delete(), 1500)
 }
 
-const list = async (interaction: Interaction) => {
-  if (!interaction.isCommand()) return
+const list = async (interaction: ChatInputCommandInteraction) => {
+  if (!interaction.isChatInputCommand()) return
 
   const limit = (interaction.options.get('number', false)?.value as number) || 10
   const timeRange = interaction.options.get('time-range', false)?.value?.toString() || 'monthly'
@@ -223,8 +223,8 @@ export default {
           option.setName('user').setDescription("User's top songs. Optional.")
         )
     ),
-  async execute(interaction: Interaction) {
-    if (!interaction.isCommand()) return
+  async execute(interaction: ChatInputCommandInteraction) {
+    if (!interaction.isChatInputCommand()) return
     await interaction.deferReply()
 
     const subCommand = (interaction.options as CommandInteractionOptionResolver).getSubcommand()

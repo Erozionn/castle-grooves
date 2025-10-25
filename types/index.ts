@@ -3,7 +3,7 @@ import {
   AutocompleteInteraction,
   Client,
   Collection,
-  CommandInteraction,
+  ChatInputCommandInteraction,
   SlashCommandBuilder,
 } from 'discord.js'
 
@@ -115,6 +115,6 @@ export type CommandObject = {
   default: {
     data: SlashCommandBuilder
   }
-  execute: (interaction: CommandInteraction) => Promise<void>
+  execute: (interaction: ChatInputCommandInteraction) => Promise<void>
   autoComplete?: (interaction: AutocompleteInteraction) => Promise<void>
 }

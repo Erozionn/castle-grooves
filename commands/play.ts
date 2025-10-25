@@ -1,7 +1,7 @@
 import { deserialize, SearchOptions, Track, useMainPlayer, useQueue } from 'discord-player'
-import { AutocompleteInteraction, GuildMember, Interaction, SlashCommandBuilder } from 'discord.js'
+import { AutocompleteInteraction, ChatInputCommandInteraction, GuildMember, SlashCommandBuilder } from 'discord.js'
 import { SpotifyExtractor } from 'discord-player-spotify'
-import { YoutubeiExtractor } from 'discord-player-youtubei'
+import { YoutubeSabrExtractor } from '@extractors/youtubei/youtubeiExtractor'
 
 import { playerOptions, nodeOptions } from '@constants/PlayerInitOptions'
 import { isSpotifyUrl, isUrl, isYouTubeUrl, parseSongName } from '@utils/utilities'
@@ -77,8 +77,8 @@ export default {
       console.warn('[searchCommand]', e)
     }
   },
-  async execute(interaction: Interaction) {
-    if (!interaction.isCommand()) return
+  async execute(interaction: ChatInputCommandInteraction) {
+    if (!interaction.isChatInputCommand()) return
 
     const player = useMainPlayer()
     const queue = useQueue(interaction.guild?.id as string)
@@ -110,7 +110,7 @@ export default {
       let searchEngine: SearchOptions['searchEngine']
       if (isUrl(songName)) {
         if (isYouTubeUrl(songName)) {
-          searchEngine = `ext:${YoutubeiExtractor.identifier}`
+          searchEngine = `ext:${YoutubeSabrExtractor.identifier}`
         } else if (isSpotifyUrl(songName)) {
           searchEngine = `ext:${SpotifyExtractor.identifier}`
         } else {

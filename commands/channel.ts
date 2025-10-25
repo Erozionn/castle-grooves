@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, CommandInteraction } from 'discord.js'
+import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js'
 import { useQueue } from 'discord-player'
 
 import { moveMainMessage, sendMessage } from '@utils/mainMessage'
@@ -8,7 +8,7 @@ export default {
   data: new SlashCommandBuilder()
     .setName('channel')
     .setDescription('Shows the bot music player on text channel.'),
-  async execute(interaction: CommandInteraction) {
+  async execute(interaction: ChatInputCommandInteraction) {
     if (!interaction.guild) return
 
     const { channel } = interaction
