@@ -110,24 +110,13 @@ export default {
     console.log(`[playCommand] Playing: "${songName}"`)
 
     try {
-      // Determine the search prefix based on input
-      let searchQuery: string
-
-      if (isUrl(songName)) {
-        // Direct URL - no prefix needed
-        searchQuery = songName.trim()
-      } else {
-        // Search query - let MusicManager handle prefixing (defaults to ytsearch)
-        searchQuery = songName.trim()
-      }
-
       // Get or create queue
       const guildId = interaction.guild?.id as string
       const existingQueue = useQueue(guildId)
 
       if (!existingQueue) {
         // Create new queue and play - MusicManager.play() handles search internally
-        const { track } = await musicManager.play(voiceChannel, searchQuery, {
+        const { track } = await musicManager.play(voiceChannel, songName.trim(), {
           requestedBy: member as GuildMember,
           metadata: {
             channel: interaction.channel,
@@ -144,7 +133,7 @@ export default {
         }
 
         // Search for the track manually to add to existing queue
-        const searchResult = await musicManager.search(searchQuery, {
+        const searchResult = await musicManager.search(songName.trim(), {
           requester: member as GuildMember,
         })
 

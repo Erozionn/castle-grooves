@@ -1,9 +1,7 @@
-import { GuildQueue, QueueRepeatMode } from 'discord-player'
-import { Interaction } from 'discord.js'
-
 import { getMainMessage, sendMessage } from '@utils/mainMessage'
+import { MusicQueue } from '../../lib'
 
-export default async (queue: GuildQueue<Interaction> | null) => {
+export default async (queue: MusicQueue | null) => {
   const mainMessage = getMainMessage()
 
   if (!queue) {
@@ -13,9 +11,9 @@ export default async (queue: GuildQueue<Interaction> | null) => {
     return
   }
 
-  if (queue.tracks.size > 0 || queue.repeatMode === QueueRepeatMode.AUTOPLAY) {
-    queue.node.skip()
+  if (queue.tracks.length > 0) {
+    queue.skip()
   } else {
-    queue.node.stop()
+    queue.stop()
   }
 }

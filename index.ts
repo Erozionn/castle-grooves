@@ -12,12 +12,7 @@ import {
   TextChannel,
   Message,
 } from 'discord.js'
-import { GuildQueueEvent, Player } from 'discord-player'
-import { DeezerExtractor } from 'discord-player-deezer'
-import { SpotifyExtractor } from 'discord-player-spotify'
-import { SoundcloudExtractor } from 'discord-player-soundcloud'
 
-import { YoutubeSabrExtractor } from '@extractors/youtubei/youtubeiExtractor'
 import {
   addSongEventHandler,
   disconnectEventHandler,
@@ -38,6 +33,7 @@ import { commandInteractionHandler } from '@components/interactions'
 import { nowPlayingCanvas, nowPlayingCanvasWithUpNext } from '@utils/nowPlayingCanvas'
 import useMockTracks from '@data/dummies/songArray'
 
+import { MusicManager, setMusicManager } from './lib'
 import registerCommands from './deploy-commands'
 
 const {
@@ -47,11 +43,6 @@ const {
   NOW_PLAYING_MOCK_DATA,
   TS_NODE_DEV,
   PRELOAD_SONG_DATA,
-  SPOTIFY_CLIENT_ID,
-  SPOTIFY_CLIENT_SECRET,
-  SPOTIFY_MARKET,
-  DEEZER_ARL,
-  DEEZER_KEY,
 } = ENV
 
 const client = new Client({
@@ -63,26 +54,26 @@ const client = new Client({
   partials: [Partials.Channel],
 }) as ClientType
 
-// if (SPOTIFY.CLIENT_ID && SPOTIFY.CLIENT_SECRET) console.log('[init] Loading with Spotify search')
+// Initialize Music Manager with Lavalink connection
+const musicManager = new MusicManager(client, {
+  nodes: [
+    {
+      name: 'CastleGrooves-Lavalink',
+      url: `${ENV.LAVALINK_HOST}:${ENV.LAVALINK_PORT}`,
+      auth: ENV.LAVALINK_PASSWORD,
+    },
+  ],
+})
 
-const player = new Player(client)
+// Set global music manager instance
+setMusicManager(musicManager)
 
-player.extractors.register(SoundcloudExtractor, {})
-
-// Set high priority to prefer YoutubeSabr extractor over others
-
-// const interceptor = player.createStreamInterceptor({
-//   async shouldIntercept(queue, track, format, stream) {
-//     return true
-//   },
-// })
-
-client.player = player
+client.musicManager = musicManager
 
 client.commands = new Collection<string, CommandObject['default']>()
 
 // Initialize the API and webserver.
-initApi()
+initApi(client)
 // Register commands.
 registerCommands()
 
@@ -130,42 +121,8 @@ commandFiles.forEach(async (file) => {
 })
 
 client.once('ready', async () => {
-  const spotifyExt = await player.extractors.register(SpotifyExtractor, {
-    clientId: SPOTIFY_CLIENT_ID,
-    clientSecret: SPOTIFY_CLIENT_SECRET,
-    market: SPOTIFY_MARKET,
-  })
-
-  if (spotifyExt) {
-    spotifyExt.priority = 10 // Set high priority to prefer Spotify extractor over others
-  }
-
-  const deezerExt = await player.extractors.register(DeezerExtractor, {
-    decryptionKey: DEEZER_KEY,
-    arl: DEEZER_ARL,
-  })
-
-  if (deezerExt) {
-    deezerExt.priority = 9 // Set high priority to prefer Deezer extractor over others
-  }
-
-  const ytExt = await player.extractors.register(YoutubeSabrExtractor, {
-    streamOptions: {
-      useClient: 'WEB_EMBEDDED',
-    },
-    innertubeConfigRaw: {
-      player_id: '0004de42',
-    },
-    generateWithPoToken: true,
-    useServerAbrStream: false,
-  })
-
-  if (ytExt) {
-    ytExt.priority = 8
-  }
-
-  // await player.extractors.loadMulti(DefaultExtractors)
-  console.log(`discord-player loaded dependencies:\n${player.scanDeps()}`)
+  // Music Manager connects to Lavalink automatically through Shoukaku
+  // No need to register extractors - Lavalink handles all sources
 
   client.user?.setActivity({
     name: '🎶 Music 🎶',
@@ -200,7 +157,10 @@ client.once('ready', async () => {
   textChannels.forEach(async (channel) => {
     if (!channel || channel.type !== ChannelType.GuildText) return
     const messages = await channel.messages.fetch()
-    const botMessages = messages.filter((message: Message) => message.author.id === client.user?.id)
+    const botMessages = messages.filter(
+      (message: Message) =>
+        message.author.id === client.user?.id || message.author.id === '684773505157431347'
+    )
 
     if (botMessages.size > 0)
       console.log(
@@ -246,37 +206,21 @@ client.on('interactionCreate', async (interaction) => {
 // On user join voice channel event
 client.on('voiceStateUpdate', (oldState, newState) => recordVoiceStateChange(oldState, newState))
 
-player.events.on('playerStart', playSongEventHandler)
+// Music Manager event listeners
+musicManager.on('playerStart', playSongEventHandler)
+musicManager.on('audioTrackAdd', addSongEventHandler)
+musicManager.on('audioTracksAdd', addSongEventHandler) // For playlists
+musicManager.on('disconnect', disconnectEventHandler)
+musicManager.on('emptyQueue', emptyEventHandler)
+musicManager.on('emptyQueue', songFinishEventHandler)
+musicManager.on('queueCreate', queueCreatedEventHandler)
 
-// On add song event
-player.events.on('audioTrackAdd', addSongEventHandler)
-
-// on add playlist event
-player.events.on('audioTracksAdd', addSongEventHandler)
-
-// On bot disconnected from voice channel
-player.events.on('disconnect', disconnectEventHandler)
-
-// On voice channel empty
-player.events.on('emptyChannel', emptyEventHandler)
-
-// On queue/song finish
-player.events.on('emptyQueue', songFinishEventHandler)
-
-player.events.on(GuildQueueEvent.QueueCreate, queueCreatedEventHandler)
-
-// On error
-player.events.on('error', async (channel, e) => {
-  console.error('[playerError]', e)
+// Error handlers
+musicManager.on('error', (guildId: string, error: Error) => {
+  console.error('[musicManagerError]', error)
 })
 
-player.events.on('playerError', (queue, error) => {
-  // Emitted when the audio player errors while streaming audio track
-  console.log(`Player error event: ${error.message}`)
-  console.log(error)
-})
-
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason)
 })
 

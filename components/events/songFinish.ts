@@ -1,13 +1,12 @@
-import { GuildQueue } from 'discord-player'
-import { Interaction } from 'discord.js'
-
 import { useComponents } from '@constants/messageComponents'
 import { sendMessage } from '@utils/mainMessage'
 import { addSong } from '@utils/songHistory'
 import { useDJMode } from '@hooks/useDJMode'
 import { triggerQueueEmpty } from '@utils/djTriggers'
 
-export default async (queue: GuildQueue<Interaction>) => {
+import type { MusicQueue } from '../../lib'
+
+export default async (queue: MusicQueue) => {
   const { stopDJMode } = useDJMode(queue)
 
   // Trigger DJ event for queue empty
@@ -15,7 +14,7 @@ export default async (queue: GuildQueue<Interaction>) => {
 
   stopDJMode()
 
-  console.log('[songFinish] Queue finished', queue.isEmpty(), !queue.currentTrack)
+  console.log('[songFinish] Queue finished', queue.tracks.length === 0, !queue.currentTrack)
 
   const components = await useComponents(queue)
   const { channel } = queue.metadata
