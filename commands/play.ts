@@ -1,11 +1,13 @@
-import { deserialize, SearchOptions, Track, useMainPlayer, useQueue } from 'discord-player'
-import { AutocompleteInteraction, ChatInputCommandInteraction, GuildMember, SlashCommandBuilder } from 'discord.js'
-import { SpotifyExtractor } from 'discord-player-spotify'
-import { YoutubeSabrExtractor } from '@extractors/youtubei/youtubeiExtractor'
+import {
+  AutocompleteInteraction,
+  ChatInputCommandInteraction,
+  GuildMember,
+  SlashCommandBuilder,
+} from 'discord.js'
 
-import { playerOptions, nodeOptions } from '@constants/PlayerInitOptions'
-import { isSpotifyUrl, isUrl, isYouTubeUrl, parseSongName } from '@utils/utilities'
-import { getRandomSongsFromCache, getTopSongs } from '@utils/songHistory'
+import { isUrl, parseSongName } from '@utils/utilities'
+
+import { useMusicManager, useQueue, LavalinkTrack } from '../lib'
 
 export default {
   data: new SlashCommandBuilder()
@@ -21,7 +23,7 @@ export default {
   async autoComplete(interaction: AutocompleteInteraction) {
     if (!interaction.isAutocomplete()) return
 
-    const player = useMainPlayer()
+    const musicManager = useMusicManager()
 
     const focusedValue = interaction.options.getFocused()
 
@@ -31,43 +33,47 @@ export default {
       return
     }
 
-    let recentSongs = getRandomSongsFromCache(15)
-
-    if (recentSongs.length === 0) {
-      recentSongs = await getTopSongs('weekly', 15)
-      if (recentSongs.length === 0) {
-        recentSongs = await getTopSongs('monthly', 15)
-      }
-    }
-
-    const randomSong = deserialize(
-      player,
-      JSON.parse(recentSongs[Math.floor(Math.random() * recentSongs.length)].serializedTrack)
-    ) as Track
     try {
-      const searchQuery = focusedValue || randomSong.author || randomSong.title
+      // Use focused value or fallback to a default search
+      const searchQuery = focusedValue || 'popular music'
 
-      const searchResults = await player.search(searchQuery, {
-        searchEngine: `ext:${SpotifyExtractor.identifier}`,
-      })
-      const choices = searchResults.tracks.map((track) => {
-        let { author: artist, title } = track
-        if (track.source === 'youtube') {
-          const titleObj = parseSongName(track.title)
-          artist = titleObj.artist
-          if (titleObj.title) title = titleObj.title
-        }
-        return {
-          name: `${artist} - ${title}`.substring(0, 95),
-          value: `${artist} ${title}`.substring(0, 100),
-        }
-      })
+      // Search using YouTube for autocomplete
+      const searchResults = await musicManager.search(searchQuery, { source: 'ytsearch' })
+
+      if (searchResults.loadType === 'empty' || searchResults.loadType === 'error') {
+        await interaction.respond([])
+        return
+      }
+
+      const choices = searchResults.tracks
+        .filter((track: LavalinkTrack) => track?.info?.title && track?.info?.author)
+        .slice(0, 25)
+        .map((track: LavalinkTrack) => {
+          let artist = track.info.author
+          let title = track.info.title
+
+          if (track.info.sourceName === 'youtube') {
+            const titleObj = parseSongName(track.info.title)
+            artist = titleObj.artist
+            if (titleObj.title) title = titleObj.title
+          }
+
+          return {
+            name: `${artist} - ${title}`.substring(0, 95),
+            value: `${artist} ${title}`.substring(0, 100),
+          }
+        })
 
       const splitValue = focusedValue.split(' ')
 
       // Remove duplicates and filter by search query words
-      const filtered = [...new Map(choices.map((item) => [item['value'], item])).values()]
-        .filter((choice) =>
+      interface Choice {
+        name: string
+        value: string
+      }
+
+      const filtered = [...new Map(choices.map((item: Choice) => [item.value, item])).values()]
+        .filter((choice: Choice) =>
           splitValue.some((word) => choice.name.toLowerCase().includes(word.toLowerCase()))
         )
         .slice(0, 25)
@@ -75,13 +81,13 @@ export default {
       await interaction.respond(filtered)
     } catch (e) {
       console.warn('[searchCommand]', e)
+      await interaction.respond([])
     }
   },
   async execute(interaction: ChatInputCommandInteraction) {
     if (!interaction.isChatInputCommand()) return
 
-    const player = useMainPlayer()
-    const queue = useQueue(interaction.guild?.id as string)
+    const musicManager = useMusicManager()
     const { member } = interaction
 
     const {
@@ -99,47 +105,88 @@ export default {
     const loadingMsg = await interaction.reply({ content: '⏱ | Loading...' })
     setTimeout(() => loadingMsg.delete(), 1500)
 
-    // await interaction.deferReply()
-
     const songName = interaction.options.get('song')?.value as string
 
     console.log(`[playCommand] Playing: "${songName}"`)
 
     try {
-      // Determine the right search engine based on input
-      let searchEngine: SearchOptions['searchEngine']
+      // Determine the search prefix based on input
+      let searchQuery: string
+
       if (isUrl(songName)) {
-        if (isYouTubeUrl(songName)) {
-          searchEngine = `ext:${YoutubeSabrExtractor.identifier}`
-        } else if (isSpotifyUrl(songName)) {
-          searchEngine = `ext:${SpotifyExtractor.identifier}`
-        } else {
-          searchEngine = 'auto'
-        }
+        // Direct URL - no prefix needed
+        searchQuery = songName.trim()
       } else {
-        searchEngine = playerOptions.searchEngine || 'auto'
+        // Search query - let MusicManager handle prefixing (defaults to ytsearch)
+        searchQuery = songName.trim()
       }
 
-      // Use appropriate search format based on input type
-      const searchQuery = isUrl(songName) ? songName.trim() : `"${songName.trim()}"`
+      // Get or create queue
+      const guildId = interaction.guild?.id as string
+      const existingQueue = useQueue(guildId)
 
-      const { queue: newQueue, track } = await player.play(voiceChannel, searchQuery, {
-        ...playerOptions,
-        searchEngine,
-        nodeOptions: {
-          ...nodeOptions,
-          metadata: interaction,
-        },
-        requestedBy: member as GuildMember,
-      })
+      if (!existingQueue) {
+        // Create new queue and play - MusicManager.play() handles search internally
+        const { track } = await musicManager.play(voiceChannel, searchQuery, {
+          requestedBy: member as GuildMember,
+          metadata: {
+            channel: interaction.channel,
+          },
+        })
 
-      console.log(`[playCommand] Now playing: "${track?.title}" by "${track?.author}")`)
-
-      if (queue && queue.node.isPaused()) {
-        if (queue.tracks.size + (queue.currentTrack ? 1 : 0) >= 1) {
-          await queue.node.skip()
+        if (track?.info) {
+          console.log(`[playCommand] Now playing: "${track.info.title}" by "${track.info.author}"`)
         }
-        queue.node.resume()
+      } else {
+        // Ensure channel metadata is set for existing queue
+        if (!existingQueue.metadata.channel) {
+          existingQueue.metadata.channel = interaction.channel
+        }
+
+        // Search for the track manually to add to existing queue
+        const searchResult = await musicManager.search(searchQuery, {
+          requester: member as GuildMember,
+        })
+
+        if (
+          searchResult.loadType === 'empty' ||
+          searchResult.loadType === 'error' ||
+          searchResult.tracks.length === 0
+        ) {
+          await interaction.editReply({ content: '❌ | No results found!' })
+          return
+        }
+
+        // Add to existing queue
+        if (searchResult.loadType === 'playlist' && searchResult.tracks.length > 1) {
+          // Add all playlist tracks
+          for (const track of searchResult.tracks) {
+            await existingQueue.addTrack(track)
+          }
+        } else {
+          // Add single track
+          await existingQueue.addTrack(searchResult.tracks[0])
+        }
+
+        // If nothing is playing, start playing
+        if (!existingQueue.isPlaying && !existingQueue.currentTrack) {
+          await existingQueue.play()
+        }
+
+        // If queue is paused, skip to new track and resume
+        if (existingQueue.isPaused) {
+          if (existingQueue.tracks.length >= 1) {
+            await existingQueue.skip()
+          }
+          existingQueue.resume()
+        }
+
+        const track = searchResult.tracks[0]
+        if (track?.info) {
+          console.log(
+            `[playCommand] Added to queue: "${track.info.title}" by "${track.info.author}"`
+          )
+        }
       }
     } catch (e) {
       console.warn('[playCommand]', e)

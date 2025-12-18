@@ -1,12 +1,11 @@
-import { GuildQueue, Track } from 'discord-player'
-import { Interaction } from 'discord.js'
-
 import { useComponents } from '@constants/messageComponents'
 import { sendMessage } from '@utils/mainMessage'
 import { generateNowPlayingCanvas } from '@utils/nowPlayingCanvas'
 import { triggerTrackAdd } from '@utils/djTriggers'
 
-export default async (queue: GuildQueue<Interaction>, track: Track | Track[]) => {
+import type { MusicQueue, LavalinkTrack } from '../../lib'
+
+export default async (queue: MusicQueue, track: LavalinkTrack | LavalinkTrack[]) => {
   // Trigger DJ event for track add
   triggerTrackAdd(queue, track)
 
@@ -18,9 +17,9 @@ export default async (queue: GuildQueue<Interaction>, track: Track | Track[]) =>
   const components = await useComponents(queue)
   const { channel } = queue.metadata
 
-  const log = (track: Track) =>
+  const log = (track: LavalinkTrack) =>
     console.log(
-      `[addSong] Adding song: ${track.title?.substring(0, 90)} ${track.author.substring(0, 90)}`
+      `[addSong] Adding song: ${track.info.title?.substring(0, 90)} ${track.info.author.substring(0, 90)}`
     )
 
   if (Array.isArray(track)) {
@@ -29,10 +28,11 @@ export default async (queue: GuildQueue<Interaction>, track: Track | Track[]) =>
     log(track)
   }
 
-  if (queue.tracks.size + (queue.currentTrack ? 1 : 0) >= 1 && channel) {
-    const tracks = queue.tracks.toArray()
+  if (queue.tracks.length + (queue.currentTrack ? 1 : 0) >= 1 && channel) {
+    const tracks = [...queue.tracks]
     if (queue.currentTrack) tracks.unshift(queue.currentTrack)
 
+    console.log(`[addSong] Generating canvas with ${tracks.length} tracks`)
     const buffer = await generateNowPlayingCanvas(tracks)
     if (!channel || !channel.isTextBased() || !('guild' in channel)) return
 
@@ -40,5 +40,9 @@ export default async (queue: GuildQueue<Interaction>, track: Track | Track[]) =>
       files: [buffer],
       components,
     })
+  } else {
+    console.log(
+      `[addSong] Not generating canvas - tracks: ${queue.tracks.length}, currentTrack: ${!!queue.currentTrack}, channel: ${!!channel}`
+    )
   }
 }
