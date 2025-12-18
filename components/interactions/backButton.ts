@@ -1,30 +1,44 @@
-import { GuildQueue, useHistory } from 'discord-player'
-import { Interaction } from 'discord.js'
-
 import { getMainMessage, sendMessage } from '@utils/mainMessage'
 
-export default async (queue: GuildQueue<Interaction> | null) => {
+import { MusicQueue } from '../../lib'
+
+export default async (queue: MusicQueue | null) => {
   const mainMessage = getMainMessage()
 
-  if (!queue) {
-    if (!mainMessage?.channel.isTextBased() || !('guild' in mainMessage.channel)) return
-    sendMessage(mainMessage.channel, { content: '❌ | No music is being played!' })
+  if (!queue || !queue.currentTrack) {
     return
   }
 
-  const history = useHistory(queue.metadata.guildId as string)
-  const timestamp = queue.node.getTimestamp() || { current: { value: 0 } }
+  // Get current position in the track
+  const position = queue.player?.position || 0
 
-  if (queue.isPlaying() && timestamp.current.value > 5000) {
-    await queue.node.seek(0)
+  // If more than 3 seconds into the track, restart it
+  if (!queue.history || queue.history.length === 0 || position > 3000) {
+    console.log(`[backButton] Restarting current track (position: ${position}ms)`)
+    queue.player?.seekTo(0)
     return
   }
 
-  if (history && !history?.isEmpty()) {
-    try {
-      await history.previous()
-    } catch (e) {
-      console.error('[backButton]', e)
-    }
+  // Get the last track from history
+  const previousTrack = queue.history[queue.history.length - 1]
+
+  // Remove from history
+  queue.history.pop()
+
+  // Put current track at the front of the queue so we can go forward to it later
+  if (queue.currentTrack) {
+    queue.tracks.unshift(queue.currentTrack)
+  }
+
+  // Put the previous track at the very front
+  queue.tracks.unshift(previousTrack)
+
+  // Skip to play the previous track
+  queue.skip()
+
+  if (mainMessage?.channel.isTextBased() && 'guild' in mainMessage.channel) {
+    sendMessage(mainMessage.channel, {
+      content: `⏮️ Playing previous track: **${previousTrack.info.title}**`,
+    })
   }
 }

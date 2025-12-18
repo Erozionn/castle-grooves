@@ -46,9 +46,12 @@ function serializeLavalinkTrack(track: LavalinkTrack): string {
  * Deserialize database JSON to LavalinkTrack
  * Handles BOTH old discord-player format AND new Lavalink format
  */
-function deserializeLavalinkTrack(serialized: string): LavalinkTrack | null {
+function deserializeLavalinkTrack(
+  serialized: string | Record<string, unknown>
+): LavalinkTrack | null {
   try {
-    const data = JSON.parse(serialized)
+    // Handle both string and object formats
+    const data = typeof serialized === 'string' ? JSON.parse(serialized) : serialized
 
     // Check if it's new Lavalink format
     if (data.__lavalinkFormat) {

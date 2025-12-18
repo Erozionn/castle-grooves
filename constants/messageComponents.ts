@@ -102,8 +102,8 @@ export const useComponents = async (queue?: MusicQueue) => {
     playerButtons.back,
     playerButtons.playPause,
     playerButtons.skip,
-    // playerButtons.recommended,
-    playerButtons.dj,
+    playerButtons.recommended,
+    // playerButtons.dj,
     playerButtons.stop
   )
 
