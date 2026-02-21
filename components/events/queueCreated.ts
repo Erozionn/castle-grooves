@@ -1,12 +1,7 @@
-import { GuildQueue, Track } from 'discord-player'
-import { Interaction } from 'discord.js'
+import type { MusicQueue } from '../../lib'
 
-import { useComponents } from '@constants/messageComponents'
-import { sendMessage } from '@utils/mainMessage'
-import { useDJMode } from '@hooks/useDJMode'
-
-export default async (queue: GuildQueue<Interaction>) => {
-  // const guildId = queue.guild.id
+export default async (queue: MusicQueue) => {
+  // const guildId = queue.guildId
   // const { startDJMode } = useDJMode()
   //   startDJMode(guildId)
 }
