@@ -1,8 +1,8 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js'
-import { useQueue } from 'discord-player'
 
 import { moveMainMessage, sendMessage } from '@utils/mainMessage'
 import { useComponents } from '@constants/messageComponents'
+import { useQueue } from '../lib'
 
 export default {
   data: new SlashCommandBuilder()
@@ -12,7 +12,7 @@ export default {
     if (!interaction.guild) return
 
     const { channel } = interaction
-    const queue = useQueue(interaction.guild) || undefined
+    const queue = useQueue(interaction.guild.id) || undefined
     const components = await useComponents(queue)
     await interaction.deferReply()
 

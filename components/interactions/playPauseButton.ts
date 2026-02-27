@@ -1,10 +1,8 @@
-import { Interaction } from 'discord.js'
-import { GuildQueue } from 'discord-player'
-
 import { getMainMessage, sendMessage } from '@utils/mainMessage'
 import { useComponents } from '@constants/messageComponents'
+import { MusicQueue } from '../../lib'
 
-export default async (queue: GuildQueue<Interaction> | null) => {
+export default async (queue: MusicQueue | null) => {
   const mainMessage = getMainMessage()
   if (!queue) {
     if (!mainMessage || !mainMessage.channel.isTextBased() || !('guild' in mainMessage.channel))
@@ -17,10 +15,10 @@ export default async (queue: GuildQueue<Interaction> | null) => {
 
   if (!channel) return
 
-  if (!queue.node.isPaused()) {
-    queue.node.pause()
+  if (!queue.isPaused) {
+    queue.pause()
   } else {
-    queue.node.resume()
+    queue.resume()
   }
 
   const components = await useComponents(queue)

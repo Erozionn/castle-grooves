@@ -1,11 +1,9 @@
-import { Interaction } from 'discord.js'
-import { GuildQueue } from 'discord-player'
-
 import { sendMessage } from '@utils/mainMessage'
 import { useComponents } from '@constants/messageComponents'
 import { useDJMode } from '@hooks/useDJMode'
+import { MusicQueue } from '../../lib'
 
-export default async (queue: GuildQueue<Interaction> | null) => {
+export default async (queue: MusicQueue | null) => {
   if (!queue) return
 
   const { channel } = queue.metadata
@@ -16,13 +14,10 @@ export default async (queue: GuildQueue<Interaction> | null) => {
 
   stopDJMode()
 
-  if ((queue.isPlaying() || queue.currentTrack || queue.tracks.size > 0) && channel) {
+  // If there's music playing or tracks in queue, just stop playback (stay in channel)
+  if (queue.isPlaying || queue.currentTrack || queue.tracks.length > 0) {
     try {
-      queue.node.stop()
-      queue.clear()
-      queue.history.clear()
-
-      console.log('[stopButton] Stopped playback and cleared queue, staying in voice channel.')
+      queue.stop()
     } catch (error) {
       console.error('[stopButton] Error stopping playback:', error)
     }
@@ -36,8 +31,8 @@ export default async (queue: GuildQueue<Interaction> | null) => {
       components,
     })
   } else {
-    // If not playing, delete the queue entirely
-    queue.delete()
+    // If nothing is playing, disconnect from voice channel
+    queue.destroy()
 
     if (!channel || !channel.isTextBased() || !('guild' in channel)) return
 
@@ -47,6 +42,5 @@ export default async (queue: GuildQueue<Interaction> | null) => {
       files: [],
       components,
     })
-    console.log('[stopButton] Disconnected from voice connection.')
   }
 }

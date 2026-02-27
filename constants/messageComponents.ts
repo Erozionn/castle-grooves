@@ -1,4 +1,3 @@
-import { GuildQueue, QueueRepeatMode, useHistory } from 'discord-player'
 import {
   ActionRowBuilder,
   ButtonBuilder,
@@ -8,8 +7,10 @@ import {
   StringSelectMenuInteraction,
 } from 'discord.js'
 
-import { generateHistoryOptions } from '@utils/songHistory'
+import { generateHistoryOptions } from '@utils/songHistoryV2'
 import { useDJMode } from '@hooks/useDJMode'
+
+import { MusicQueue } from '../lib'
 
 const defaultPlayerButtons = {
   back: new ButtonBuilder()
@@ -69,7 +70,7 @@ const resetToDefaults = () => {
     .setEmoji('lightninganimated:1418830322996351027')
 }
 
-export const useComponents = async (queue?: GuildQueue) => {
+export const useComponents = async (queue?: MusicQueue) => {
   const playerButtons = defaultPlayerButtons
   const playerHistory = defaultPlayerHistory
 
@@ -101,8 +102,8 @@ export const useComponents = async (queue?: GuildQueue) => {
     playerButtons.back,
     playerButtons.playPause,
     playerButtons.skip,
-    // playerButtons.recommended,
-    playerButtons.dj,
+    playerButtons.recommended,
+    // playerButtons.dj,
     playerButtons.stop
   )
 
@@ -114,11 +115,12 @@ export const useComponents = async (queue?: GuildQueue) => {
 
   const { customId } = queue.metadata as ButtonInteraction | StringSelectMenuInteraction
 
-  const history = useHistory(queue)
-  const { isDJModeActive } = useDJMode(queue)
-  playerButtons.back.setDisabled(history?.isEmpty())
+  // History tracking not yet fully implemented
+  const hasHistory = queue.history && queue.history.length > 0
+  playerButtons.back.setDisabled(!hasHistory)
 
-  const isQueueEmpty = queue.isEmpty() && !queue.currentTrack
+  const { isDJModeActive } = useDJMode(queue)
+  const isQueueEmpty = queue.isEmpty && !queue.currentTrack
 
   if (isQueueEmpty) {
     playerButtons.skip.setDisabled(true)
@@ -141,7 +143,8 @@ export const useComponents = async (queue?: GuildQueue) => {
     }
   }
 
-  if (queue?.repeatMode === QueueRepeatMode.AUTOPLAY) {
+  // Check for autoplay mode (not yet implemented, so default to secondary)
+  if (queue?.repeatMode === 'queue') {
     playerButtons.recommended.setStyle(ButtonStyle.Success)
   } else {
     playerButtons.recommended.setStyle(ButtonStyle.Secondary)
@@ -149,13 +152,13 @@ export const useComponents = async (queue?: GuildQueue) => {
 
   switch (customId) {
     case 'stop_button':
-      if (queue.node.isPaused()) {
+      if (queue.isPaused) {
         resetToDefaults()
         playerButtons.stop.setEmoji('disconnect:1043629464166355015')
       }
       break
     case 'play_pause_button':
-      if (queue.node.isPaused()) {
+      if (queue.isPaused) {
         playerButtons.playPause.setStyle(ButtonStyle.Success)
       }
       break

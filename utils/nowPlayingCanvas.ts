@@ -1,7 +1,6 @@
 import path from 'node:path'
 
 import { Canvas, GlobalFonts, loadImage } from '@napi-rs/canvas'
-import { Track } from 'discord-player'
 
 import {
   capitalize,
@@ -10,7 +9,8 @@ import {
   splitAtClosestSpace,
   truncateString,
 } from '@utils/utilities'
-import { TrackWithSpotifyMetadata, TrackWithYoutubeiMetadata } from '@types'
+
+import { LavalinkTrack } from '../lib'
 
 GlobalFonts.registerFromPath(path.resolve('./assets/fonts/Poppins-Thin.ttf'), 'Poppins-Thin')
 GlobalFonts.registerFromPath(path.resolve('./assets/fonts/Poppins-Light.ttf'), 'Poppins-Light')
@@ -22,12 +22,25 @@ GlobalFonts.registerFromPath(
 )
 GlobalFonts.registerFromPath(path.resolve('./assets/fonts/Poppins-Bold.ttf'), 'Poppins-Bold')
 
-const getThumbnailUrl = (song: Track) => {
-  if (song.source === 'youtube') {
-    return `https://img.youtube.com/vi/${getYoutubeVideoId((song as TrackWithYoutubeiMetadata).url)}/mqdefault.jpg`
-  } else if (song.source === 'spotify') {
-    return (song as TrackWithSpotifyMetadata).metadata?.source?.thumbnail || song.thumbnail
+const getThumbnailUrl = (song: LavalinkTrack) => {
+  // Check if artworkUrl is provided by Lavalink
+  if (song.info.artworkUrl) {
+    return song.info.artworkUrl
   }
+
+  // Fallback: check userData for thumbnail
+  if (song.userData?.thumbnail) {
+    return song.userData.thumbnail
+  }
+
+  // For YouTube videos, extract ID from URI and construct thumbnail URL
+  if (song.info.sourceName === 'youtube' && song.info.uri) {
+    const videoId = getYoutubeVideoId(song.info.uri)
+    if (videoId) {
+      return `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`
+    }
+  }
+
   return null
 }
 
@@ -76,14 +89,14 @@ const renderMultiLineTitle = (
   return lineHeight * multiLineArray.length
 }
 
-export const nowPlayingCanvasWithUpNext = async (songs: Track[]) => {
+export const nowPlayingCanvasWithUpNext = async (songs: LavalinkTrack[]): Promise<Buffer> => {
   const canvas = new Canvas(700, 394)
   const canv = canvas.getContext('2d')
 
   const song = songs[0]
-  const { requestedBy } = song
+  const { requestedBy } = song.userData || {}
   const thumbnailUrl = getThumbnailUrl(song)
-  const isLocal = (song.metadata as { isLocal?: boolean })?.isLocal
+  const isLocal = false // Local file detection not implemented for Lavalink yet
 
   try {
     if (thumbnailUrl) {
@@ -109,9 +122,9 @@ export const nowPlayingCanvasWithUpNext = async (songs: Track[]) => {
   }
 
   // Split artist and title
-  let { author: artist, title } = song
-  if (song.source === 'youtube') {
-    const titleObj = parseSongName(song.title)
+  let { author: artist, title } = song.info
+  if (song.info.sourceName === 'youtube') {
+    const titleObj = parseSongName(song.info.title)
     artist = titleObj.artist
     if (titleObj.title) title = titleObj.title
   }
@@ -162,7 +175,7 @@ export const nowPlayingCanvasWithUpNext = async (songs: Track[]) => {
     canv.fillStyle = '#ffffff'
     canv.textAlign = 'left'
     canv.font = '600 18px Poppins'
-    canv.fillText(capitalize(requestedBy.displayName), 70, 364)
+    canv.fillText(capitalize(requestedBy.user.username), 70, 364)
     canv.fillStyle = '#ffffff'
 
     // Render "Up Next"
@@ -174,8 +187,8 @@ export const nowPlayingCanvasWithUpNext = async (songs: Track[]) => {
     try {
       const pics = await Promise.all(
         songs.slice(1, 7).map((s) => {
-          return s.requestedBy
-            ? loadImage(s.requestedBy.displayAvatarURL({ extension: 'png', size: 64 }))
+          return s.userData?.requestedBy
+            ? loadImage(s.userData.requestedBy.displayAvatarURL({ extension: 'png', size: 64 }))
             : null
         })
       )
@@ -203,9 +216,9 @@ export const nowPlayingCanvasWithUpNext = async (songs: Track[]) => {
     canv.fillStyle = `#ffffff`
     canv.font = '300 22px Poppins'
     canv.textAlign = 'left'
-    let { author: artist, title } = songObj
-    if (songObj.source === 'youtube') {
-      const titleObj = parseSongName(songObj.title)
+    let { author: artist, title } = songObj.info
+    if (songObj.info.sourceName === 'youtube') {
+      const titleObj = parseSongName(songObj.info.title)
       artist = titleObj.artist
       if (titleObj.title) title = titleObj.title
     }
@@ -239,12 +252,12 @@ export const nowPlayingCanvasWithUpNext = async (songs: Track[]) => {
   return await canvas.toBuffer('image/png')
 }
 
-export const nowPlayingCanvas = async (song: Track) => {
+export const nowPlayingCanvas = async (song: LavalinkTrack): Promise<Buffer> => {
   const canvas = new Canvas(700, 169)
   const canv = canvas.getContext('2d')
-  const { requestedBy } = song
+  const { requestedBy } = song.userData || {}
   const thumbnailUrl = getThumbnailUrl(song)
-  const isLocal = (song.metadata as { isLocal?: boolean })?.isLocal
+  const isLocal = false // Local file detection not implemented for Lavalink yet
 
   let _width = 0
 
@@ -269,9 +282,9 @@ export const nowPlayingCanvas = async (song: Track) => {
   }
 
   // Split artist and title
-  let { author: artist, title } = song
-  if (song.source === 'youtube') {
-    const titleObj = parseSongName(song.title)
+  let { author: artist, title } = song.info
+  if (song.info.sourceName === 'youtube') {
+    const titleObj = parseSongName(song.info.title)
     artist = titleObj.artist
     if (titleObj.title) title = titleObj.title
   }
@@ -320,7 +333,7 @@ export const nowPlayingCanvas = async (song: Track) => {
     canv.fillStyle = '#ffffff'
     canv.textAlign = 'left'
     canv.font = '600 18px Poppins'
-    canv.fillText(capitalize(requestedBy.displayName), _width + 25 + 32 + 12, 139)
+    canv.fillText(capitalize(requestedBy.user.username), _width + 25 + 32 + 12, 139)
 
     if (isLocal) {
       const isLocalIcon = await loadImage('./assets/icons/downloaded.png')
@@ -335,7 +348,7 @@ export const nowPlayingCanvas = async (song: Track) => {
 let lastExecutionTime = 0
 let debounceTimeout: NodeJS.Timeout | null = null
 
-export const generateNowPlayingCanvas = async (tracks: Track[]): Promise<Buffer> => {
+export const generateNowPlayingCanvas = async (tracks: LavalinkTrack[]): Promise<Buffer> => {
   const now = Date.now()
   const cooldown = 1000
 
@@ -357,12 +370,18 @@ export const generateNowPlayingCanvas = async (tracks: Track[]): Promise<Buffer>
   return await processTracks(tracks)
 }
 
-const processTracks = async (tracks: Track[]): Promise<Buffer> => {
+const processTracks = async (tracks: LavalinkTrack[]): Promise<Buffer> => {
   if (!tracks || tracks.length < 1)
     throw Error('Error: Cannot generate now playing canvas without songs')
+
+  console.log(`[Canvas] Processing ${tracks.length} track(s)`)
+
   if (tracks.length > 1) {
+    console.log(`[Canvas] Using nowPlayingCanvasWithUpNext`)
     return await nowPlayingCanvasWithUpNext(tracks)
   }
+
+  console.log(`[Canvas] Using nowPlayingCanvas (single track)`)
   return await nowPlayingCanvas(tracks[0])
 }
 

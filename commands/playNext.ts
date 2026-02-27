@@ -1,7 +1,6 @@
-import { useMainPlayer, useQueue } from 'discord-player'
 import { GuildMember, ChatInputCommandInteraction, SlashCommandBuilder } from 'discord.js'
 
-import { playerOptions, nodeOptions } from '@constants/PlayerInitOptions'
+import { useMusicManager, useQueue } from '../lib'
 
 export default {
   data: new SlashCommandBuilder()
@@ -13,7 +12,7 @@ export default {
   async execute(interaction: ChatInputCommandInteraction) {
     if (!interaction.isChatInputCommand()) return
 
-    const player = useMainPlayer()
+    const musicManager = useMusicManager()
     const queue = useQueue(interaction.guild?.id as string)
     const { member } = interaction
 
@@ -35,33 +34,42 @@ export default {
     const songName = interaction.options.get('song')?.value as string
 
     try {
-      if (queue?.node.isPlaying()) {
-        console.log('queue.node.isPlaying()')
-        const searchResult = await player.search(songName, {
-          requestedBy: member as GuildMember,
+      if (queue?.isPlaying || queue?.currentTrack) {
+        // Ensure channel metadata is set
+        if (!queue.metadata.channel) {
+          queue.metadata.channel = interaction.channel
+        }
+
+        // Search for the track
+        const results = await musicManager.search(songName, { source: 'spsearch' })
+
+        if (!results || !results.tracks || results.tracks.length === 0) {
+          await interaction.editReply({ content: '❌ | No results found!' })
+          return
+        }
+
+        // Insert at the front of the queue
+        queue.insertTrack(results.tracks[0], 0)
+        await interaction.editReply({
+          content: `✅ | Added **${results.tracks[0].info.title}** to play next!`,
         })
-        queue?.insertTrack(searchResult.tracks[0], 0)
       } else {
-        console.log('queue.node.isPlaying() is false')
-        player.play(voiceChannel, songName, {
-          ...playerOptions,
-          nodeOptions: {
-            ...nodeOptions,
-            metadata: interaction,
-          },
-          requestedBy: member as GuildMember,
+        // No queue exists or nothing playing, just play the song
+        await musicManager.play(voiceChannel, songName, {
+          metadata: { channel: interaction.channel },
         })
       }
 
-      if (queue && queue.node.isPaused()) {
-        if (queue.tracks.size + (queue.currentTrack ? 1 : 0) >= 1) {
-          await queue.node.skip()
+      // If queue is paused, skip to the next track and resume
+      if (queue && queue.isPaused) {
+        if (queue.tracks.length + (queue.currentTrack ? 1 : 0) >= 1) {
+          queue.skip()
         }
-        queue.node.resume()
+        queue.resume()
       }
     } catch (e) {
-      console.warn('[playCommand]', e)
-      await interaction.editReply({ content: 'Error joining your channel.' })
+      console.warn('[playNextCommand]', e)
+      await interaction.editReply({ content: '❌ | Error playing the song.' })
     }
   },
 }

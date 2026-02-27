@@ -1,11 +1,10 @@
-import { GuildQueue } from 'discord-player'
-import { Interaction } from 'discord.js'
-
 import { useComponents } from '@constants/messageComponents'
 import { sendMessage } from '@utils/mainMessage'
 import { useDJMode } from '@hooks/useDJMode'
 
-export default async (queue: GuildQueue<Interaction>) => {
+import type { MusicQueue } from '../../lib'
+
+export default async (queue: MusicQueue) => {
   const { stopDJMode } = useDJMode(queue)
 
   stopDJMode()

@@ -1,16 +1,17 @@
-import { ButtonInteraction, GuildMember, Interaction } from 'discord.js'
-import { GuildQueue, QueueRepeatMode, useMainPlayer, deserialize, Track } from 'discord-player'
+import { ButtonInteraction, GuildMember } from 'discord.js'
 
+import type { ClientType } from '@types'
 import { sendMessage } from '@utils/mainMessage'
 import { useComponents } from '@constants/messageComponents'
-import { getSmartSongRecommendation } from '@utils/songHistory'
-import { nodeOptions, playerOptions } from '@constants/PlayerInitOptions'
+import { getRecommendationsFromQueue } from '@utils/spotifyRecommendations'
 
-export default async (
-  queue: GuildQueue<ButtonInteraction> | null,
-  interaction: ButtonInteraction
-) => {
+import { MusicQueue } from '../../lib'
+
+export default async (queue: MusicQueue | null, interaction: ButtonInteraction) => {
+  const client = interaction.client as ClientType
+  const musicManager = client.musicManager
   const { channel } = queue?.metadata || interaction
+  const guildId = interaction.guildId
 
   const {
     member,
@@ -21,7 +22,7 @@ export default async (
     voice: { channel: voiceChannel },
   } = member as GuildMember
 
-  if (!userId || !voiceChannel) {
+  if (!userId || !voiceChannel || !guildId) {
     if (channel && channel.isTextBased() && 'guild' in channel) {
       await sendMessage(channel, {
         content: '❌ | You need to be in a voice channel to get song recommendations!',
@@ -30,133 +31,148 @@ export default async (
     return
   }
 
-  if (queue && (queue.isPlaying() || queue.currentTrack || queue.tracks.size > 0)) {
-    if (queue && queue.repeatMode !== QueueRepeatMode.AUTOPLAY) {
-      queue.setRepeatMode(QueueRepeatMode.AUTOPLAY)
-    } else if (queue) {
-      queue.setRepeatMode(QueueRepeatMode.OFF)
-    }
-
-    if (channel && channel.isTextBased() && 'guild' in channel) {
-      await sendMessage(channel, {
-        components: await useComponents(queue),
-      })
-    }
-    return
-  }
-
   try {
     // Show loading message
-    let loadingMessage = null
     if (channel && channel.isTextBased() && 'guild' in channel) {
-      loadingMessage = await sendMessage(channel, {
-        content: '⚡ | Loading song...',
+      await sendMessage(channel, {
+        content: '⚡ | Getting recommendations...',
       })
     }
 
-    // Get all user IDs from the voice channel
-    const voiceChannelUserIds = voiceChannel.members
-      .filter((member) => !member.user.bot)
-      .map((member) => member.user.id)
+    // Get recommendations - works even without current track by using history
+    const recommendations = await getRecommendationsFromQueue(queue ?? undefined, musicManager)
 
-    // Get recommendation using all voice channel users
-    const recommendation = await getSmartSongRecommendation(voiceChannelUserIds, queue || undefined)
-
-    if (recommendation && recommendation.serializedTrack) {
-      console.log(`[recommendedButton] Found recommendation: "${recommendation.songTitle}"`)
-
-      const player = useMainPlayer()
-      const track = deserialize(player, JSON.parse(recommendation.serializedTrack)) as Track
-
-      if (track) {
-        console.log(`[recommendedButton] Deserialized track: "${track.title}" by ${track.author}`)
-
-        // Ensure the track is requested by the button clicker
-        if ('setMetadata' in track) {
-          track.setMetadata({
-            ...(typeof track.metadata === 'object' && track.metadata !== null
-              ? track.metadata
-              : {}),
-            requestedBy: member as GuildMember,
-          })
-        }
-
-        track.requestedBy = (member as GuildMember).user
-
-        const { queue: updatedQueue } = await player.play(voiceChannel, track, {
-          ...playerOptions,
-          nodeOptions: {
-            ...nodeOptions,
-            metadata: interaction,
-          },
-          requestedBy: member as GuildMember,
+    if (!recommendations || recommendations.length === 0) {
+      if (channel && channel.isTextBased() && 'guild' in channel) {
+        await sendMessage(channel, {
+          content:
+            '❌ No recommendations found. Play some Spotify songs first to build your history!',
         })
+      }
+      return
+    }
 
-        if (queue && queue.node.isPaused()) {
-          if (queue.tracks.size + (queue.currentTrack ? 1 : 0) >= 1) {
-            await queue.node.skip()
-          }
-          queue.node.resume()
-        }
+    console.log(`[recommendedButton] Found ${recommendations.length} recommendations`)
 
-        console.log(
-          `[recommendedButton] Track added. Queue state: currentTrack=${!!updatedQueue?.currentTrack}, tracks=${updatedQueue?.tracks.size || 0}, isPlaying=${updatedQueue?.node.isPlaying()}`
-        )
+    // First, deduplicate the recommendations themselves
+    const seenIdentifiers = new Set<string>()
+    const deduplicatedRecommendations = recommendations.filter((track) => {
+      if (seenIdentifiers.has(track.info.identifier)) {
+        return false
+      }
+      seenIdentifiers.add(track.info.identifier)
+      return true
+    })
 
-        // Ensure the queue starts playing, especially important when no queue existed before
-        // if (updatedQueue) {
-        //   // If this was the first song (no existing queue), give more time for connection to establish
-        //   const waitTime = hadExistingQueue ? 500 : 2000
+    console.log(
+      `[recommendedButton] Deduplicated recommendations: ${recommendations.length} -> ${deduplicatedRecommendations.length}`
+    )
 
-        //   setTimeout(() => {
-        //     if (!updatedQueue.node.isPlaying() && !updatedQueue.node.isPaused()) {
-        //       console.log(
-        //         '[recommendedButton] Queue not playing after connection, attempting to start...'
-        //       )
-        //       updatedQueue.node.resume()
+    // Get currently queued track identifiers to avoid duplicates
+    const queuedIdentifiers = new Set<string>()
 
-        //       // For brand new queues, try a more aggressive approach
-        //       if (!hadExistingQueue) {
-        //         setTimeout(() => {
-        //           if (!updatedQueue.node.isPlaying()) {
-        //             console.log(
-        //               '[recommendedButton] Still not playing, trying skip to force start...'
-        //             )
-        //             if (updatedQueue.tracks.size > 0) {
-        //               updatedQueue.node.skip()
-        //             }
-        //           }
-        //         }, 1000)
-        //       }
-        //     }
-        //   }, waitTime)
+    // Add current track if exists
+    if (queue?.currentTrack) {
+      queuedIdentifiers.add(queue.currentTrack.info.identifier)
+    }
 
-        //   // Update components after successful play
-        //   const components = await useComponents(updatedQueue)
-        //   if (channel && channel.isTextBased() && 'guild' in channel) {
-        //     await sendMessage(channel, {
-        //       components,
-        //     })
-        //   }
-        // }
-
-        return
+    // Add all tracks in queue if exists
+    if (queue?.tracks) {
+      for (const track of queue.tracks) {
+        queuedIdentifiers.add(track.info.identifier)
       }
     }
 
-    // Fallback if no recommendation found
+    // Filter out duplicates
+    const uniqueRecommendations = deduplicatedRecommendations.filter((track) => {
+      return !queuedIdentifiers.has(track.info.identifier)
+    })
+
+    console.log(
+      `[recommendedButton] Filtered to ${uniqueRecommendations.length} unique tracks (removed ${recommendations.length - uniqueRecommendations.length} duplicates)`
+    )
+
+    if (uniqueRecommendations.length === 0) {
+      if (channel && channel.isTextBased() && 'guild' in channel) {
+        await sendMessage(channel, {
+          content: '❌ All recommended tracks are already in the queue!',
+          components: await useComponents(queue || undefined),
+        })
+      }
+      return
+    }
+
+    // Create queue if it doesn't exist
+    let activeQueue = queue
+    if (!activeQueue) {
+      console.log('[recommendedButton] No queue exists, creating by playing first track')
+      // Play the first track to create the queue
+      const firstTrack = uniqueRecommendations[0]
+      const trackUrl = firstTrack.info.uri?.startsWith('http')
+        ? firstTrack.info.uri
+        : `https://open.spotify.com/track/${firstTrack.info.identifier}`
+
+      const result = await musicManager.play(voiceChannel, trackUrl, {
+        requestedBy: member as GuildMember,
+        metadata: { channel },
+      })
+      activeQueue = result.queue
+
+      // Remove first track from list since we just played it
+      uniqueRecommendations.shift()
+    }
+
+    // Add remaining unique recommendations to queue
+    for (const track of uniqueRecommendations) {
+      // Preserve requestedBy in userData
+      if (!track.userData) {
+        track.userData = {}
+      }
+      track.userData.requestedBy = member as GuildMember
+
+      activeQueue.addTrack(track)
+    }
+
+    console.log(`[recommendedButton] Added ${uniqueRecommendations.length} tracks to queue`)
+
+    // If queue is paused, resume playback
+    if (activeQueue.isPaused) {
+      console.log('[recommendedButton] Queue is paused, resuming playback')
+      activeQueue.resume()
+    }
+
+    // If nothing is playing and queue has tracks, start playing
+    if (!activeQueue.isPlaying && !activeQueue.currentTrack && activeQueue.tracks.length > 0) {
+      console.log('[recommendedButton] Queue not playing, starting playback')
+      await activeQueue.play()
+    }
+
+    // Update message with success
     if (channel && channel.isTextBased() && 'guild' in channel) {
+      const totalAdded = queue ? uniqueRecommendations.length : uniqueRecommendations.length
       await sendMessage(channel, {
-        content:
-          '❌ No song recommendations found. Try playing some songs first or try again later!',
+        content: `✅ Added ${totalAdded} recommended tracks to the queue!${!queue ? ' Started playing!' : ''}`,
+        components: await useComponents(activeQueue),
       })
     }
+
+    return
   } catch (error) {
-    console.warn('[recommendedButton] Error getting recommendation:', error)
+    console.error('[recommendedButton] Error getting recommendation:', error)
 
     let errorMessage = '❌ Failed to get song recommendation. Please try again.'
-    if (error instanceof Error && error.message && error.message.includes('YOUTUBEJS')) {
-      errorMessage = '❌ YouTube search is currently experiencing issues. Please try again later.'
+    if (error instanceof Error) {
+      console.error('[recommendedButton] Error details:', error.message)
+      if (error.message.includes('YOUTUBEJS')) {
+        errorMessage = '❌ YouTube search is currently experiencing issues. Please try again later.'
+      } else if (error.message.includes('No Spotify tracks')) {
+        errorMessage =
+          '❌ No Spotify tracks found in history. Play some Spotify songs first to get recommendations!'
+      } else if (error.message.includes('Spotify credentials')) {
+        errorMessage = '❌ Spotify credentials not configured. Please check your .env file.'
+      } else {
+        errorMessage = `❌ ${error.message}`
+      }
     }
 
     if (channel && channel.isTextBased() && 'guild' in channel) {

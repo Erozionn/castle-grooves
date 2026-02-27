@@ -119,3 +119,5 @@ mockNowPlayingMulti.png
 recordings/**
 
 *-player-script.js
+
+influx-backup/

@@ -1,5 +1,4 @@
 import { CacheType, ChatInputCommandInteraction } from 'discord.js'
-import { useMainPlayer } from 'discord-player'
 
 import { ClientType, CommandObject } from '@types'
 
@@ -10,14 +9,8 @@ export default async (interaction: ChatInputCommandInteraction<CacheType>, clien
 
   if (!command || !interaction.guild) return
 
-  const player = useMainPlayer()
-
-  const data = {
-    guild: interaction.guild,
-  }
-
   try {
-    await player.context.provide(data, () => command.execute(interaction))
+    await command.execute(interaction)
   } catch (error) {
     console.error('[commandInteraction]', error)
 
