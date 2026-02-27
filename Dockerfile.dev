@@ -1,0 +1,33 @@
+# Development Dockerfile with hot reload support
+FROM node:lts-alpine
+
+# Install dependencies
+RUN apk update && \
+  apk add --no-cache \
+  python3 \
+  make \
+  g++ \
+  fontconfig \
+  ffmpeg
+
+# Enable Yarn
+RUN corepack enable && corepack prepare yarn@stable --activate && yarn set version 4
+
+# Set working directory
+WORKDIR /usr/src/app
+
+# Copy package files
+COPY package.json yarn.lock .yarnrc.yml ./
+COPY patches ./patches
+
+# Install dependencies (including dev dependencies)
+RUN yarn install --immutable
+
+# Copy source code (will be overridden by volume mount in dev)
+COPY . .
+
+# Expose port
+EXPOSE 1337
+
+# Use ts-node-dev for hot reload
+CMD ["yarn", "start:dev"]

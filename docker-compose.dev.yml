@@ -1,13 +1,14 @@
 services:
-  # Discord Bot
+  # Discord Bot (Development Mode with Hot Reload)
   bot:
     build:
       context: .
-      dockerfile: Dockerfile
-    container_name: castle-grooves-bot
+      dockerfile: Dockerfile.dev
+    container_name: castle-grooves-bot-dev
     restart: unless-stopped
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=development
+      - TS_NODE_DEV=true
       - BOT_TOKEN=${BOT_TOKEN}
       - CLIENT_ID=${CLIENT_ID}
       - GUILD_ID=${GUILD_ID}
@@ -28,6 +29,7 @@ services:
       - PRELOAD_SONG_DATA=${PRELOAD_SONG_DATA}
     ports:
       - "1337:1337"
+      - "9229:9229"  # Node debugger port
     depends_on:
       lavalink:
         condition: service_started
@@ -36,12 +38,18 @@ services:
     networks:
       - castle-grooves
     volumes:
+      # Mount source code for hot reload
+      - ./:/usr/src/app
+      # Use named volumes for node_modules to avoid overwriting
+      - node_modules:/usr/src/app/node_modules
+      - yarn_cache:/usr/src/app/.yarn
+      # Mount recordings
       - ./recordings:/usr/src/app/recordings
 
   # Lavalink Audio Server
   lavalink:
     image: ghcr.io/lavalink-devs/lavalink:4-alpine
-    container_name: castle-grooves-lavalink
+    container_name: castle-grooves-lavalink-dev
     restart: unless-stopped
     environment:
       - _JAVA_OPTIONS=-Xmx2G
@@ -61,7 +69,7 @@ services:
   # InfluxDB Time-Series Database
   influxdb:
     image: influxdb:2-alpine
-    container_name: castle-grooves-influxdb
+    container_name: castle-grooves-influxdb-dev
     restart: unless-stopped
     environment:
       - DOCKER_INFLUXDB_INIT_MODE=setup
@@ -71,8 +79,8 @@ services:
       - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUX_BUCKET}
       - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUX_TOKEN}
     volumes:
-      - influxdb-data:/var/lib/influxdb2
-      - influxdb-config:/etc/influxdb2
+      - influxdb-data-dev:/var/lib/influxdb2
+      - influxdb-config-dev:/etc/influxdb2
     ports:
       - "8086:8086"
     networks:
@@ -89,5 +97,7 @@ networks:
     driver: bridge
 
 volumes:
-  influxdb-data:
-  influxdb-config:
+  node_modules:
+  yarn_cache:
+  influxdb-data-dev:
+  influxdb-config-dev:

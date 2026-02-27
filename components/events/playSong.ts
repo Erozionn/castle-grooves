@@ -23,7 +23,12 @@ export default async (queue: MusicQueue, track: LavalinkTrack) => {
     if (queue.currentTrack) tracks.unshift(queue.currentTrack)
 
     // Write song info into DB (playing [true:false], song)
-    await addSong(queue.isPlaying, track)
+    // Get requestedBy from track.userData if available
+    console.log(
+      `[playSong] Now playing: ${track.info.title} (requested by: ${track.userData?.requestedBy || 'unknown'})`
+    )
+    const requestedBy = track.userData?.requestedBy
+    await addSong(queue.isPlaying, track, requestedBy)
 
     if (!channel || !channel.isTextBased() || !('guild' in channel)) return
 
