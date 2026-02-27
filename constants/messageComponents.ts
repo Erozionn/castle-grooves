@@ -45,11 +45,6 @@ const defaultPlayerButtons = {
     .setEmoji('musicoff:909248235623825439'),
 }
 
-const defaultPlayerHistory = new StringSelectMenuBuilder()
-  .setCustomId('history')
-  .setMaxValues(1)
-  .setPlaceholder('-- Song History --')
-
 // Simple function to reset buttons to default state
 const resetToDefaults = () => {
   defaultPlayerButtons.back.setStyle(ButtonStyle.Primary).setDisabled(true)
@@ -72,7 +67,12 @@ const resetToDefaults = () => {
 
 export const useComponents = async (queue?: MusicQueue) => {
   const playerButtons = defaultPlayerButtons
-  const playerHistory = defaultPlayerHistory
+
+  // Create fresh instance each time to avoid shared state issues
+  const playerHistory = new StringSelectMenuBuilder()
+    .setCustomId('history')
+    .setMaxValues(1)
+    .setPlaceholder('-- Song History --')
 
   resetToDefaults()
 
