@@ -1,0 +1,78 @@
+diff --git a/node_modules/@distube/ytdl-core/lib/sig.js b/node_modules/@distube/ytdl-core/lib/sig.js
+index 6ff1501..7682244 100644
+--- a/node_modules/@distube/ytdl-core/lib/sig.js
++++ b/node_modules/@distube/ytdl-core/lib/sig.js
+@@ -96,9 +96,9 @@ const TCE_SIGN_FUNCTION_REGEXP = "function\\(\\s*([a-zA-Z0-9$])\\s*\\)\\s*\\{" +
+     "\\s*\\3\\[\\2\\[\\d+\\]\\]\\(\\s*\\1\\s*,\\s*\\d+\\s*\\);" +
+     ".*?return\\s*\\1\\[\\2\\[\\d+\\]\\]\\(\\2\\[\\d+\\]\\)\\};";
+ 
+-const TCE_SIGN_FUNCTION_ACTION_REGEXP = "var\\s*[a-zA-Z0-9$_]+\\s*=\\s*\\{\\s*[a-zA-Z0-9$_]+\\s*:\\s*function\\((\\w+|\\s*\\w+\\s*,\\s*\\w+\\s*)\\)\\s*\\{\\s*(\\s*var\\s*\\w+=\\w+\\[\\d+\\];\\w+\\[\\d+\\]\\s*=\\s*\\w+\\[\\w+\\s*\\%\\s*\\w+\\[\\w+\\[\\d+\\]\\]\\];\\s*\\w+\\[\\w+\\s*%\\s*\\w+\\[\\w+\\[\\d+\\]\\]\\]\\s*=\\s*\\w+\\s*\\},|\\w+\\[\\w+\\[\\d+\\]\\]\\(\\)\\},)\\s*[a-zA-Z0-9$_]+\\s*:\\s*function\\((\\s*\\w+\\w*,\\s*\\w+\\s*|\\w+)\\)\\s*\\{(\\w+\\[\\w+\\[\\d+\\]\\]\\(\\)|\\s*var\\s*\\w+\\s*=\\s*\\w+\\[\\d+\\]\\s*;\\w+\\[\\d+\\]\\s*=\\w+\\[\\s*\\w+\\s*%\\s*\\w+\\[\\w+\\[\\d+\\]\\]\\]\\s*;\\w+\\[\\s*\\w+\\s*%\\s*\\w\\[\\w+\\[\\d+\\]\\]\\]\\s*=\\s*\\w+\\s*)\\},\\s*[a-zA-Z0-9$_]+\\s*:\\s*function\\s*\\(\\s*\\w+\\s*,\\s*\\w+\\s*\\)\\{\\w+\\[\\w+\\[\\d+\\]\\]\\(\\s*\\d+\\s*,\\s*\\w+\\s*\\)\\}\\};";
++const TCE_SIGN_FUNCTION_ACTION_REGEXP = "var\\s+([A-Za-z0-9_]+)\\s*=\\s*\\{\\s*(?:[A-Za-z0-9_]+)\\s*:\\s*function\\s*\\([^)]*\\)\\s*\\{[^{}]*(?:\\{[^{}]*\\}[^{}]*)*\\}\\s*,\\s*(?:[A-Za-z0-9_]+)\\s*:\\s*function\\s*\\([^)]*\\)\\s*\\{[^{}]*(?:\\{[^{}]*\\}[^{}]*)*\\}\\s*,\\s*(?:[A-Za-z0-9_]+)\\s*:\\s*function\\s*\\([^)]*\\)\\s*\\{[^{}]*(?:\\{[^{}]*\\}[^{}]*)*\\}\\s*\\};";
+ 
+-const TCE_N_FUNCTION_REGEXP = "function\\s*\\((\\w+)\\)\\s*\\{var\\s*\\w+\\s*=\\s*\\1\\[\\w+\\[\\d+\\]\\]\\(\\w+\\[\\d+\\]\\)\\s*,\\s*\\w+\\s*=\\s*\\[.*?\\]\\;.*?catch\\(\\s*(\\w+)\\s*\\s*\\)\\s*\\{return\\s*\\w+\\[\\d+\\](\\+\\1)?\\}\\s*return\\s*\\w+\\[\\w+\\[\\d+\\]\\]\\(\\w+\\[\\d+\\]\\)\\}\\;";
++const TCE_N_FUNCTION_REGEXP = "function\\s*\\((\\w+)\\)\\s*\\{var\\s*\\w+\\s*=\\s*\\1\\[\\w+\\[\\d+\\]\\]\\(\\w+\\[\\d+\\]\\)\\s*,\\s*\\w+\\s*=\\s*\\[.*?\\]\\;.*?catch\\s*\\(\\s*(\\w+)\\s*\\)\\s*\\{return\\s*\\w+\\[\\d+\\]\\s*\\+\\s*\\1\\}\\s*return\\s*\\w+\\[\\w+\\[\\d+\\]\\]\\(\\w+\\[\\d+\\]\\)\\}\\s*\\;";
+ 
+ const PATTERN_PREFIX = "(?:^|,)\\\"?(" + VARIABLE_PART + ")\\\"?";
+ const REVERSE_PATTERN = new RegExp(PATTERN_PREFIX + REVERSE_PART, "m");
+@@ -129,7 +129,7 @@ const extractTceFunc = (body) => {
+     const varname = tceVariableMatcherGroups.varname;
+ 
+     return { name: varname, code: code };
+-  } catch (e) {
++  }catch (e) {
+     console.error("Error in extractTceFunc:", e);
+     return null;
+   }
+@@ -199,6 +199,7 @@ const extractDecipherFunc = (body, name, code) => {
+ 
+ const extractNTransformFunc = (body, name, code) => {
+   try {
++
+     const callerFunc = N_TRANSFORM_FUNC_NAME + "(" + N_ARGUMENT + ");";
+     let resultFunc;
+     let nFunction;
+@@ -209,6 +210,7 @@ const extractNTransformFunc = (body, name, code) => {
+       nFunction = nFunctionMatcher[0];
+   
+       const tceEscapeName = name.replace("$", "\\$");
++    
+       const shortCircuitPattern = new RegExp(
+         `;\\s*if\\s*\\(\\s*typeof\\s+[a-zA-Z0-9_$]+\\s*===?\\s*(?:\"undefined\"|'undefined'|${tceEscapeName}\\[\\d+\\])\\s*\\)\\s*return\\s+\\w+;`
+       );
+@@ -385,21 +387,19 @@ exports.setDownloadURL = (format, decipherScript, nTransformScript) => {
+   }
+ };
+ 
++/**
++ * Applies decipher and n parameter transforms to all format URL's.
++ *
++ * @param {Array.<Object>} formats
++ * @param {string} html5player
++ * @param {Object} options
++ */
+ exports.decipherFormats = async (formats, html5player, options) => {
+-  try {
+-    const decipheredFormats = {};
+-    const [decipherScript, nTransformScript] = await exports.getFunctions(html5player, options);
+-
+-    formats.forEach(format => {
+-      exports.setDownloadURL(format, decipherScript, nTransformScript);
+-      if (format.url) {
+-        decipheredFormats[format.url] = format;
+-      }
+-    });
+-
+-    return decipheredFormats;
+-  } catch (err) {
+-    console.error("Error deciphering formats:", err);
+-    return {};
+-  }
++  const decipheredFormats = {};
++  const [decipherScript, nTransformScript] = await exports.getFunctions(html5player, options);
++  formats.forEach(format => {
++    exports.setDownloadURL(format, decipherScript, nTransformScript);
++    decipheredFormats[format.url] = format;
++  });
++  return decipheredFormats;
+ };
+\ No newline at end of file

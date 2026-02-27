@@ -1,10 +1,10 @@
-import { SlashCommandBuilder } from 'discord.js'
+import { ChatInputCommandInteraction, SlashCommandBuilder } from 'discord.js'
 
 export default {
   data: new SlashCommandBuilder()
     .setName('coin-toss')
     .setDescription('Tosses a coin. Heads or tails.'),
-  async execute(interaction) {
+  async execute(interaction: ChatInputCommandInteraction) {
     await interaction.deferReply()
 
     setTimeout(async () => {

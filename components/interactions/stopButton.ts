@@ -1,38 +1,46 @@
-import { Queue } from 'distube'
-import { ButtonInteraction } from 'discord.js'
-
 import { sendMessage } from '@utils/mainMessage'
-import {
-  components,
-  playerButtons,
-  playerButtonsType,
-  playerHistory,
-} from '@constants/messageComponents'
-import { ClientType } from '@types'
+import { useComponents } from '@constants/messageComponents'
+import { useDJMode } from '@hooks/useDJMode'
+import { MusicQueue } from '../../lib'
 
-export default async (client: ClientType, interaction: ButtonInteraction, queue?: Queue) => {
-  if (!queue) {
-    client.player.voices.leave(interaction)
-    return
-  }
+export default async (queue: MusicQueue | null) => {
+  if (!queue) return
 
-  if (queue.playing && queue.textChannel) {
-    queue.pause()
-    queue.songs.splice(1)
+  const { channel } = queue.metadata
 
-    playerButtons.stop.setEmoji('disconnect:1043629464166355015')
-    playerHistory.setPlaceholder('-- Song History --')
+  if (!channel) return
 
-    for (let i = 0; i < 4; i++) {
-      playerButtons[Object.keys(playerButtons)[i] as playerButtonsType].setDisabled(true)
+  const { stopDJMode } = useDJMode(queue)
+
+  stopDJMode()
+
+  // If there's music playing or tracks in queue, just stop playback (stay in channel)
+  if (queue.isPlaying || queue.currentTrack || queue.tracks.length > 0) {
+    try {
+      queue.stop()
+    } catch (error) {
+      console.error('[stopButton] Error stopping playback:', error)
     }
 
-    await sendMessage(queue.textChannel, {
+    if (!channel || !channel.isTextBased() || !('guild' in channel)) return
+
+    const components = await useComponents(queue)
+    await sendMessage(channel, {
       content: '🎶 | Previously Played:',
       files: [],
       components,
     })
   } else {
-    queue.stop()
+    // If nothing is playing, disconnect from voice channel
+    queue.destroy()
+
+    if (!channel || !channel.isTextBased() || !('guild' in channel)) return
+
+    const components = await useComponents()
+    await sendMessage(channel, {
+      content: '🎶 | Pick a song below or use </play:991566063068250134>',
+      files: [],
+      components,
+    })
   }
 }

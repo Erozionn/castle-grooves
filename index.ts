@@ -12,9 +12,6 @@ import {
   TextChannel,
   Message,
 } from 'discord.js'
-import { DisTube } from 'distube'
-import { YtDlpPlugin } from '@distube/yt-dlp'
-import { SpotifyPlugin } from '@distube/spotify'
 
 import {
   addSongEventHandler,
@@ -22,29 +19,30 @@ import {
   emptyEventHandler,
   playSongEventHandler,
   songFinishEventHandler,
+  queueCreatedEventHandler,
   buttonHandler,
 } from '@components/events'
-import { ClientType } from '@types'
-import { historyActionRow, playerHistory } from '@constants/messageComponents'
+import { ClientType, CommandObject } from '@types'
+import { useComponents } from '@constants/messageComponents'
 import { getMainMessage, sendMessage, deleteMessage } from '@utils/mainMessage'
+import { preloadSongData } from '@utils/songHistoryV2'
 import initApi from '@api'
 import ENV from '@constants/Env'
-import { generateHistoryOptions } from '@utils/songHistory'
 import { recordVoiceStateChange } from '@utils/recordActivity'
 import { commandInteractionHandler } from '@components/interactions'
 import { nowPlayingCanvas, nowPlayingCanvasWithUpNext } from '@utils/nowPlayingCanvas'
-import mockSongArray from '@data/dummies/songArray'
+import useMockTracks from '@data/dummies/songArray'
 
+import { MusicManager, setMusicManager } from './lib'
 import registerCommands from './deploy-commands'
 
 const {
   BOT_TOKEN,
   GUILD_ID,
   DEFAULT_TEXT_CHANNEL,
-  YOUTUBE_COOKIE,
-  YOUTUBE_IDENTITY_TOKEN,
   NOW_PLAYING_MOCK_DATA,
-  SPOTIFY,
+  TS_NODE_DEV,
+  PRELOAD_SONG_DATA,
 } = ENV
 
 const client = new Client({
@@ -56,44 +54,23 @@ const client = new Client({
   partials: [Partials.Channel],
 }) as ClientType
 
-if (SPOTIFY.CLIENT_ID && SPOTIFY.CLIENT_SECRET) console.log('[init] Loading with Spotify search')
-
-const player = new DisTube(client, {
-  emptyCooldown: 300,
-  nsfw: true,
-  searchSongs: 1,
-  youtubeCookie: YOUTUBE_COOKIE,
-  youtubeIdentityToken: YOUTUBE_IDENTITY_TOKEN,
-  plugins: [
-    new YtDlpPlugin(),
-    ...(SPOTIFY && SPOTIFY.CLIENT_ID && SPOTIFY.CLIENT_SECRET
-      ? [
-          new SpotifyPlugin({
-            parallel: true,
-            emitEventsAfterFetching: true,
-            api: {
-              clientId: SPOTIFY.CLIENT_ID,
-              clientSecret: SPOTIFY.CLIENT_SECRET,
-              topTracksCountry: SPOTIFY.COUNTRY,
-            },
-          }),
-        ]
-      : []),
-
-    new SpotifyPlugin({
-      parallel: true,
-      api: {
-        clientId: 'SpotifyAppClientID',
-        clientSecret: 'SpotifyAppClientSecret',
-        topTracksCountry: 'CA',
-      },
-    }),
+// Initialize Music Manager with Lavalink connection
+const musicManager = new MusicManager(client, {
+  nodes: [
+    {
+      name: 'CastleGrooves-Lavalink',
+      url: `${ENV.LAVALINK_HOST}:${ENV.LAVALINK_PORT}`,
+      auth: ENV.LAVALINK_PASSWORD,
+    },
   ],
 })
 
-client.player = player
+// Set global music manager instance
+setMusicManager(musicManager)
 
-client.commands = new Collection()
+client.musicManager = musicManager
+
+client.commands = new Collection<string, CommandObject['default']>()
 
 // Initialize the API and webserver.
 initApi(client)
@@ -102,12 +79,13 @@ registerCommands()
 
 if (NOW_PLAYING_MOCK_DATA) {
   console.log('[nowPlayingMock] Generating mock now playing data...')
+  const mockTracks = useMockTracks()
 
-  nowPlayingCanvasWithUpNext(mockSongArray).then((buffer) => {
+  nowPlayingCanvasWithUpNext(mockTracks).then((buffer) => {
     fs.writeFileSync('mockNowPlayingMulti.png', buffer)
   })
 
-  nowPlayingCanvas(mockSongArray[0]).then((buffer) => {
+  nowPlayingCanvas(mockTracks[0]).then((buffer) => {
     fs.writeFileSync('mockNowPlaying.png', buffer)
   })
 
@@ -126,8 +104,15 @@ if (NOW_PLAYING_MOCK_DATA) {
 }
 
 // Import commands.
-const commandsPath = './build/commands'
-const commandFiles = fs.readdirSync(commandsPath).filter((file) => file.endsWith('.js'))
+let commandsPath: string, commandFiles: string[]
+
+if (TS_NODE_DEV) {
+  commandsPath = 'commands'
+  commandFiles = fs.readdirSync(commandsPath).filter((file) => file.endsWith('.ts'))
+} else {
+  commandsPath = 'build/commands'
+  commandFiles = fs.readdirSync(commandsPath).filter((file) => file.endsWith('.js'))
+}
 
 commandFiles.forEach(async (file) => {
   const filePath = path.resolve(commandsPath, file)
@@ -136,6 +121,9 @@ commandFiles.forEach(async (file) => {
 })
 
 client.once('ready', async () => {
+  // Music Manager connects to Lavalink automatically through Shoukaku
+  // No need to register extractors - Lavalink handles all sources
+
   client.user?.setActivity({
     name: '🎶 Music 🎶',
     type: ActivityType.Listening,
@@ -148,7 +136,7 @@ client.once('ready', async () => {
 
   const mainGuild = await client.guilds.cache.get(GUILD_ID)
 
-  if (!mainGuild || !mainGuild) return
+  if (!mainGuild) return
 
   const channels = await mainGuild.channels.fetch()
 
@@ -169,7 +157,10 @@ client.once('ready', async () => {
   textChannels.forEach(async (channel) => {
     if (!channel || channel.type !== ChannelType.GuildText) return
     const messages = await channel.messages.fetch()
-    const botMessages = messages.filter((message: Message) => message.author.id === client.user?.id)
+    const botMessages = messages.filter(
+      (message: Message) =>
+        message.author.id === client.user?.id || message.author.id === '684773505157431347'
+    )
 
     if (botMessages.size > 0)
       console.log(
@@ -181,47 +172,69 @@ client.once('ready', async () => {
     })
   })
 
-  // Generate song history and sen d it to the main channel.
-  playerHistory.setOptions(await generateHistoryOptions())
-  playerHistory.setPlaceholder('-- Song History --')
+  const components = await useComponents()
+
   await sendMessage(defaultTextChannel, {
     content: `🎶 | Pick a song below or use </play:991566063068250134>`,
-    components: [historyActionRow],
+    components,
   })
+
+  // Preload song data to warm cache if enabled
+  if (PRELOAD_SONG_DATA) {
+    preloadSongData()
+  }
 
   // eslint-disable-next-line no-console
   console.log('[CastleGrooves] Ready!')
 })
 
-client.on('interactionCreate', async (interaction) =>
-  commandInteractionHandler(interaction, client)
-)
+client.on('interactionCreate', async (interaction) => {
+  if (interaction.isAutocomplete()) {
+    const command: CommandObject = client.commands.get(interaction.commandName)
+    if (command.autoComplete) command.autoComplete(interaction)
+  }
 
-client.on('interactionCreate', async (interaction) => await buttonHandler(interaction, client))
+  if (interaction.isChatInputCommand()) {
+    commandInteractionHandler(interaction, client)
+  }
+
+  if (interaction.isButton() || interaction.isStringSelectMenu()) {
+    await buttonHandler(interaction)
+  }
+})
+
 // On user join voice channel event
 client.on('voiceStateUpdate', (oldState, newState) => recordVoiceStateChange(oldState, newState))
 
-client.player.on('playSong', playSongEventHandler)
+// Music Manager event listeners
+musicManager.on('playerStart', playSongEventHandler)
+musicManager.on('audioTrackAdd', addSongEventHandler)
+musicManager.on('audioTracksAdd', addSongEventHandler) // For playlists
+musicManager.on('disconnect', disconnectEventHandler)
+musicManager.on('emptyQueue', emptyEventHandler)
+musicManager.on('emptyQueue', songFinishEventHandler)
+musicManager.on('queueCreate', queueCreatedEventHandler)
 
-// On add song event
-client.player.on('addSong', addSongEventHandler)
-
-// on add playlist event
-client.player.on('addList', addSongEventHandler)
-
-// On bot disconnected from voice channel
-client.player.on('disconnect', disconnectEventHandler)
-
-// On voice channel empty
-client.player.on('empty', emptyEventHandler)
-
-// On queue/song finish
-client.player.on('finish', songFinishEventHandler)
-
-// On error
-client.player.on('error', async (channel, e) => {
-  console.error('[playerError]', e)
+// Error handlers
+musicManager.on('error', (guildId: string, error: Error) => {
+  console.error('[musicManagerError]', error)
 })
+
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled Rejection:', reason)
+})
+
+// player.on('debug', async (message) => {
+//   // Emitted when the player sends debug info
+//   // Useful for seeing what dependencies, extractors, etc are loaded
+//   console.log(`General player debug event: ${message}`)
+// })
+
+// player.events.on('debug', async (queue, message) => {
+//   // Emitted when the player queue sends debug info
+//   // Useful for seeing what state the current queue is at
+//   console.log(`Player debug event: ${message}`)
+// })
 
 // Resets main message if many messages have since been sent in the channel
 let msgResetCount = 0
@@ -238,6 +251,8 @@ client.on('messageCreate', (msg) => {
 
   if (msgResetCount > 0) {
     deleteMessage()
+
+    if (!channel || !channel.isTextBased() || !('guild' in channel)) return
     sendMessage(channel, { content, components, files: attachments.map((a) => a.url) })
     msgResetCount = 0
   }

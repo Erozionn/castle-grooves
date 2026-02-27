@@ -1,17 +1,21 @@
-import { Queue } from 'distube'
-
-import { historyActionRow, playerHistory } from '@constants/messageComponents'
+import { useComponents } from '@constants/messageComponents'
 import { sendMessage } from '@utils/mainMessage'
-import { generateHistoryOptions } from '@utils/songHistory'
+import { useDJMode } from '@hooks/useDJMode'
 
-export default async (queue: Queue) => {
-  playerHistory.setOptions(await generateHistoryOptions())
-  playerHistory.setPlaceholder('-- Song History --')
+import type { MusicQueue } from '../../lib'
 
-  if (!queue.textChannel) return
-  await sendMessage(queue.textChannel, {
-    content: '🎶 | Previously Played:',
+export default async (queue: MusicQueue) => {
+  const { stopDJMode } = useDJMode(queue)
+
+  stopDJMode()
+
+  const components = await useComponents(queue)
+  const { channel } = queue.metadata
+
+  if (!channel || !channel.isTextBased() || !('guild' in channel)) return
+  await sendMessage(channel, {
+    content: '🎶 | Pick a song below or use </play:991566063068250134>',
     files: [],
-    components: [historyActionRow],
+    components,
   })
 }

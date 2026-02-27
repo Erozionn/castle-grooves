@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js'
+import { ChatInputCommandInteraction, GuildMember, SlashCommandBuilder } from 'discord.js'
 
 export default {
   data: new SlashCommandBuilder()
@@ -7,11 +7,15 @@ export default {
     .addIntegerOption((option) =>
       option.setName('number').setDescription('Roll between 1 and this number. Default: 10')
     ),
-  async execute(interaction) {
-    const { member } = interaction
+  async execute(interaction: ChatInputCommandInteraction) {
+    if (!interaction.isCommand()) return
+
+    const member = interaction.member as GuildMember
     const { displayName } = member
+
+    if (!member) return
     await interaction.deferReply()
-    const number = interaction.options.getInteger('number') || 10
+    const number = (interaction.options.get('number')?.value || 10) as number
 
     setTimeout(async () => {
       await interaction.editReply({

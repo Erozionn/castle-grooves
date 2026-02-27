@@ -1,14 +1,19 @@
-import { SlashCommandBuilder, CommandInteraction } from 'discord.js'
+import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js'
 
-import { sendMessage } from '@utils/mainMessage'
-import { historyActionRow } from '@constants/messageComponents'
+import { moveMainMessage, sendMessage } from '@utils/mainMessage'
+import { useComponents } from '@constants/messageComponents'
+import { useQueue } from '../lib'
 
 export default {
   data: new SlashCommandBuilder()
     .setName('channel')
     .setDescription('Shows the bot music player on text channel.'),
-  async execute(interaction: CommandInteraction) {
+  async execute(interaction: ChatInputCommandInteraction) {
+    if (!interaction.guild) return
+
     const { channel } = interaction
+    const queue = useQueue(interaction.guild.id) || undefined
+    const components = await useComponents(queue)
     await interaction.deferReply()
 
     if (!channel || !channel.isTextBased()) {
@@ -22,9 +27,8 @@ export default {
       })
       .then((msg) => msg.delete())
 
-    await sendMessage(channel, {
-      content: `🎶 | Pick a song below or use </play:991566063068250134>`,
-      components: [historyActionRow],
-    })
+    if (!channel || !channel.isTextBased() || !('guild' in channel)) return
+
+    moveMainMessage(channel, queue)
   },
 }

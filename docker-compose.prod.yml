@@ -1,0 +1,112 @@
+version: '3.8'
+
+services:
+  # Discord Bot - Uses published image from Docker Hub
+  bot:
+    image: ${DOCKER_HUB_USERNAME}/castle-grooves:latest  # Published by GitHub Actions
+    container_name: castle-grooves-bot
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - BOT_TOKEN=${BOT_TOKEN}
+      - CLIENT_ID=${CLIENT_ID}
+      - GUILD_ID=${GUILD_ID}
+      - ADMIN_USER_ID=${ADMIN_USER_ID}
+      - DEFAULT_TEXT_CHANNEL=${DEFAULT_TEXT_CHANNEL}
+      - LAVALINK_HOST=lavalink
+      - LAVALINK_PORT=2333
+      - LAVALINK_PASSWORD=${LAVALINK_PASSWORD:-youshallnotpass}
+      - SPOTIFY_CLIENT_ID=${SPOTIFY_CLIENT_ID}
+      - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET}
+      - SPOTIFY_MARKET=${SPOTIFY_MARKET:-US}
+      - INFLUX_URL=http://influxdb:8086
+      - INFLUX_TOKEN=${INFLUX_TOKEN}
+      - INFLUX_ORG=${INFLUX_ORG}
+      - INFLUX_BUCKET=${INFLUX_BUCKET}
+      - ENABLE_DB_WRITES_IN_DEV=true
+      - WEBSERVER_PORT=${WEBSERVER_PORT:-1337}
+      - NOW_PLAYING_MOCK_DATA=${NOW_PLAYING_MOCK_DATA:-false}
+      - PRELOAD_SONG_DATA=${PRELOAD_SONG_DATA:-true}
+    ports:
+      - "1337:1337"
+    depends_on:
+      lavalink:
+        condition: service_started
+      influxdb:
+        condition: service_healthy
+    networks:
+      - castle-grooves
+    volumes:
+      - ./recordings:/usr/src/app/recordings
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # Lavalink Audio Server
+  lavalink:
+    image: ghcr.io/lavalink-devs/lavalink:4-alpine
+    container_name: castle-grooves-lavalink
+    restart: unless-stopped
+    environment:
+      - _JAVA_OPTIONS=-Xmx2G
+      - SERVER_PORT=2333
+      - LAVALINK_SERVER_PASSWORD=${LAVALINK_PASSWORD:-youshallnotpass}
+      - SPOTIFY_CLIENT_ID=${SPOTIFY_CLIENT_ID}
+      - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET}
+    volumes:
+      - ./lavalink/application.yml:/opt/Lavalink/application.yml:ro
+      - ./lavalink/plugins:/opt/Lavalink/plugins
+      - ./lavalink/logs:/opt/Lavalink/logs
+    ports:
+      - "2333:2333"
+    networks:
+      - castle-grooves
+
+  # InfluxDB Time-Series Database
+  influxdb:
+    image: influxdb:2-alpine
+    container_name: castle-grooves-influxdb
+    restart: unless-stopped
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUX_ADMIN_USERNAME:-admin}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUX_ADMIN_PASSWORD:-changeme123}
+      - DOCKER_INFLUXDB_INIT_ORG=${INFLUX_ORG}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUX_BUCKET}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUX_TOKEN}
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+      - influxdb-config:/etc/influxdb2
+    ports:
+      - "8086:8086"
+    networks:
+      - castle-grooves
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Watchtower - Auto-updates containers when new images are published
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: castle-grooves-watchtower
+    restart: unless-stopped
+    environment:
+      - WATCHTOWER_CLEANUP=true           # Remove old images after updating
+      - WATCHTOWER_INCLUDE_RESTARTING=true
+      - WATCHTOWER_POLL_INTERVAL=300      # Check every 5 minutes (300 seconds)
+      - WATCHTOWER_LABEL_ENABLE=true      # Only watch labeled containers
+      - TZ=America/New_York               # Adjust to your timezone
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - castle-grooves
+
+networks:
+  castle-grooves:
+    driver: bridge
+
+volumes:
+  influxdb-data:
+  influxdb-config:

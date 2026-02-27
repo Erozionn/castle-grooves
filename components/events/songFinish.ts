@@ -1,32 +1,31 @@
-import { Queue } from 'distube'
-
-import {
-  components,
-  playerButtons,
-  playerButtonsType,
-  playerHistory,
-} from '@constants/messageComponents'
+import { useComponents } from '@constants/messageComponents'
 import { sendMessage } from '@utils/mainMessage'
-import { addSong } from '@utils/songHistory'
+import { addSong } from '@utils/songHistoryV2'
+import { useDJMode } from '@hooks/useDJMode'
+import { triggerQueueEmpty } from '@utils/djTriggers'
 
-const playerButtonKeys = Object.keys(playerButtons)
+import type { MusicQueue } from '../../lib'
 
-export default async (queue: Queue) => {
-  playerHistory.setPlaceholder('-- Song History --')
-  for (let i = 0; i < 4; i++) {
-    playerButtons[playerButtonKeys[i] as playerButtonsType].setDisabled()
-  }
+export default async (queue: MusicQueue) => {
+  const { stopDJMode } = useDJMode(queue)
 
-  // Change stop button to disconnect button
-  playerButtons.stop.setEmoji('disconnect:1043629464166355015')
+  // Trigger DJ event for queue empty
+  triggerQueueEmpty(queue)
 
-  if (queue.textChannel) {
-    await sendMessage(queue.textChannel, {
-      content: '✅ | Queue finished!',
-      files: [],
-      components,
-    })
-  }
+  stopDJMode()
+
+  console.log('[songFinish] Queue finished', queue.tracks.length === 0, !queue.currentTrack)
+
+  const components = await useComponents(queue)
+  const { channel } = queue.metadata
 
   addSong(false)
+
+  if (!channel || !channel.isTextBased() || !('guild' in channel)) return
+
+  await sendMessage(channel, {
+    content: '✅ | Queue finished!',
+    files: [],
+    components,
+  })
 }
