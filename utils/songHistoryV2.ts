@@ -638,49 +638,54 @@ const addBotStateChange = (
  * Generate history options for UI display - V2 version
  */
 const generateHistoryOptions = async () => {
-  const history = await getSongsPlayed('monthly', 34, true)
+  try {
+    const history = await getSongsPlayed('monthly', 34, true)
 
-  const songs = history
-    .filter((s: SongHistory) => s.serializedTrack)
-    .map((s: SongHistory) => {
-      const track = deserializeLavalinkTrack(s.serializedTrack)
-      if (!track) return null
+    const songs = history
+      .filter((s: SongHistory) => s.serializedTrack)
+      .map((s: SongHistory) => {
+        const track = deserializeLavalinkTrack(s.serializedTrack)
+        if (!track) return null
+
+        return {
+          playedAt: s._time,
+          track,
+          requestedBy: {
+            id: s.requestedById,
+            username: s.requestedByUsername,
+            avatar: s.requestedByAvatar,
+          },
+        }
+      })
+      .filter((s): s is NonNullable<typeof s> => s !== null)
+      .slice(0, 24)
+      .reverse()
+
+    const options = songs.map((s, index: number) => {
+      let { author: artist, title } = s.track.info
+      if (s.track.info.sourceName === 'youtube') {
+        const titleObj = parseSongName(s.track.info.title)
+        artist = titleObj.artist
+        if (titleObj.title) title = titleObj.title
+      }
+
+      const lastPlayed = formatDistanceToNowStrict(new Date(s.playedAt), {
+        addSuffix: true,
+      })
 
       return {
-        playedAt: s._time,
-        track,
-        requestedBy: {
-          id: s.requestedById,
-          username: s.requestedByUsername,
-          avatar: s.requestedByAvatar,
-        },
+        label: title ? title.substring(0, 95) : artist.substring(0, 95),
+        description: `${title ? artist.substring(0, 65) : ' '} - ${lastPlayed}`,
+        emoji: '🎶',
+        value: index.toString(),
       }
     })
-    .filter((s): s is NonNullable<typeof s> => s !== null)
-    .slice(0, 24)
-    .reverse()
 
-  const options = songs.map((s, index: number) => {
-    let { author: artist, title } = s.track.info
-    if (s.track.info.sourceName === 'youtube') {
-      const titleObj = parseSongName(s.track.info.title)
-      artist = titleObj.artist
-      if (titleObj.title) title = titleObj.title
-    }
-
-    const lastPlayed = formatDistanceToNowStrict(new Date(s.playedAt), {
-      addSuffix: true,
-    })
-
-    return {
-      label: title ? title.substring(0, 95) : artist.substring(0, 95),
-      description: `${title ? artist.substring(0, 65) : ' '} - ${lastPlayed}`,
-      emoji: '🎶',
-      value: index.toString(),
-    }
-  })
-
-  return { options, songs }
+    return { options, songs }
+  } catch (error) {
+    console.error('[generateHistoryOptions] Error generating history:', error)
+    return { options: [], songs: [] }
+  }
 }
 
 // ============================================================================
