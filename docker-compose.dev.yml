@@ -6,6 +6,8 @@ services:
       dockerfile: Dockerfile.dev
     container_name: castle-grooves-bot-dev
     restart: unless-stopped
+    env_file:
+      - .env.dev
     environment:
       - NODE_ENV=development
       - TS_NODE_DEV=true
@@ -27,6 +29,7 @@ services:
       - WEBSERVER_PORT=${WEBSERVER_PORT:-1338}
       - NOW_PLAYING_MOCK_DATA=${NOW_PLAYING_MOCK_DATA}
       - PRELOAD_SONG_DATA=${PRELOAD_SONG_DATA}
+      - ENABLE_DB_WRITES_IN_DEV=${ENABLE_DB_WRITES_IN_DEV:-false}
     ports:
       - "1337:1337"
       - "9229:9229"  # Node debugger port
@@ -51,6 +54,8 @@ services:
     image: ghcr.io/lavalink-devs/lavalink:4-alpine
     container_name: castle-grooves-lavalink-dev
     restart: unless-stopped
+    env_file:
+      - .env.dev
     environment:
       - _JAVA_OPTIONS=-Xmx2G
       - SERVER_PORT=2333
@@ -71,6 +76,8 @@ services:
     image: influxdb:2-alpine
     container_name: castle-grooves-influxdb-dev
     restart: unless-stopped
+    env_file:
+      - .env.dev
     environment:
       - DOCKER_INFLUXDB_INIT_MODE=setup
       - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUX_ADMIN_USERNAME:-admin}

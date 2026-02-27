@@ -1,6 +1,6 @@
 import { useComponents } from '@constants/messageComponents'
 import { sendMessage } from '@utils/mainMessage'
-import { addSong } from '@utils/songHistory'
+import { addSong } from '@utils/songHistoryV2'
 import { useDJMode } from '@hooks/useDJMode'
 import { triggerQueueEmpty } from '@utils/djTriggers'
 

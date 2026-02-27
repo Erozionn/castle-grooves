@@ -25,7 +25,7 @@ import {
 import { ClientType, CommandObject } from '@types'
 import { useComponents } from '@constants/messageComponents'
 import { getMainMessage, sendMessage, deleteMessage } from '@utils/mainMessage'
-import { preloadSongData } from '@utils/songHistory'
+import { preloadSongData } from '@utils/songHistoryV2'
 import initApi from '@api'
 import ENV from '@constants/Env'
 import { recordVoiceStateChange } from '@utils/recordActivity'

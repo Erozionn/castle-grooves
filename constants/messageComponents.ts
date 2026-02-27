@@ -7,7 +7,7 @@ import {
   StringSelectMenuInteraction,
 } from 'discord.js'
 
-import { generateHistoryOptions } from '@utils/songHistory'
+import { generateHistoryOptions } from '@utils/songHistoryV2'
 import { useDJMode } from '@hooks/useDJMode'
 
 import { MusicQueue } from '../lib'

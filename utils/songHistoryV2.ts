@@ -18,14 +18,14 @@ const { INFLUX_BUCKET } = ENV
 // ============================================================================
 /**
  * SCHEMA V2 IMPROVEMENTS:
- * 
+ *
  * Measurement: song_play (renamed from "song" for clarity)
- * 
+ *
  * Tags (indexed, low cardinality):
  * - songHash: 8-char MD5 hash for grouping (low cardinality ~1000s)
  * - requestedById: User ID (low cardinality < 10k)
  * - source: youtube/spotify/etc (very low cardinality)
- * 
+ *
  * Fields (not indexed, any cardinality):
  * - songTitle: string (artist - title)
  * - artist: string (extracted artist)
@@ -37,7 +37,7 @@ const { INFLUX_BUCKET } = ENV
  * - requestedByUsername: string
  * - requestedByAvatar: string
  * - duration: int
- * 
+ *
  * Benefits:
  * - No pivot operations needed (flat schema)
  * - Low cardinality tags = better performance
@@ -97,7 +97,17 @@ function deserializeLavalinkTrack(
   serialized: string | Record<string, unknown>
 ): LavalinkTrack | null {
   try {
+    // Handle null/undefined input
+    if (!serialized) {
+      return null
+    }
+
     const data = typeof serialized === 'string' ? JSON.parse(serialized) : serialized
+
+    // Validate data exists
+    if (!data || typeof data !== 'object') {
+      return null
+    }
 
     // Handle Lavalink format (V1 or V2)
     if (data.__lavalinkFormat) {
@@ -318,7 +328,7 @@ const getTimeRangeParams = (timeRange: string) => {
  * Build query for V2 schema
  * V2 Benefits: No pivot operations = more reliable queries
  */
-const buildSongQueryV2 = (
+const buildSongQuery = (
   timeRange: string,
   limit: number,
   userId?: string | string[],
@@ -355,34 +365,28 @@ const buildSongQueryV2 = (
         r["_field"] == "requestedByUsername" or 
         r["_field"] == "requestedByAvatar")
     |> group(columns: ["_time", "songHash", "requestedById"])
+    |> pivot(rowKey:["_time", "songHash", "requestedById"], columnKey: ["_field"], valueColumn: "_value")
+    |> group()
     |> sort(columns: ["_time"], desc: true)
     |> limit(n: ${limit})`
 
     case 'topSongs':
-      // Count plays by songHash (efficient grouping!)
+      // Count plays by songHash and get latest details
       // V2: Uses low-cardinality tag for grouping
       return `${baseQuery}
-    |> filter(fn: (r) => r["_field"] == "songTitle")
+    |> filter(fn: (r) => 
+        r["_field"] == "title" or 
+        r["_field"] == "artist" or 
+        r["_field"] == "songUrl" or 
+        r["_field"] == "songThumbnail" or 
+        r["_field"] == "serializedTrack")
+    |> group(columns: ["songHash", "_field"])
+    |> last()
     |> group(columns: ["songHash"])
-    |> count()
-    |> rename(columns: {_value: "count"})
-    |> sort(columns: ["count"], desc: true)
-    |> limit(n: ${limit})
-    
-    // Get additional fields for top songs
-    |> join(
-      tables: {
-        detail: from(bucket:"${INFLUX_BUCKET}")
-          |> range(start: ${startTime}, stop: ${endTime})
-          |> filter(fn: (r) => r["_measurement"] == "song_play")
-          |> filter(fn: (r) => 
-              r["_field"] == "songUrl" or 
-              r["_field"] == "songThumbnail" or 
-              r["_field"] == "serializedTrack")
-          |> last()
-      },
-      on: ["songHash"]
-    )`
+    |> pivot(rowKey:["songHash"], columnKey: ["_field"], valueColumn: "_value")
+    |> map(fn: (r) => ({r with playCount: 1}))
+    |> sort(columns: ["_time"], desc: true)
+    |> limit(n: ${limit})`
 
     case 'userTopSongs':
       if (!userId || Array.isArray(userId)) {
@@ -390,27 +394,19 @@ const buildSongQueryV2 = (
       }
       return `${baseQuery}
     |> filter(fn: (r) => r["requestedById"] == "${userId}")
-    |> filter(fn: (r) => r["_field"] == "songTitle")
+    |> filter(fn: (r) => 
+        r["_field"] == "title" or 
+        r["_field"] == "artist" or 
+        r["_field"] == "songUrl" or 
+        r["_field"] == "songThumbnail" or 
+        r["_field"] == "serializedTrack")
+    |> group(columns: ["songHash", "_field"])
+    |> last()
     |> group(columns: ["songHash"])
-    |> count()
-    |> rename(columns: {_value: "count"})
-    |> sort(columns: ["count"], desc: true)
-    |> limit(n: ${limit})
-    
-    |> join(
-      tables: {
-        detail: from(bucket:"${INFLUX_BUCKET}")
-          |> range(start: ${startTime}, stop: ${endTime})
-          |> filter(fn: (r) => r["_measurement"] == "song_play")
-          |> filter(fn: (r) => r["requestedById"] == "${userId}")
-          |> filter(fn: (r) => 
-              r["_field"] == "songUrl" or 
-              r["_field"] == "songThumbnail" or 
-              r["_field"] == "serializedTrack")
-          |> last()
-      },
-      on: ["songHash"]
-    )`
+    |> pivot(rowKey:["songHash"], columnKey: ["_field"], valueColumn: "_value")
+    |> map(fn: (r) => ({r with playCount: 1}))
+    |> sort(columns: ["_time"], desc: true)
+    |> limit(n: ${limit})`
 
     case 'multiUserTopSongs':
       const userIds = Array.isArray(userId) ? userId : [userId!]
@@ -423,17 +419,24 @@ const buildSongQueryV2 = (
 
       return `${baseQuery}
     |> filter(fn: (r) => r["requestedById"] =~ /^(${userFilter})$/)
-    |> filter(fn: (r) => r["_field"] == "songTitle")
-    |> group(columns: ["songHash", "requestedById"])
-    |> count()
-    |> rename(columns: {_value: "count"})
+    |> filter(fn: (r) => 
+        r["_field"] == "title" or 
+        r["_field"] == "artist" or 
+        r["_field"] == "songUrl" or 
+        r["_field"] == "songThumbnail" or 
+        r["_field"] == "serializedTrack")
+    |> group(columns: ["songHash", "_field"])
+    |> last()
+    |> group(columns: ["songHash"])
+    |> pivot(rowKey:["songHash"], columnKey: ["_field"], valueColumn: "_value")
+    |> map(fn: (r) => ({r with playCount: 1}))
     |> group()
-    |> sort(columns: ["count"], desc: true)
+    |> sort(columns: ["_time"], desc: true)
     |> limit(n: ${Math.min(limit * userIds.length, 1000)})`
 
     case 'totalCount':
       return `${baseQuery}
-    |> filter(fn: (r) => r["_field"] == "songTitle")
+    |> filter(fn: (r) => r["_field"] == "title")
     |> count()`
 
     default:
@@ -445,7 +448,7 @@ const buildSongQueryV2 = (
 // DATABASE QUERY FUNCTIONS
 // ============================================================================
 
-const getSongsPlayedV2 = async (timeRange = 'monthly', limitResults = 34, bypassCache = false) => {
+const getSongsPlayed = async (timeRange = 'monthly', limitResults = 34, bypassCache = false) => {
   const cacheKey = `history-v2-${timeRange}-${limitResults}`
 
   if (!bypassCache) {
@@ -459,7 +462,7 @@ const getSongsPlayedV2 = async (timeRange = 'monthly', limitResults = 34, bypass
   const queryStart = performance.now()
   try {
     const results: SongHistory[] = await queryApi().collectRows(
-      buildSongQueryV2(timeRange, limitResults, undefined, 'history')
+      buildSongQuery(timeRange, limitResults, undefined, 'history')
     )
     const queryDuration = performance.now() - queryStart
     console.log(
@@ -476,7 +479,7 @@ const getSongsPlayedV2 = async (timeRange = 'monthly', limitResults = 34, bypass
   }
 }
 
-const getTopSongsV2 = async (timeRange = 'monthly', limit = 20) => {
+const getTopSongs = async (timeRange = 'monthly', limit = 20) => {
   const cacheKey = `topSongs-v2-${timeRange}-${limit}`
   const cached = getCachedQuery(cacheKey)
   if (cached) {
@@ -486,7 +489,7 @@ const getTopSongsV2 = async (timeRange = 'monthly', limit = 20) => {
 
   try {
     const results: (SongHistory & { count: number })[] = await queryApi().collectRows(
-      buildSongQueryV2(timeRange, limit, undefined, 'topSongs')
+      buildSongQuery(timeRange, limit, undefined, 'topSongs')
     )
 
     const shuffledResults = results.sort(() => Math.random() - 0.5)
@@ -498,7 +501,7 @@ const getTopSongsV2 = async (timeRange = 'monthly', limit = 20) => {
   }
 }
 
-const getUserTopSongsV2 = async (userId: string, timeRange = 'monthly', limit = 20) => {
+const getUserTopSongs = async (userId: string, timeRange = 'monthly', limit = 20) => {
   const cacheKey = `userTopSongs-v2-${userId}-${timeRange}-${limit}`
   const cached = getCachedQuery(cacheKey)
   if (cached) {
@@ -508,7 +511,7 @@ const getUserTopSongsV2 = async (userId: string, timeRange = 'monthly', limit = 
 
   try {
     const results: (SongHistory & { count: number })[] = await queryApi().collectRows(
-      buildSongQueryV2(timeRange, limit, userId, 'userTopSongs')
+      buildSongQuery(timeRange, limit, userId, 'userTopSongs')
     )
 
     const shuffledResults = results.sort(() => Math.random() - 0.5)
@@ -520,10 +523,10 @@ const getUserTopSongsV2 = async (userId: string, timeRange = 'monthly', limit = 
   }
 }
 
-const getTotalSongsPlayedCountV2 = async (timeRange = 'yearly') => {
+const getTotalSongsPlayedCount = async (timeRange = 'yearly') => {
   try {
     const results = await queryApi().collectRows(
-      buildSongQueryV2(timeRange, 1, undefined, 'totalCount')
+      buildSongQuery(timeRange, 1, undefined, 'totalCount')
     )
     return results.length > 0 ? (results[0] as any)._value || 0 : 0
   } catch (e) {
@@ -538,7 +541,7 @@ const getTotalSongsPlayedCountV2 = async (timeRange = 'yearly') => {
 
 /**
  * Add a song play to the database - V2 SCHEMA
- * 
+ *
  * Changes from V1:
  * - songTitle moved from TAG to FIELD (fixes cardinality)
  * - Added songHash TAG (low cardinality, for grouping)
@@ -546,7 +549,7 @@ const getTotalSongsPlayedCountV2 = async (timeRange = 'yearly') => {
  * - Only write when actually playing (no playing=false points)
  * - Uses song_play measurement
  */
-const addSongV2 = (playing: boolean, track?: LavalinkTrack, requestedBy?: GuildMember) => {
+const addSong = (playing: boolean, track?: LavalinkTrack, requestedBy?: GuildMember) => {
   if (ENV.TS_NODE_DEV && !process.env.ENABLE_DB_WRITES_IN_DEV) {
     console.log(
       '[addSongV2] Skipping DB write in dev mode (set ENABLE_DB_WRITES_IN_DEV=true to enable)'
@@ -572,6 +575,10 @@ const addSongV2 = (playing: boolean, track?: LavalinkTrack, requestedBy?: GuildM
 
   const songHash = generateSongHash(track)
 
+  console.log(
+    `[addSongV2] Writing to DB: "${track.info.title}" by ${track.info.author} (hash: ${songHash}, user: ${requestedBy.user.username})`
+  )
+
   const point = new Point('song_play')
     // TAGS - Low cardinality only
     .tag('songHash', songHash)
@@ -593,8 +600,11 @@ const addSongV2 = (playing: boolean, track?: LavalinkTrack, requestedBy?: GuildM
   writeApi().writePoint(point)
   writeApi()
     .close()
+    .then(() => {
+      console.log('[addSongV2] ✅ Write successful')
+    })
     .catch((e) => {
-      console.warn('[addSongV2]', e)
+      console.warn('[addSongV2] ❌ Write failed:', e)
     })
 }
 
@@ -627,8 +637,8 @@ const addBotStateChange = (
 /**
  * Generate history options for UI display - V2 version
  */
-const generateHistoryOptionsV2 = async () => {
-  const history = await getSongsPlayedV2('monthly', 34, true)
+const generateHistoryOptions = async () => {
+  const history = await getSongsPlayed('monthly', 34, true)
 
   const songs = history
     .filter((s: SongHistory) => s.serializedTrack)
@@ -705,17 +715,18 @@ const getRandomSongsFromCache = (_limit = 20): SongHistory[] => {
   return shuffled.slice(0, _limit)
 }
 
-const preloadSongDataV2 = async () => {
+const preloadSongData = async () => {
   console.log('[preloadSongDataV2] Starting cache warm-up...')
   const startTime = performance.now()
 
   try {
     const preloadPromises = [
-      getTopSongsV2('weekly', 5),
-      getTopSongsV2('monthly', 10),
-      getTopSongsV2('yearly', 50),
-      getSongsPlayedV2('weekly', 10),
-      getSongsPlayedV2('monthly', 10),
+      // TODO: Fix topSongs Flux queries - temporarily disabled due to schema collision errors
+      // getTopSongs('weekly', 5),
+      // getTopSongs('monthly', 10),
+      // getTopSongs('yearly', 50),
+      getSongsPlayed('weekly', 10),
+      getSongsPlayed('monthly', 10),
     ]
 
     await Promise.allSettled(preloadPromises)
@@ -738,29 +749,29 @@ const preloadSongDataV2 = async () => {
 
 export {
   // Main functions
-  getSongsPlayedV2,
-  getTopSongsV2,
-  getUserTopSongsV2,
-  getTotalSongsPlayedCountV2,
-  addSongV2,
+  getSongsPlayed,
+  getTopSongs,
+  getUserTopSongs,
+  getTotalSongsPlayedCount,
+  addSong,
   addBotStateChange,
-  generateHistoryOptionsV2,
-  
+  generateHistoryOptions,
+
   // Query builders
-  buildSongQueryV2,
-  
+  buildSongQuery,
+
   // Utilities
   getSmartSongRecommendation,
   getTimeRangeDescription,
   getCacheStats,
   clearCache,
-  preloadSongDataV2,
+  preloadSongData,
   getRandomSongsFromCache,
-  
+
   // Serialization
   serializeLavalinkTrack,
   deserializeLavalinkTrack,
-  
+
   // Hash generation
   generateSongHash,
 }

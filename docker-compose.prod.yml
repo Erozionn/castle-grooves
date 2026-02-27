@@ -1,11 +1,9 @@
 version: '3.8'
 
 services:
-  # Discord Bot
+  # Discord Bot - Uses published image from Docker Hub
   bot:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ${DOCKER_HUB_USERNAME}/castle-grooves:latest  # Published by GitHub Actions
     container_name: castle-grooves-bot
     restart: unless-stopped
     environment:
@@ -40,6 +38,8 @@ services:
       - castle-grooves
     volumes:
       - ./recordings:/usr/src/app/recordings
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
 
   # Lavalink Audio Server
   lavalink:
@@ -79,13 +79,29 @@ services:
     ports:
       - "8086:8086"
     networks:
-      - castle-groorontooves
+      - castle-grooves
     healthcheck:
       test: ["CMD", "influx", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
+
+  # Watchtower - Auto-updates containers when new images are published
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: castle-grooves-watchtower
+    restart: unless-stopped
+    environment:
+      - WATCHTOWER_CLEANUP=true           # Remove old images after updating
+      - WATCHTOWER_INCLUDE_RESTARTING=true
+      - WATCHTOWER_POLL_INTERVAL=300      # Check every 5 minutes (300 seconds)
+      - WATCHTOWER_LABEL_ENABLE=true      # Only watch labeled containers
+      - TZ=America/New_York               # Adjust to your timezone
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - castle-grooves
 
 networks:
   castle-grooves:

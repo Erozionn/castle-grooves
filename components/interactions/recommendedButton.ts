@@ -54,6 +54,20 @@ export default async (queue: MusicQueue | null, interaction: ButtonInteraction) 
 
     console.log(`[recommendedButton] Found ${recommendations.length} recommendations`)
 
+    // First, deduplicate the recommendations themselves
+    const seenIdentifiers = new Set<string>()
+    const deduplicatedRecommendations = recommendations.filter((track) => {
+      if (seenIdentifiers.has(track.info.identifier)) {
+        return false
+      }
+      seenIdentifiers.add(track.info.identifier)
+      return true
+    })
+
+    console.log(
+      `[recommendedButton] Deduplicated recommendations: ${recommendations.length} -> ${deduplicatedRecommendations.length}`
+    )
+
     // Get currently queued track identifiers to avoid duplicates
     const queuedIdentifiers = new Set<string>()
 
@@ -70,7 +84,7 @@ export default async (queue: MusicQueue | null, interaction: ButtonInteraction) 
     }
 
     // Filter out duplicates
-    const uniqueRecommendations = recommendations.filter((track) => {
+    const uniqueRecommendations = deduplicatedRecommendations.filter((track) => {
       return !queuedIdentifiers.has(track.info.identifier)
     })
 
@@ -120,6 +134,18 @@ export default async (queue: MusicQueue | null, interaction: ButtonInteraction) 
     }
 
     console.log(`[recommendedButton] Added ${uniqueRecommendations.length} tracks to queue`)
+
+    // If queue is paused, resume playback
+    if (activeQueue.isPaused) {
+      console.log('[recommendedButton] Queue is paused, resuming playback')
+      activeQueue.resume()
+    }
+
+    // If nothing is playing and queue has tracks, start playing
+    if (!activeQueue.isPlaying && !activeQueue.currentTrack && activeQueue.tracks.length > 0) {
+      console.log('[recommendedButton] Queue not playing, starting playback')
+      await activeQueue.play()
+    }
 
     // Update message with success
     if (channel && channel.isTextBased() && 'guild' in channel) {

@@ -1,7 +1,7 @@
 import { useComponents } from '@constants/messageComponents'
 import { sendMessage } from '@utils/mainMessage'
 import { generateNowPlayingCanvas } from '@utils/nowPlayingCanvas'
-import { addSong } from '@utils/songHistory'
+import { addSong } from '@utils/songHistoryV2'
 import { triggerSongStart } from '@utils/djTriggers'
 
 import type { MusicQueue, LavalinkTrack } from '../../lib'

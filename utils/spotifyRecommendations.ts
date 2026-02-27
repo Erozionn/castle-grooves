@@ -2,7 +2,7 @@ import type { LavalinkTrack } from '@types'
 
 import type { MusicManager } from '../lib/MusicManager'
 import type { MusicQueue } from '../lib/MusicQueue'
-import { getSongsPlayed } from './songHistory'
+import { getSongsPlayed } from './songHistoryV2'
 
 /**
  * Get Spotify recommendations based on a seed track
@@ -236,7 +236,7 @@ export const getRecommendationsFromQueue = async (
   // Always load history from database for better recommendations
   console.log('[getRecommendationsFromQueue] Loading history from database...')
   const dbHistory = await getSongsPlayed('monthly', 10)
-  const { deserializeLavalinkTrack } = await import('./songHistory')
+  const { deserializeLavalinkTrack } = await import('./songHistoryV2')
 
   const deserializedHistory = dbHistory
     .map((s) => {

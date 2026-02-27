@@ -1,7 +1,7 @@
 import { GuildMember, StringSelectMenuInteraction } from 'discord.js'
 
 import type { ClientType, LavalinkTrack } from '@types'
-import { generateHistoryOptions } from '@utils/songHistory'
+import { generateHistoryOptions } from '@utils/songHistoryV2'
 
 import { MusicQueue } from '../../lib'
 

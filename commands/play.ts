@@ -150,11 +150,16 @@ export default {
         if (searchResult.loadType === 'playlist' && searchResult.tracks.length > 1) {
           // Add all playlist tracks
           for (const track of searchResult.tracks) {
+            track.userData = track.userData || {}
+            track.userData.requestedBy = member as GuildMember
             await existingQueue.addTrack(track)
           }
         } else {
           // Add single track
-          await existingQueue.addTrack(searchResult.tracks[0])
+          const track = searchResult.tracks[0]
+          track.userData = track.userData || {}
+          track.userData.requestedBy = member as GuildMember
+          await existingQueue.addTrack(track)
         }
 
         // If nothing is playing, start playing

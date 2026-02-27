@@ -1,19 +1,21 @@
 #!/usr/bin/env ts-node
 /**
  * Migration script: InfluxDB V1 schema → V2 schema
- * 
+ *
  * Migrates data from old schema (with pivot issues) to new schema:
  * - Moves songTitle from TAG to FIELD
  * - Adds songHash TAG for efficient grouping
  * - Converts 'song' measurement to 'song_play'
  * - Filters out useless playing=false points
- * 
+ *
  * Run with: ts-node -r tsconfig-paths/register scripts/migrateInfluxDB.ts
  */
 
 import 'module-alias/register'
 import crypto from 'crypto'
+
 import { Point } from '@influxdata/influxdb-client'
+
 import { queryApi, writeApi } from '@hooks/InfluxDb'
 import ENV from '@constants/Env'
 
@@ -69,20 +71,20 @@ async function migrateData(dryRun = true, timeRange = '-365d') {
 
     // Group by timestamp to reconstruct records
     const recordsByTime = new Map<string, Partial<OldSongRecord>>()
-    
+
     for (const row of rows) {
       const timeKey = row._time
       if (!recordsByTime.has(timeKey)) {
         recordsByTime.set(timeKey, { _time: timeKey })
       }
-      
+
       const record = recordsByTime.get(timeKey)!
-      
+
       // Reconstruct the record from individual field rows
       if (row._field && row._value !== undefined) {
         record[row._field] = row._value
       }
-      
+
       // Copy tags
       if (row.songTitle) record.songTitle = row.songTitle
       if (row.requestedById) record.requestedById = row.requestedById
@@ -95,7 +97,7 @@ async function migrateData(dryRun = true, timeRange = '-365d') {
     // Filter and migrate
     let migratedCount = 0
     let skippedCount = 0
-    
+
     // Get write API once and reuse
     const writer = writeApi()
 
@@ -150,7 +152,7 @@ async function migrateData(dryRun = true, timeRange = '-365d') {
       if (migratedCount % 100 === 0) {
         console.log(`⏳ Migrated ${migratedCount} records...`)
       }
-      
+
       // Flush every 1000 records to avoid memory issues
       if (!dryRun && migratedCount % 1000 === 0) {
         await writer.flush()
@@ -167,7 +169,7 @@ async function migrateData(dryRun = true, timeRange = '-365d') {
     console.log(`\n✅ Migration complete!`)
     console.log(`   • Migrated: ${migratedCount} records`)
     console.log(`   • Skipped: ${skippedCount} records (no playing=true or missing data)`)
-    
+
     if (dryRun) {
       console.log(`\n⚠️  This was a DRY RUN - no data was written`)
       console.log(`   Run with --live flag to actually migrate data`)
