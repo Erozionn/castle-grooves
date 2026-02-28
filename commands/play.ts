@@ -87,6 +87,9 @@ export default {
   async execute(interaction: ChatInputCommandInteraction) {
     if (!interaction.isChatInputCommand()) return
 
+    // Defer immediately to prevent timeout
+    await interaction.deferReply()
+
     const musicManager = useMusicManager()
     const { member } = interaction
 
@@ -98,12 +101,11 @@ export default {
       const errMsg = await interaction.editReply({
         content: '❌ | You need to be in a voice channel!',
       })
-      setTimeout(() => errMsg.delete(), 3000)
+      setTimeout(() => interaction.deleteReply(), 3000)
       return
     }
 
-    const loadingMsg = await interaction.reply({ content: '⏱ | Loading...' })
-    setTimeout(() => loadingMsg.delete(), 1500)
+    await interaction.editReply({ content: '⏱ | Loading...' })
 
     const songName = interaction.options.get('song')?.value as string
 
