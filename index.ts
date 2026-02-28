@@ -81,13 +81,17 @@ if (NOW_PLAYING_MOCK_DATA) {
   console.log('[nowPlayingMock] Generating mock now playing data...')
   const mockTracks = useMockTracks()
 
-  nowPlayingCanvasWithUpNext(mockTracks).then((buffer) => {
-    fs.writeFileSync('mockNowPlayingMulti.png', buffer)
-  })
+  if (mockTracks && mockTracks.length > 0) {
+    nowPlayingCanvasWithUpNext(mockTracks).then((buffer) => {
+      fs.writeFileSync('mockNowPlayingMulti.png', buffer)
+    })
 
-  nowPlayingCanvas(mockTracks[0]).then((buffer) => {
-    fs.writeFileSync('mockNowPlaying.png', buffer)
-  })
+    nowPlayingCanvas(mockTracks[0]).then((buffer) => {
+      fs.writeFileSync('mockNowPlaying.png', buffer)
+    })
+  } else {
+    console.log('[nowPlayingMock] No mock data available, skipping')
+  }
 
   // client.once('ready', async () => {
   //   console.log('[nowPlayingMock] Sending mock now playing data...')
