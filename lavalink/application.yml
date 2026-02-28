@@ -105,7 +105,7 @@ plugins:
       - MUSIC
       - ANDROID_VR
       - WEB
-      - WEBEMBEDDED 
+      - TVHTML5_SIMPLY 
 
 metrics:
   prometheus:
