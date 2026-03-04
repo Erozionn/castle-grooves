@@ -1,4 +1,4 @@
-import { VoiceBasedChannel, GuildMember } from 'discord.js'
+import { VoiceBasedChannel, GuildMember, Message } from 'discord.js'
 import { Player as ShoukakuPlayer } from 'shoukaku'
 import type { MusicManager, LavalinkTrack } from './MusicManager'
 
@@ -143,10 +143,10 @@ export class MusicQueue {
         this.metadata.channel.send({
           content: `⚠️ | Failed to play **${this.currentTrack?.info?.title || 'track'}**. Skipping to next song...`,
         })
-        .then((msg) => {
+        .then((msg: Message) => {
           setTimeout(() => msg.delete().catch(() => {}), 3000)
         })
-        .catch((err) => console.error('[Queue] Failed to send error message:', err))
+        .catch((err: Error) => console.error('[Queue] Failed to send error message:', err))
       }
 
       // Skip to next track
