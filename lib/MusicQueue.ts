@@ -57,6 +57,20 @@ export class MusicQueue {
       throw new Error('No available Lavalink node')
     }
 
+    // Always cleanup any existing player first to prevent stale state issues
+    // This is critical after disconnects/reconnects to avoid incomplete voice state updates
+    try {
+      const existingPlayer = this.manager.shoukaku.players.get(this.guildId)
+      if (existingPlayer) {
+        console.log('[Queue] Found existing player, cleaning up before connecting...')
+        await this.manager.shoukaku.leaveVoiceChannel(this.guildId)
+        await new Promise((resolve) => setTimeout(resolve, 500))
+      }
+    } catch (cleanupError) {
+      // Ignore cleanup errors
+      console.log('[Queue] Pre-cleanup completed')
+    }
+
     try {
       // Create Shoukaku player - it handles the Discord voice connection internally
       this.player = await this.manager.shoukaku.joinVoiceChannel({
@@ -71,23 +85,15 @@ export class MusicQueue {
       this.setupPlayerEvents()
       this.setupConnectionEvents()
     } catch (error: any) {
-      // If we get a 400 Bad Request, it's likely a stale session - clear and retry once
+      // If we still get a 400 Bad Request, wait longer and retry once
       if (error?.status === 400 || error?.message?.includes('Bad Request')) {
-        console.warn('[Queue] Stale connection detected, attempting cleanup and retry...')
-
-        // Try to destroy any existing player on this guild
-        try {
-          await this.manager.shoukaku.leaveVoiceChannel(this.guildId)
-        } catch (cleanupError) {
-          // Ignore cleanup errors
-          console.log('[Queue] Cleanup error (expected):', (cleanupError as Error).message)
-        }
+        console.warn('[Queue] Connection failed with 400, waiting for state to clear...')
 
         this.player = null
         this.connection = null
 
-        // Wait a bit for Discord/Lavalink to clean up state
-        await new Promise((resolve) => setTimeout(resolve, 1000))
+        // Wait longer for Discord/Lavalink to fully clear state
+        await new Promise((resolve) => setTimeout(resolve, 2000))
 
         console.log('[Queue] Retrying voice connection...')
 
@@ -102,7 +108,7 @@ export class MusicQueue {
         this.setupPlayerEvents()
         this.setupConnectionEvents()
 
-        console.log('[Queue] Successfully reconnected after stale session')
+        console.log('[Queue] Successfully reconnected after retry')
       } else {
         throw error
       }
