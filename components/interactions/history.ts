@@ -77,7 +77,16 @@ export default async (queue: MusicQueue | null, interaction: StringSelectMenuInt
       if (!existingQueue.isPlaying && !existingQueue.currentTrack) {
         await existingQueue.play()
       }
-    } catch (e) {
+    } catch (e: any) {
+      // Handle Lavalink connection errors specifically
+      if (e?.status === 400 || e?.message?.includes('Bad Request')) {
+        console.warn('[history] Lavalink connection error:', e?.message || e)
+        message
+          .edit('⚠️ | Music server reconnecting. Please try again in a moment.')
+          .catch(() => {})
+        return
+      }
+
       console.warn('[history]', e)
       message.edit('❌ | An error occurred while playing the song!')
       return
