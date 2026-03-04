@@ -131,6 +131,28 @@ export class MusicQueue {
       this.skip()
     })
 
+    this.player.on('exception', (data) => {
+      console.error(`[Queue] Track exception in ${this.guildId}:`, {
+        error: data.exception?.message || 'Unknown error',
+        severity: data.exception?.severity,
+        cause: data.exception?.cause,
+      })
+      
+      // Notify user if channel exists
+      if (this.metadata?.channel) {
+        this.metadata.channel.send({
+          content: `⚠️ | Failed to play **${this.currentTrack?.info?.title || 'track'}**. Skipping to next song...`,
+        })
+        .then((msg) => {
+          setTimeout(() => msg.delete().catch(() => {}), 3000)
+        })
+        .catch((err) => console.error('[Queue] Failed to send error message:', err))
+      }
+
+      // Skip to next track
+      this.skip()
+    })
+
     this.player.on('closed', (data) => {
       console.warn(`[Queue] Player closed in ${this.guildId}:`, data)
       this.manager.emit('disconnect', this)

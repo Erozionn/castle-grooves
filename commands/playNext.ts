@@ -12,6 +12,9 @@ export default {
   async execute(interaction: ChatInputCommandInteraction) {
     if (!interaction.isChatInputCommand()) return
 
+    // Defer immediately to prevent timeout
+    await interaction.deferReply()
+
     const musicManager = useMusicManager()
     const queue = useQueue(interaction.guild?.id as string)
     const { member } = interaction
@@ -21,15 +24,14 @@ export default {
     } = member as GuildMember
 
     if (!voiceChannel) {
-      const errMsg = await interaction.editReply({
+      await interaction.editReply({
         content: '❌ | You need to be in a voice channel!',
       })
-      setTimeout(() => errMsg.delete(), 3000)
+      setTimeout(() => interaction.deleteReply().catch(() => {}), 3000)
       return
     }
 
-    const loadingMsg = await interaction.reply({ content: '⏱ | Loading...' })
-    setTimeout(() => loadingMsg.delete(), 1500)
+    await interaction.editReply({ content: '⏱ | Loading...' })
 
     const songName = interaction.options.get('song')?.value as string
 
@@ -45,6 +47,7 @@ export default {
 
         if (!results || !results.tracks || results.tracks.length === 0) {
           await interaction.editReply({ content: '❌ | No results found!' })
+          setTimeout(() => interaction.deleteReply().catch(() => {}), 3000)
           return
         }
 
@@ -53,11 +56,13 @@ export default {
         await interaction.editReply({
           content: `✅ | Added **${results.tracks[0].info.title}** to play next!`,
         })
+        setTimeout(() => interaction.deleteReply().catch(() => {}), 3000)
       } else {
         // No queue exists or nothing playing, just play the song
         await musicManager.play(voiceChannel, songName, {
           metadata: { channel: interaction.channel },
         })
+        setTimeout(() => interaction.deleteReply().catch(() => {}), 1500)
       }
 
       // If queue is paused, skip to the next track and resume
@@ -68,8 +73,25 @@ export default {
         queue.resume()
       }
     } catch (e) {
+      // Handle AbortError specifically
+      if (e instanceof Error && e.name === 'AbortError') {
+        console.warn('[playNextCommand] Operation was aborted - likely due to timeout or cancellation')
+        try {
+          await interaction.editReply({ content: '⚠️ | Operation was cancelled. Please try again.' })
+          setTimeout(() => interaction.deleteReply().catch(() => {}), 3000)
+        } catch {
+          // Ignore if interaction is invalid
+        }
+        return
+      }
+
       console.warn('[playNextCommand]', e)
-      await interaction.editReply({ content: '❌ | Error playing the song.' })
+      try {
+        await interaction.editReply({ content: '❌ | Error playing the song.' })
+        setTimeout(() => interaction.deleteReply().catch(() => {}), 3000)
+      } catch {
+        // Ignore if interaction is invalid
+      }
     }
   },
 }

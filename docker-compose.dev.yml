@@ -46,8 +46,6 @@ services:
       # Use named volumes for node_modules to avoid overwriting
       - node_modules:/usr/src/app/node_modules
       - yarn_cache:/usr/src/app/.yarn
-      # Mount recordings
-      - ./recordings:/usr/src/app/recordings
 
   # Lavalink Audio Server
   lavalink:
