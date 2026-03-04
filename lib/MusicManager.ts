@@ -1,14 +1,10 @@
-import { Shoukaku, Connectors, Node, Player as ShoukakuPlayer } from 'shoukaku'
+import { Shoukaku, Connectors, Node, Player as ShoukakuPlayer, NodeOption } from 'shoukaku'
 import { Client, VoiceBasedChannel, GuildMember, Interaction } from 'discord.js'
 import { EventEmitter } from 'events'
 import { MusicQueue } from './MusicQueue'
 
 export interface MusicManagerOptions {
-  nodes: Array<{
-    name: string
-    url: string
-    auth: string
-  }>
+  nodes: NodeOption[]
   spotify?: {
     clientId: string
     clientSecret: string
@@ -63,17 +59,8 @@ export class MusicManager extends EventEmitter {
     this.options = options
     this.queues = new Map()
 
-    // Initialize Shoukaku
-    this.shoukaku = new Shoukaku(new Connectors.DiscordJS(client), options.nodes, {
-      moveOnDisconnect: false,
-      resume: true,
-      resumeTimeout: 30,
-      resumeByLibrary: true,
-      reconnectTries: 3,
-      reconnectInterval: 5,
-      restTimeout: 60,
-      userAgent: 'Castle-Grooves/0.2.0',
-    })
+    // Initialize Shoukaku with absolute minimal config
+    this.shoukaku = new Shoukaku(new Connectors.DiscordJS(client), options.nodes)
 
     this.setupShoukakuEvents()
   }
@@ -91,7 +78,7 @@ export class MusicManager extends EventEmitter {
 
     this.shoukaku.on('close', (name: string, code: number, reason: string) => {
       console.warn(`[Lavalink] Node ${name} closed: ${code} - ${reason}`)
-      
+
       // Clear all queue connections when node closes to prevent stale sessions
       this.queues.forEach((queue) => {
         if (queue.player) {
@@ -102,7 +89,7 @@ export class MusicManager extends EventEmitter {
           queue.connection = null
         }
       })
-      
+
       this.emit('nodeClose', name, code, reason)
     })
 
@@ -112,8 +99,13 @@ export class MusicManager extends EventEmitter {
     })
 
     this.shoukaku.on('debug', (name: string, info: string) => {
-      // console.log(`[Lavalink Debug] ${name}:`, info)
+      console.log(`[Lavalink Debug] ${name}:`, info)
       this.emit('debug', name, info)
+    })
+
+    this.shoukaku.on('raw', (name: string, json: unknown) => {
+      console.log(`[Lavalink Raw] ${name}:`, JSON.stringify(json, null, 2))
+      this.emit('raw', name, json)
     })
   }
 

@@ -10,6 +10,7 @@ lavalink:
     # LavaSearch can be added if needed (now compatible with LavaSrc 4.8.1+)
   server:
     password: 'youshallnotpass' # Change this in production!
+    enableDave: true # Enable DAVE (Discord Audio Video Encryption) for E2EE support
     sources:
       youtube: false # Disabled - using youtube-plugin instead
       bandcamp: true
@@ -106,11 +107,10 @@ plugins:
       # refreshToken: "" # Will be populated after first OAuth login
     # Use specific clients that work better and are less likely to be blocked
     clients:
-      - MUSIC
-      - ANDROID_VR
-      - WEB
-      - TVHTML5_SIMPLY
-
+      - TV # OAuth-compatible, requires sign-in for playback
+      - WEB # Opus formats, livestream support
+      - TVHTML5_SIMPLY # Opus formats, livestream support
+      - ANDROID_VR # Opus formats, livestream support (backup)
 metrics:
   prometheus:
     enabled: false
@@ -134,7 +134,7 @@ logging:
   request:
     enabled: true
     includeClientInfo: true
-    includeHeaders: false
+    includeHeaders: true
     includeQueryString: true
     includePayload: true
     maxPayloadLength: 10000
