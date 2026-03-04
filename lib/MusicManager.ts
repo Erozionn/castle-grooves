@@ -91,6 +91,18 @@ export class MusicManager extends EventEmitter {
 
     this.shoukaku.on('close', (name: string, code: number, reason: string) => {
       console.warn(`[Lavalink] Node ${name} closed: ${code} - ${reason}`)
+      
+      // Clear all queue connections when node closes to prevent stale sessions
+      this.queues.forEach((queue) => {
+        if (queue.player) {
+          console.log(`[MusicManager] Clearing stale player for guild ${queue.guildId}`)
+          // eslint-disable-next-line no-param-reassign
+          queue.player = null
+          // eslint-disable-next-line no-param-reassign
+          queue.connection = null
+        }
+      })
+      
       this.emit('nodeClose', name, code, reason)
     })
 

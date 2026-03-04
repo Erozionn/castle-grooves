@@ -228,7 +228,7 @@ export default {
           setTimeout(() => interaction.deleteReply().catch((e) => console.warn('[playCommand] deleteReply failed:', e)), 1500)
         }
       }
-    } catch (e) {
+    } catch (e: any) {
       // Handle AbortError specifically (happens when operations are cancelled)
       if (e instanceof Error && e.name === 'AbortError') {
         console.warn('[playCommand] Operation was aborted - likely due to timeout or cancellation')
@@ -236,6 +236,18 @@ export default {
         try {
           await interaction.editReply({ content: '⚠️ | Operation was cancelled. Please try again.' })
           setTimeout(() => interaction.deleteReply().catch(() => {}), 3000)
+        } catch {
+          // Interaction may already be invalid, ignore
+        }
+        return
+      }
+
+      // Handle Lavalink connection errors
+      if (e?.status === 400 || e?.message?.includes('Bad Request')) {
+        console.warn('[playCommand] Lavalink connection error (possibly reconnecting)')
+        try {
+          await interaction.editReply({ content: '⚠️ | Music server reconnecting. Please try again in a moment.' })
+          setTimeout(() => interaction.deleteReply().catch(() => {}), 5000)
         } catch {
           // Interaction may already be invalid, ignore
         }
