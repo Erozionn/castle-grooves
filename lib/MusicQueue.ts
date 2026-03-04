@@ -57,18 +57,40 @@ export class MusicQueue {
       throw new Error('No available Lavalink node')
     }
 
-    // Create Shoukaku player - it handles the Discord voice connection internally
-    this.player = await this.manager.shoukaku.joinVoiceChannel({
-      guildId: this.guildId,
-      channelId: this.voiceChannel.id,
-      shardId: this.voiceChannel.guild.shardId,
-    })
+    try {
+      // Create Shoukaku player - it handles the Discord voice connection internally
+      this.player = await this.manager.shoukaku.joinVoiceChannel({
+        guildId: this.guildId,
+        channelId: this.voiceChannel.id,
+        shardId: this.voiceChannel.guild.shardId,
+      })
 
-    // Store connection reference (player acts as the connection in Shoukaku)
-    this.connection = this.player as any
+      // Store connection reference (player acts as the connection in Shoukaku)
+      this.connection = this.player as any
 
-    this.setupPlayerEvents()
-    this.setupConnectionEvents()
+      this.setupPlayerEvents()
+      this.setupConnectionEvents()
+    } catch (error: any) {
+      // If we get a 400 Bad Request, it's likely a stale session - clear and retry once
+      if (error?.status === 400 || error?.message?.includes('Bad Request')) {
+        console.warn('[Queue] Stale connection detected, clearing and retrying...')
+        this.player = null
+        this.connection = null
+
+        // Retry once
+        this.player = await this.manager.shoukaku.joinVoiceChannel({
+          guildId: this.guildId,
+          channelId: this.voiceChannel.id,
+          shardId: this.voiceChannel.guild.shardId,
+        })
+
+        this.connection = this.player as any
+        this.setupPlayerEvents()
+        this.setupConnectionEvents()
+      } else {
+        throw error
+      }
+    }
   }
 
   private setupPlayerEvents() {
@@ -137,16 +159,17 @@ export class MusicQueue {
         severity: data.exception?.severity,
         cause: data.exception?.cause,
       })
-      
+
       // Notify user if channel exists
       if (this.metadata?.channel) {
-        this.metadata.channel.send({
-          content: `⚠️ | Failed to play **${this.currentTrack?.info?.title || 'track'}**. Skipping to next song...`,
-        })
-        .then((msg: Message) => {
-          setTimeout(() => msg.delete().catch(() => {}), 3000)
-        })
-        .catch((err: Error) => console.error('[Queue] Failed to send error message:', err))
+        this.metadata.channel
+          .send({
+            content: `⚠️ | Failed to play **${this.currentTrack?.info?.title || 'track'}**. Skipping to next song...`,
+          })
+          .then((msg: Message) => {
+            setTimeout(() => msg.delete().catch(() => {}), 3000)
+          })
+          .catch((err: Error) => console.error('[Queue] Failed to send error message:', err))
       }
 
       // Skip to next track

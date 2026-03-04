@@ -72,13 +72,31 @@ export default {
         }
         queue.resume()
       }
-    } catch (e) {
+    } catch (e: any) {
       // Handle AbortError specifically
       if (e instanceof Error && e.name === 'AbortError') {
-        console.warn('[playNextCommand] Operation was aborted - likely due to timeout or cancellation')
+        console.warn(
+          '[playNextCommand] Operation was aborted - likely due to timeout or cancellation'
+        )
         try {
-          await interaction.editReply({ content: '⚠️ | Operation was cancelled. Please try again.' })
+          await interaction.editReply({
+            content: '⚠️ | Operation was cancelled. Please try again.',
+          })
           setTimeout(() => interaction.deleteReply().catch(() => {}), 3000)
+        } catch {
+          // Ignore if interaction is invalid
+        }
+        return
+      }
+
+      // Handle Lavalink connection errors
+      if (e?.status === 400 || e?.message?.includes('Bad Request')) {
+        console.warn('[playNextCommand] Lavalink connection error (possibly reconnecting)')
+        try {
+          await interaction.editReply({
+            content: '⚠️ | Music server reconnecting. Please try again in a moment.',
+          })
+          setTimeout(() => interaction.deleteReply().catch(() => {}), 5000)
         } catch {
           // Ignore if interaction is invalid
         }
