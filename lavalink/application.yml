@@ -100,12 +100,16 @@ plugins:
     allowDirectPlaylistIds: true # Whether just playlist IDs can match. If false, only complete URLs will be loaded.
     remoteCipher:
       url: "https://cipher.kikkia.dev/"
+    oauth:
+      enabled: true
+      skipInitialization: false
+      # refreshToken: "" # Will be populated after first OAuth login
     # Use specific clients that work better and are less likely to be blocked
     clients:
       - MUSIC
       - ANDROID_VR
       - WEB
-      - TVHTML5_SIMPLY 
+      - TVHTML5_SIMPLY
 
 metrics:
   prometheus:

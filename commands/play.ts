@@ -33,15 +33,34 @@ export default {
       return
     }
 
+    // Skip autocomplete for very short queries (< 2 chars) to reduce API calls
+    if (focusedValue.length < 2) {
+      await interaction.respond([])
+      return
+    }
+
     try {
       // Use focused value or fallback to a default search
       const searchQuery = focusedValue || 'popular music'
 
-      // Search using YouTube for autocomplete
-      const searchResults = await musicManager.search(searchQuery, { source: 'ytsearch' })
+      // Race between search and timeout (2.5 seconds to be safe)
+      const timeoutPromise = new Promise<null>((resolve) => {
+        setTimeout(() => resolve(null), 2500)
+      })
 
-      if (searchResults.loadType === 'empty' || searchResults.loadType === 'error') {
-        await interaction.respond([])
+      const searchPromise = musicManager.search(searchQuery, { source: 'ytsearch' })
+
+      const searchResults = await Promise.race([searchPromise, timeoutPromise])
+
+      // If timed out or no results, respond with empty array
+      if (
+        !searchResults ||
+        searchResults.loadType === 'empty' ||
+        searchResults.loadType === 'error'
+      ) {
+        await interaction.respond([]).catch(() => {
+          // Interaction may have already expired, silently fail
+        })
         return
       }
 
@@ -78,10 +97,18 @@ export default {
         )
         .slice(0, 25)
 
-      await interaction.respond(filtered)
+      await interaction.respond(filtered).catch(() => {
+        // Interaction may have already expired, silently fail
+      })
     } catch (e) {
-      console.warn('[searchCommand]', e)
-      await interaction.respond([])
+      // Only log if it's not the common "Unknown interaction" timeout error
+      if (e && typeof e === 'object' && 'code' in e && e.code !== 10062) {
+        console.warn('[searchCommand]', e)
+      }
+      // Try to respond with empty array, but don't fail if interaction expired
+      await interaction.respond([]).catch(() => {
+        // Silently ignore if interaction already expired
+      })
     }
   },
   async execute(interaction: ChatInputCommandInteraction) {
@@ -98,10 +125,10 @@ export default {
     } = member as GuildMember
 
     if (!voiceChannel) {
-      const errMsg = await interaction.editReply({
+      await interaction.editReply({
         content: '❌ | You need to be in a voice channel!',
       })
-      setTimeout(() => interaction.deleteReply(), 3000)
+      setTimeout(() => interaction.deleteReply().catch((e) => console.warn('[playCommand] deleteReply failed:', e)), 3000)
       return
     }
 
@@ -128,6 +155,7 @@ export default {
         if (track?.info) {
           console.log(`[playCommand] Now playing: "${track.info.title}" by "${track.info.author}"`)
         }
+        setTimeout(() => interaction.deleteReply().catch((e) => console.warn('[playCommand] deleteReply failed:', e)), 1500)
       } else {
         // Ensure channel metadata is set for existing queue
         if (!existingQueue.metadata.channel) {
@@ -145,6 +173,7 @@ export default {
           searchResult.tracks.length === 0
         ) {
           await interaction.editReply({ content: '❌ | No results found!' })
+          setTimeout(() => interaction.deleteReply().catch((e) => console.warn('[playCommand] deleteReply failed:', e)), 3000)
           return
         }
 
@@ -156,37 +185,70 @@ export default {
             track.userData.requestedBy = member as GuildMember
             await existingQueue.addTrack(track)
           }
+
+          // If nothing is playing, start playing
+          if (!existingQueue.isPlaying && !existingQueue.currentTrack) {
+            await existingQueue.play()
+          }
+
+          // If queue is paused, skip to new track and resume
+          if (existingQueue.isPaused) {
+            if (existingQueue.tracks.length >= 1) {
+              await existingQueue.skip()
+            }
+            existingQueue.resume()
+          }
+
+          setTimeout(() => interaction.deleteReply().catch((e) => console.warn('[playCommand] deleteReply failed:', e)), 1500)
         } else {
           // Add single track
           const track = searchResult.tracks[0]
           track.userData = track.userData || {}
           track.userData.requestedBy = member as GuildMember
           await existingQueue.addTrack(track)
-        }
 
-        // If nothing is playing, start playing
-        if (!existingQueue.isPlaying && !existingQueue.currentTrack) {
-          await existingQueue.play()
-        }
-
-        // If queue is paused, skip to new track and resume
-        if (existingQueue.isPaused) {
-          if (existingQueue.tracks.length >= 1) {
-            await existingQueue.skip()
+          // If nothing is playing, start playing
+          if (!existingQueue.isPlaying && !existingQueue.currentTrack) {
+            await existingQueue.play()
           }
-          existingQueue.resume()
-        }
 
-        const track = searchResult.tracks[0]
-        if (track?.info) {
-          console.log(
-            `[playCommand] Added to queue: "${track.info.title}" by "${track.info.author}"`
-          )
+          // If queue is paused, skip to new track and resume
+          if (existingQueue.isPaused) {
+            if (existingQueue.tracks.length >= 1) {
+              await existingQueue.skip()
+            }
+            existingQueue.resume()
+          }
+
+          if (track?.info) {
+            console.log(
+              `[playCommand] Added to queue: "${track.info.title}" by "${track.info.author}"`
+            )
+          }
+          setTimeout(() => interaction.deleteReply().catch((e) => console.warn('[playCommand] deleteReply failed:', e)), 1500)
         }
       }
     } catch (e) {
+      // Handle AbortError specifically (happens when operations are cancelled)
+      if (e instanceof Error && e.name === 'AbortError') {
+        console.warn('[playCommand] Operation was aborted - likely due to timeout or cancellation')
+        // Try to update reply if interaction is still valid
+        try {
+          await interaction.editReply({ content: '⚠️ | Operation was cancelled. Please try again.' })
+          setTimeout(() => interaction.deleteReply().catch(() => {}), 3000)
+        } catch {
+          // Interaction may already be invalid, ignore
+        }
+        return
+      }
+
       console.warn('[playCommand]', e)
-      await interaction.editReply({ content: 'Error joining your channel.' })
+      try {
+        await interaction.editReply({ content: '❌ | Error joining your channel.' })
+        setTimeout(() => interaction.deleteReply().catch(() => {}), 3000)
+      } catch {
+        // Interaction may already be invalid, ignore
+      }
     }
   },
 }
