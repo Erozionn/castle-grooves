@@ -57,18 +57,18 @@ export class MusicQueue {
       throw new Error('No available Lavalink node')
     }
 
-    // Always cleanup any existing player first to prevent stale state issues
-    // This is critical after disconnects/reconnects to avoid incomplete voice state updates
-    try {
-      const existingPlayer = this.manager.shoukaku.players.get(this.guildId)
-      if (existingPlayer) {
-        console.log('[Queue] Found existing player, cleaning up before connecting...')
-        await this.manager.shoukaku.leaveVoiceChannel(this.guildId)
-        await new Promise((resolve) => setTimeout(resolve, 500))
+    // Check for existing player and destroy it directly without using leaveVoiceChannel
+    // which sends voice state updates that Lavalink v4 rejects when channelId is null
+    const existingPlayer = this.manager.shoukaku.players.get(this.guildId)
+    if (existingPlayer) {
+      console.log('[Queue] Found existing player, destroying directly...')
+      try {
+        // Use internal method to destroy without sending voice updates
+        this.manager.shoukaku.players.delete(this.guildId)
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+      } catch (e) {
+        console.log('[Queue] Cleanup error (expected)')
       }
-    } catch (cleanupError) {
-      // Ignore cleanup errors
-      console.log('[Queue] Pre-cleanup completed')
     }
 
     try {
@@ -85,19 +85,31 @@ export class MusicQueue {
       this.setupPlayerEvents()
       this.setupConnectionEvents()
     } catch (error: any) {
-      // If we still get a 400 Bad Request, wait longer and retry once
+      // If we still get a 400 Bad Request, the session is corrupted on Lavalink
+      // Destroy the player on Lavalink side and retry
       if (error?.status === 400 || error?.message?.includes('Bad Request')) {
-        console.warn('[Queue] Connection failed with 400, waiting for state to clear...')
+        console.warn('[Queue] Connection failed with 400, destroying Lavalink session...')
+
+        // Try to destroy the player session on Lavalink directly
+        try {
+          const player = this.manager.shoukaku.players.get(this.guildId)
+          if (player) {
+            await node.rest.destroyPlayer(this.guildId)
+            this.manager.shoukaku.players.delete(this.guildId)
+          }
+        } catch (destroyError) {
+          console.log('[Queue] Session destroy completed')
+        }
 
         this.player = null
         this.connection = null
 
-        // Wait longer for Discord/Lavalink to fully clear state
+        // Wait for Lavalink to fully clear the session
         await new Promise((resolve) => setTimeout(resolve, 2000))
 
         console.log('[Queue] Retrying voice connection...')
 
-        // Retry once
+        // Retry once with fresh state
         this.player = await this.manager.shoukaku.joinVoiceChannel({
           guildId: this.guildId,
           channelId: this.voiceChannel.id,

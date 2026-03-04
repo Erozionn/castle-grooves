@@ -61,6 +61,7 @@ const musicManager = new MusicManager(client, {
       name: 'CastleGrooves-Lavalink',
       url: `${ENV.LAVALINK_HOST}:${ENV.LAVALINK_PORT}`,
       auth: ENV.LAVALINK_PASSWORD,
+      secure: false,
     },
   ],
 })

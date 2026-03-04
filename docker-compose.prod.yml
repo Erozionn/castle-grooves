@@ -43,7 +43,7 @@ services:
 
   # Lavalink Audio Server
   lavalink:
-    image: ghcr.io/lavalink-devs/lavalink:4-alpine
+    image: ghcr.io/lavalink-devs/lavalink:4.2-alpine
     container_name: castle-grooves-lavalink
     restart: unless-stopped
     environment:
