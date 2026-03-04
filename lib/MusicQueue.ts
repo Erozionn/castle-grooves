@@ -73,9 +73,23 @@ export class MusicQueue {
     } catch (error: any) {
       // If we get a 400 Bad Request, it's likely a stale session - clear and retry once
       if (error?.status === 400 || error?.message?.includes('Bad Request')) {
-        console.warn('[Queue] Stale connection detected, clearing and retrying...')
+        console.warn('[Queue] Stale connection detected, attempting cleanup and retry...')
+
+        // Try to destroy any existing player on this guild
+        try {
+          await this.manager.shoukaku.leaveVoiceChannel(this.guildId)
+        } catch (cleanupError) {
+          // Ignore cleanup errors
+          console.log('[Queue] Cleanup error (expected):', (cleanupError as Error).message)
+        }
+
         this.player = null
         this.connection = null
+
+        // Wait a bit for Discord/Lavalink to clean up state
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+
+        console.log('[Queue] Retrying voice connection...')
 
         // Retry once
         this.player = await this.manager.shoukaku.joinVoiceChannel({
@@ -87,6 +101,8 @@ export class MusicQueue {
         this.connection = this.player as any
         this.setupPlayerEvents()
         this.setupConnectionEvents()
+
+        console.log('[Queue] Successfully reconnected after stale session')
       } else {
         throw error
       }
