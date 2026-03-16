@@ -18,6 +18,7 @@ const {
   LAVALINK_HOST,
   LAVALINK_PORT,
   LAVALINK_PASSWORD,
+  DEBUG_QUEUE,
 } = process.env
 
 const ENV = {
@@ -40,6 +41,7 @@ const ENV = {
   LAVALINK_HOST: LAVALINK_HOST || 'localhost',
   LAVALINK_PORT: LAVALINK_PORT || '2333',
   LAVALINK_PASSWORD: LAVALINK_PASSWORD || 'youshallnotpass',
+  DEBUG_QUEUE: DEBUG_QUEUE === 'true',
 }
 
 export default ENV
