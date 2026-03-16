@@ -1,5 +1,6 @@
 import { VoiceBasedChannel, GuildMember, Message } from 'discord.js'
 import { Player as ShoukakuPlayer } from 'shoukaku'
+import ENV from '@constants/Env'
 import type { MusicManager, LavalinkTrack } from './MusicManager'
 
 export interface QueueMetadata {
@@ -47,7 +48,9 @@ export class MusicQueue {
    * Connect to voice channel
    */
   private async connect(): Promise<void> {
-    if (this.connection) {
+    // Check if we have a valid connection (not just that the object exists)
+    // Verify node state to ensure it's actually connected (state 2 = CONNECTED)
+    if (this.connection && this.player?.node?.state === 2) {
       return
     }
 
@@ -61,13 +64,13 @@ export class MusicQueue {
     // which sends voice state updates that Lavalink v4 rejects when channelId is null
     const existingPlayer = this.manager.shoukaku.players.get(this.guildId)
     if (existingPlayer) {
-      console.log('[Queue] Found existing player, destroying directly...')
+      if (ENV.DEBUG_QUEUE) console.log('[Queue] Found existing player, destroying directly...')
       try {
         // Use internal method to destroy without sending voice updates
         this.manager.shoukaku.players.delete(this.guildId)
         await new Promise((resolve) => setTimeout(resolve, 1000))
       } catch (e) {
-        console.log('[Queue] Cleanup error (expected)')
+        if (ENV.DEBUG_QUEUE) console.log('[Queue] Cleanup error (expected)')
       }
     }
 
@@ -98,7 +101,7 @@ export class MusicQueue {
             this.manager.shoukaku.players.delete(this.guildId)
           }
         } catch (destroyError) {
-          console.log('[Queue] Session destroy completed')
+          if (ENV.DEBUG_QUEUE) console.log('[Queue] Session destroy completed')
         }
 
         this.player = null
@@ -107,7 +110,7 @@ export class MusicQueue {
         // Wait for Lavalink to fully clear the session
         await new Promise((resolve) => setTimeout(resolve, 2000))
 
-        console.log('[Queue] Retrying voice connection...')
+        if (ENV.DEBUG_QUEUE) console.log('[Queue] Retrying voice connection...')
 
         // Retry once with fresh state
         this.player = await this.manager.shoukaku.joinVoiceChannel({
@@ -120,7 +123,7 @@ export class MusicQueue {
         this.setupPlayerEvents()
         this.setupConnectionEvents()
 
-        console.log('[Queue] Successfully reconnected after retry')
+        if (ENV.DEBUG_QUEUE) console.log('[Queue] Successfully reconnected after retry')
       } else {
         throw error
       }
@@ -135,19 +138,21 @@ export class MusicQueue {
       this.isPaused = false
       // Clear transitioning flag when track actually starts
       this.isTransitioning = false
-      console.log(`[Queue] Track started, clearing transition flag`)
+      if (ENV.DEBUG_QUEUE) console.log(`[Queue] Track started, clearing transition flag`)
       this.manager.emit('playerStart', this, this.currentTrack)
     })
 
     this.player.on('end', (reason) => {
-      console.log(`[Queue] Track ended in ${this.guildId}:`, reason.reason)
-      console.log(`[Queue] Tracks in queue:`, this.tracks.length)
-      console.log(`[Queue] Current track:`, this.currentTrack?.info?.title || 'none')
-      console.log(`[Queue] isTransitioning:`, this.isTransitioning)
+      if (ENV.DEBUG_QUEUE) {
+        console.log(`[Queue] Track ended in ${this.guildId}:`, reason.reason)
+        console.log(`[Queue] Tracks in queue:`, this.tracks.length)
+        console.log(`[Queue] Current track:`, this.currentTrack?.info?.title || 'none')
+        console.log(`[Queue] isTransitioning:`, this.isTransitioning)
+      }
 
       // Ignore end events during track transitions
       if (this.isTransitioning) {
-        console.log(`[Queue] Ignoring end event during transition`)
+        if (ENV.DEBUG_QUEUE) console.log(`[Queue] Ignoring end event during transition`)
         return
       }
 
@@ -173,10 +178,10 @@ export class MusicQueue {
 
       // Play next track
       if (this.tracks.length > 0) {
-        console.log(`[Queue] Playing next track from queue (${this.tracks.length} remaining)`)
+        if (ENV.DEBUG_QUEUE) console.log(`[Queue] Playing next track from queue (${this.tracks.length} remaining)`)
         this.play().catch((err) => console.error('[Queue] Error playing next track:', err))
       } else {
-        console.log(`[Queue] No more tracks in queue, emitting emptyQueue`)
+        if (ENV.DEBUG_QUEUE) console.log(`[Queue] No more tracks in queue, emitting emptyQueue`)
         this.isPlaying = false
         this.manager.emit('emptyQueue', this)
       }
@@ -246,9 +251,9 @@ export class MusicQueue {
       if (this.isBotAlone()) {
         // Bot is alone - start countdown if not already started
         if (!this.emptyChannelTimeout) {
-          console.log('[Queue] Bot is alone in voice channel, starting 10s countdown...')
+          if (ENV.DEBUG_QUEUE) console.log('[Queue] Bot is alone in voice channel, starting 10s countdown...')
           this.emptyChannelTimeout = setTimeout(() => {
-            console.log('[Queue] Bot was alone for 10s, disconnecting...')
+            if (ENV.DEBUG_QUEUE) console.log('[Queue] Bot was alone for 10s, disconnecting...')
             this.destroy()
             this.manager.emit('disconnect', this)
           }, 10000) // 10 seconds
@@ -256,7 +261,7 @@ export class MusicQueue {
       } else {
         // Bot is not alone - clear timeout if exists
         if (this.emptyChannelTimeout) {
-          console.log('[Queue] Users rejoined, canceling disconnect countdown')
+          if (ENV.DEBUG_QUEUE) console.log('[Queue] Users rejoined, canceling disconnect countdown')
           clearTimeout(this.emptyChannelTimeout)
           this.emptyChannelTimeout = null
         }
@@ -274,9 +279,11 @@ export class MusicQueue {
    */
   async addTrack(track: LavalinkTrack): Promise<void> {
     this.tracks.push(track)
-    console.log(
-      `[Queue] Added track to queue: "${track.info.title}" - Queue size: ${this.tracks.length}`
-    )
+    if (ENV.DEBUG_QUEUE) {
+      console.log(
+        `[Queue] Added track to queue: "${track.info.title}" - Queue size: ${this.tracks.length}`
+      )
+    }
     // Emit event so handlers can update UI
     this.manager.emit('audioTrackAdd', this, track)
   }
@@ -302,7 +309,23 @@ export class MusicQueue {
    * Play the next track in queue
    */
   async play(): Promise<void> {
-    if (!this.player) {
+    // Check if player exists AND verify the node connection is valid
+    // After sitting dormant, Discord may have closed the connection but player object still exists
+    if (!this.player || !this.player.node || !this.player.node.state || this.player.node.state !== 2) {
+      if (ENV.DEBUG_QUEUE) console.log('[Queue] Player not connected (stale connection), reconnecting...')
+      
+      // Clean up stale player if it exists
+      if (this.player) {
+        try {
+          await this.player.node.rest.destroyPlayer(this.guildId)
+          this.manager.shoukaku.players.delete(this.guildId)
+          this.player = null
+          this.connection = null
+        } catch (err) {
+          if (ENV.DEBUG_QUEUE) console.log('[Queue] Cleanup of stale player completed')
+        }
+      }
+      
       await this.connect()
     }
 
@@ -327,7 +350,7 @@ export class MusicQueue {
       throw new Error('Player not initialized')
     }
 
-    console.log(`[Queue] Playing track: "${this.currentTrack.info.title}"`)
+    if (ENV.DEBUG_QUEUE) console.log(`[Queue] Playing track: "${this.currentTrack.info.title}"`)
 
     // Play track
     await this.player.playTrack({ track: { encoded: this.currentTrack.encoded } })
