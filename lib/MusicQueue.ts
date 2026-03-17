@@ -65,10 +65,11 @@ export class MusicQueue {
     const existingPlayer = this.manager.shoukaku.players.get(this.guildId)
     if (existingPlayer) {
       if (ENV.DEBUG_QUEUE) console.log('[Queue] Found existing player, destroying directly...')
-      try {
-        // Use internal method to destroy without sending voice updates
+      try {        // Destroy on Lavalink first, then remove from map
+        await node.rest.destroyPlayer(this.guildId).catch(() => {})
         this.manager.shoukaku.players.delete(this.guildId)
-        await new Promise((resolve) => setTimeout(resolve, 1000))
+        // Give Lavalink time to process the destruction
+        await new Promise((resolve) => setTimeout(resolve, 1500))
       } catch (e) {
         if (ENV.DEBUG_QUEUE) console.log('[Queue] Cleanup error (expected)')
       }
@@ -217,6 +218,13 @@ export class MusicQueue {
 
     this.player.on('closed', (data) => {
       console.warn(`[Queue] Player closed in ${this.guildId}:`, data)
+      
+      // Clean up player references to allow reconnection
+      if (ENV.DEBUG_QUEUE) console.log('[Queue] Cleaning up closed player...')
+      this.manager.shoukaku.players.delete(this.guildId)
+      this.player = null
+      this.connection = null
+      
       this.manager.emit('disconnect', this)
     })
   }
@@ -309,23 +317,10 @@ export class MusicQueue {
    * Play the next track in queue
    */
   async play(): Promise<void> {
-    // Check if player exists AND verify the node connection is valid
-    // After sitting dormant, Discord may have closed the connection but player object still exists
-    if (!this.player || !this.player.node || !this.player.node.state || this.player.node.state !== 2) {
-      if (ENV.DEBUG_QUEUE) console.log('[Queue] Player not connected (stale connection), reconnecting...')
-      
-      // Clean up stale player if it exists
-      if (this.player) {
-        try {
-          await this.player.node.rest.destroyPlayer(this.guildId)
-          this.manager.shoukaku.players.delete(this.guildId)
-          this.player = null
-          this.connection = null
-        } catch (err) {
-          if (ENV.DEBUG_QUEUE) console.log('[Queue] Cleanup of stale player completed')
-        }
-      }
-      
+    // Only reconnect if there's no player at all
+    // Trust the existing connection - only clean up if we actually get an error
+    if (!this.player) {
+      if (ENV.DEBUG_QUEUE) console.log('[Queue] No player, connecting...')
       await this.connect()
     }
 
@@ -352,12 +347,37 @@ export class MusicQueue {
 
     if (ENV.DEBUG_QUEUE) console.log(`[Queue] Playing track: "${this.currentTrack.info.title}"`)
 
-    // Play track
-    await this.player.playTrack({ track: { encoded: this.currentTrack.encoded } })
+    try {
+      // Play track
+      await this.player.playTrack({ track: { encoded: this.currentTrack.encoded } })
 
-    // Set volume
-    if (this.volume !== 100) {
-      await this.player.setGlobalVolume(this.volume)
+      // Set volume
+      if (this.volume !== 100) {
+        await this.player.setGlobalVolume(this.volume)
+      }
+    } catch (error: any) {
+      // If playback fails due to dead connection, clean up and retry once
+      if (error?.message?.includes('No available guild node') || error?.message?.includes('Player not found')) {
+        if (ENV.DEBUG_QUEUE) console.log('[Queue] Connection dead, cleaning up and retrying...')
+        
+        // Clean up dead player
+        this.manager.shoukaku.players.delete(this.guildId)
+        this.player = null
+        this.connection = null
+        
+        // Wait a bit for cleanup
+        await new Promise((resolve) => setTimeout(resolve, 500))
+        
+        // Reconnect and retry
+        await this.connect()
+        await this.player!.playTrack({ track: { encoded: this.currentTrack!.encoded } })
+        
+        if (this.volume !== 100) {
+          await this.player!.setGlobalVolume(this.volume)
+        }
+      } else {
+        throw error
+      }
     }
   }
 
