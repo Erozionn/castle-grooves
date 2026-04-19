@@ -273,6 +273,7 @@ const getTimeRangeDescription = (timeRange: string): string => {
 
 const getTimeRangeParams = (timeRange: string) => {
   const timeRanges: Record<string, { start: string; end?: string }> = {
+    '1h': { start: '-1h' },
     daily: { start: '-1d' },
     weekly: { start: '-7d' },
     'bi-weekly': { start: '-14d' },
@@ -447,6 +448,76 @@ const buildSongQuery = (
 // ============================================================================
 // DATABASE QUERY FUNCTIONS
 // ============================================================================
+
+/**
+ * Get songs historically played within a ±windowHours window of a given hour-of-day.
+ * Searches across the past year so there's enough data for any hour.
+ */
+const getSongsPlayedAtHour = async (
+  hour: number,
+  isWeekend: boolean,
+  windowHours = 1,
+  limitResults = 60,
+  bypassCache = false
+) => {
+  const startHour = ((hour - windowHours) % 24 + 24) % 24
+  const endHour = (hour + windowHours) % 24
+  const dayType = isWeekend ? 'weekend' : 'weekday'
+  const cacheKey = `hourly-v2-${startHour}-${endHour}-${dayType}-${limitResults}`
+
+  if (!bypassCache) {
+    const cached = getCachedQuery(cacheKey)
+    if (cached) {
+      console.log(`[getSongsPlayedAtHour] Cache hit for ${cacheKey}`)
+      return cached as SongHistory[]
+    }
+  }
+
+  // Weekday = Mon-Fri (1-5), Weekend = Sat-Sun (0,6) — matches Flux date.weekDay()
+  const dowFilter = isWeekend
+    ? `date.weekDay(t: r._time) == 0 or date.weekDay(t: r._time) == 6`
+    : `date.weekDay(t: r._time) >= 1 and date.weekDay(t: r._time) <= 5`
+
+  const queryStart = performance.now()
+  try {
+    // Scan a year of data, filter by hour-of-day and weekday/weekend
+    const query = `
+  import "date"
+  from(bucket:"${INFLUX_BUCKET}")
+    |> range(start: -1y)
+    |> filter(fn: (r) => r["_measurement"] == "song_play")
+    |> filter(fn: (r) =>
+        r["_field"] == "songTitle" or
+        r["_field"] == "artist" or
+        r["_field"] == "title" or
+        r["_field"] == "songUrl" or
+        r["_field"] == "songThumbnail" or
+        r["_field"] == "serializedTrack" or
+        r["_field"] == "requestedByUsername" or
+        r["_field"] == "requestedByAvatar")
+    |> hourSelection(start: ${startHour}, stop: ${endHour === 0 ? 24 : endHour})
+    |> filter(fn: (r) => ${dowFilter})
+    |> group(columns: ["_time", "songHash", "requestedById"])
+    |> pivot(rowKey:["_time", "songHash", "requestedById"], columnKey: ["_field"], valueColumn: "_value")
+    |> group()
+    |> sort(columns: ["_time"], desc: true)
+    |> limit(n: ${limitResults})`
+
+    const results: SongHistory[] = await queryApi().collectRows(query)
+    const queryDuration = performance.now() - queryStart
+    console.log(
+      `[getSongsPlayedAtHour] hour=${hour} window=±${windowHours}h ${dayType} → ${results.length} results in ${queryDuration.toFixed(2)}ms`
+    )
+
+    if (!bypassCache) {
+      setCachedQuery(cacheKey, results)
+    }
+    return results
+  } catch (e) {
+    console.warn('[getSongsPlayedAtHour]', e)
+    return []
+  }
+}
 
 const getSongsPlayed = async (timeRange = 'monthly', limitResults = 34, bypassCache = false) => {
   const cacheKey = `history-v2-${timeRange}-${limitResults}`
@@ -725,13 +796,18 @@ const preloadSongData = async () => {
   const startTime = performance.now()
 
   try {
+    const now = new Date()
+    const hour = now.getHours()
+    const isWeekend = now.getDay() === 0 || now.getDay() === 6
+
     const preloadPromises = [
       // TODO: Fix topSongs Flux queries - temporarily disabled due to schema collision errors
       // getTopSongs('weekly', 5),
       // getTopSongs('monthly', 10),
       // getTopSongs('yearly', 50),
       getSongsPlayed('weekly', 10),
-      getSongsPlayed('monthly', 10),
+      getSongsPlayed('monthly', 80),
+      getSongsPlayedAtHour(hour, isWeekend, 1, 60),
     ]
 
     await Promise.allSettled(preloadPromises)
@@ -755,6 +831,7 @@ const preloadSongData = async () => {
 export {
   // Main functions
   getSongsPlayed,
+  getSongsPlayedAtHour,
   getTopSongs,
   getUserTopSongs,
   getTotalSongsPlayedCount,

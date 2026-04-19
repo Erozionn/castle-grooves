@@ -2,219 +2,87 @@ import type { LavalinkTrack } from '@types'
 
 import type { MusicManager } from '../lib/MusicManager'
 import type { MusicQueue } from '../lib/MusicQueue'
-import { getSongsPlayed } from './songHistoryV2'
+import { getSongsPlayed, getSongsPlayedAtHour, deserializeLavalinkTrack } from './songHistoryV2'
+
+// ============================================================================
+// SCORING
+// ============================================================================
 
 /**
- * Get Spotify recommendations based on a seed track
- *
- * Uses song history to find other Spotify tracks and loads them directly by URL
+ * Score candidate tracks using what-came-next analysis.
+ * For each track in recentContext, if that track appears in fullHistory,
+ * any track that followed it within `window` slots gets +1.
  */
-export const getSpotifyRecommendations = async (
-  seedTrack: LavalinkTrack,
-  musicManager: MusicManager,
-  history?: LavalinkTrack[]
-): Promise<LavalinkTrack[]> => {
-  console.log(
-    `[SpotifyRecommendations] Getting recommendations from history for "${seedTrack.info.title}"`
-  )
+function scoreByWhatCameNext(
+  candidates: LavalinkTrack[],
+  recentContext: LavalinkTrack[],
+  fullHistory: LavalinkTrack[],
+  window = 3
+): Map<string, number> {
+  const scores = new Map<string, number>()
+  const contextIds = new Set(recentContext.map((t) => t.info.identifier))
 
-  // If we have history, use it to get diverse Spotify tracks
-  if (!history || history.length === 0) {
-    return []
+  for (let i = 0; i < fullHistory.length; i++) {
+    if (!contextIds.has(fullHistory[i].info.identifier)) continue
+    for (let j = i + 1; j <= Math.min(i + window, fullHistory.length - 1); j++) {
+      const followerId = fullHistory[j].info.identifier
+      scores.set(followerId, (scores.get(followerId) ?? 0) + 1)
+    }
   }
 
-  // Filter for Spotify tracks only, exclude current track
-  const spotifyTracks = history.filter((track) => {
+  // Ensure all candidates have an entry (0 if no score)
+  for (const track of candidates) {
+    if (!scores.has(track.info.identifier)) scores.set(track.info.identifier, 0)
+  }
+
+  return scores
+}
+
+// ============================================================================
+// LOADING
+// ============================================================================
+
+/**
+ * Load a batch of candidate tracks for playback.
+ * Spotify tracks are re-resolved via Lavalink (gets fresh stream URL).
+ * All other sources are returned directly from history — already fully populated.
+ */
+async function loadCandidates(
+  candidates: LavalinkTrack[],
+  musicManager: MusicManager
+): Promise<LavalinkTrack[]> {
+  const loaded: LavalinkTrack[] = []
+
+  for (const track of candidates) {
     const isSpotify =
       track.info.sourceName === 'spotify' ||
       track.info.uri?.includes('spotify.com') ||
-      track.info.identifier?.length === 22 // Spotify ID length
+      track.info.identifier?.length === 22
 
-    const isDifferent = track.info.identifier !== seedTrack.info.identifier
-
-    return isSpotify && isDifferent
-  })
-
-  console.log(`[SpotifyRecommendations] Found ${spotifyTracks.length} Spotify tracks in history`)
-
-  if (spotifyTracks.length === 0) {
-    return []
-  }
-
-  // Shuffle and take up to 10
-  const shuffled = spotifyTracks.sort(() => Math.random() - 0.5)
-  const selected = shuffled.slice(0, 10)
-
-  // Load each track by its Spotify URL
-  const loadedTracks: LavalinkTrack[] = []
-
-  for (const track of selected) {
-    try {
-      const spotifyUrl = track.info.uri?.startsWith('http')
-        ? track.info.uri
-        : `https://open.spotify.com/track/${track.info.identifier}`
-
-      const result = await musicManager.search(spotifyUrl)
-
-      if (result.tracks && result.tracks.length > 0) {
-        loadedTracks.push(result.tracks[0])
-      }
-    } catch (error) {
-      console.error('[SpotifyRecommendations] Error loading track:', error)
-    }
-  }
-
-  console.log(
-    `[SpotifyRecommendations] Successfully loaded ${loadedTracks.length} tracks from history`
-  )
-
-  return loadedTracks
-}
-
-/**
- * Fallback recommendation method using YouTube searches with music filtering
- */
-async function getYouTubeMixRecommendations(
-  seedTrack: LavalinkTrack,
-  musicManager: MusicManager
-): Promise<LavalinkTrack[]> {
-  try {
-    const artist = seedTrack.info.author
-    const title = seedTrack.info.title
-
-    // Search for OTHER songs by artist and similar artists (NOT the current song)
-    const searchStrategies = [
-      `${artist} best songs`, // Best songs by artist
-      `${artist} popular tracks`, // Popular by artist
-      `similar to ${artist}`, // Similar artists
-    ]
-
-    for (const query of searchStrategies) {
-      console.log(`[SpotifyRecommendations] Trying: ${query}`)
-
-      const result = await musicManager.search(query)
-
-      if (!result.tracks || result.tracks.length < 5) {
-        continue
-      }
-
-      console.log(`[SpotifyRecommendations] Found ${result.tracks.length} results, filtering...`)
-
-      // Filter out: current song, remixes, covers, garbage
-      const musicTracks = result.tracks.filter((track) => {
-        const duration = track.info.length
-        const trackTitle = track.info.title.toLowerCase()
-        const trackArtist = track.info.author.toLowerCase()
-        const currentTitle = title.toLowerCase()
-
-        // Skip the current song
-        if (trackTitle.includes(currentTitle) && trackArtist.includes(artist.toLowerCase())) {
-          return false
+    if (isSpotify) {
+      try {
+        const url = track.info.uri?.startsWith('http')
+          ? track.info.uri
+          : `https://open.spotify.com/track/${track.info.identifier}`
+        const result = await musicManager.search(url)
+        if (result.tracks && result.tracks.length > 0) {
+          loaded.push(result.tracks[0])
         }
-
-        // Skip remixes, covers, mashups of current song
-        if (
-          trackTitle.includes(currentTitle) &&
-          (trackTitle.includes('remix') ||
-            trackTitle.includes('cover') ||
-            trackTitle.includes('mashup') ||
-            trackTitle.includes('vs'))
-        ) {
-          return false
-        }
-
-        // Skip garbage
-        const isGarbage =
-          trackTitle.includes('#ytsearch') ||
-          trackTitle.includes('#shorts') ||
-          trackTitle.includes('tutorial') ||
-          trackTitle.includes('how to') ||
-          trackTitle.includes('review') ||
-          trackTitle.includes('reaction') ||
-          trackTitle.includes('producing') ||
-          duration < 120000
-
-        return !isGarbage
-      })
-
-      if (musicTracks.length >= 5) {
-        console.log(`[SpotifyRecommendations] Using ${musicTracks.length} filtered tracks`)
-        return musicTracks.slice(0, 10)
+      } catch (error) {
+        console.error('[Recommendations] Error loading Spotify track:', error)
       }
-    }
-
-    console.warn('[SpotifyRecommendations] No good recommendations found')
-    return []
-  } catch (error) {
-    console.error('[SpotifyRecommendations] Error getting YouTube recommendations:', error)
-    return []
-  }
-}
-
-export const getRecommendationsFromTracks = async (
-  tracks: LavalinkTrack[],
-  musicManager: MusicManager,
-  history?: LavalinkTrack[]
-): Promise<LavalinkTrack[]> => {
-  // Instead of using a single seed track, just return a shuffled selection
-  // of Spotify tracks from the combined pool (tracks + history)
-  const allSpotifyTracks = [...tracks]
-
-  if (history && history.length > 0) {
-    const historySpotify = history.filter(
-      (track) =>
-        track.info.sourceName === 'spotify' ||
-        track.info.uri?.includes('spotify.com') ||
-        track.info.identifier?.length === 22
-    )
-    allSpotifyTracks.push(...historySpotify)
-  }
-
-  console.log(
-    `[getRecommendationsFromTracks] Found ${allSpotifyTracks.length} total Spotify tracks`
-  )
-
-  if (allSpotifyTracks.length === 0) {
-    return []
-  }
-
-  // Remove duplicates by identifier
-  const uniqueTracks = allSpotifyTracks.filter(
-    (track, index, self) =>
-      index === self.findIndex((t) => t.info.identifier === track.info.identifier)
-  )
-
-  console.log(
-    `[getRecommendationsFromTracks] ${uniqueTracks.length} unique Spotify tracks after deduplication`
-  )
-
-  // Shuffle and return up to 10
-  const shuffled = uniqueTracks.sort(() => Math.random() - 0.5)
-  const selected = shuffled.slice(0, 10)
-
-  // Load each by URL to get fresh track data
-  const loadedTracks: LavalinkTrack[] = []
-
-  for (const track of selected) {
-    try {
-      const spotifyUrl = track.info.uri?.startsWith('http')
-        ? track.info.uri
-        : `https://open.spotify.com/track/${track.info.identifier}`
-
-      const result = await musicManager.search(spotifyUrl)
-
-      if (result.tracks && result.tracks.length > 0) {
-        loadedTracks.push(result.tracks[0])
-      }
-    } catch (error) {
-      console.error('[getRecommendationsFromTracks] Error loading track:', error)
+    } else {
+      // Non-Spotify: the serialized track from history is fully usable as-is
+      loaded.push(track)
     }
   }
 
-  console.log(`[getRecommendationsFromTracks] Successfully loaded ${loadedTracks.length} tracks`)
-
-  return loadedTracks
+  return loaded
 }
+
+// ============================================================================
+// MAIN EXPORT
+// ============================================================================
 
 export const getRecommendationsFromQueue = async (
   queue: MusicQueue | undefined,
@@ -225,52 +93,105 @@ export const getRecommendationsFromQueue = async (
   const musicManager = manager || queue?.manager
 
   if (!musicManager) {
-    console.error('[getRecommendationsFromQueue] No MusicManager available')
+    console.error('[Recommendations] No MusicManager available')
     return []
   }
 
   console.log(
-    `[getRecommendationsFromQueue] Current track: ${currentTrack ? `"${currentTrack.info.title}" (source: ${currentTrack.info.sourceName})` : 'None'}`
+    `[Recommendations] Current track: ${currentTrack ? `"${currentTrack.info.title}" (${currentTrack.info.sourceName})` : 'None'}`
   )
 
-  // Always load history from database for better recommendations
-  console.log('[getRecommendationsFromQueue] Loading history from database...')
-  const dbHistory = await getSongsPlayed('monthly', 10)
-  const { deserializeLavalinkTrack } = await import('./songHistoryV2')
+  // -- 1. Fetch history pools in parallel ---------------------------------
+  const now = new Date()
+  const hour = now.getHours()
+  const dow = now.getDay() // 0=Sunday, 6=Saturday
+  const isWeekend = dow === 0 || dow === 6
+  console.log(`[Recommendations] ${isWeekend ? 'Weekend' : 'Weekday'} hour=${hour}, fetching history...`)
 
-  const deserializedHistory = dbHistory
-    .map((s) => {
-      // Handle both string and object formats
-      const trackData =
-        typeof s.serializedTrack === 'string' ? JSON.parse(s.serializedTrack) : s.serializedTrack
-      return deserializeLavalinkTrack(trackData)
-    })
-    .filter((track): track is LavalinkTrack => track !== null)
+  const [hourlyHistory, monthlyHistory, recentPlays] = await Promise.all([
+    getSongsPlayedAtHour(hour, isWeekend, 1, 60),
+    getSongsPlayed('monthly', 80),
+    getSongsPlayed('1h', 20),
+  ])
 
-  const allHistory = [...queueHistory, ...deserializedHistory]
-  console.log(`[getRecommendationsFromQueue] Loaded ${deserializedHistory.length} tracks from DB`)
-
-  // If current track is Spotify, use it directly
-  if (currentTrack && currentTrack.info.sourceName === 'spotify') {
-    console.log('[getRecommendationsFromQueue] Using current Spotify track for recommendations')
-    return getSpotifyRecommendations(currentTrack, musicManager, allHistory)
+  const deserializeTrack = (s: { serializedTrack?: string | Record<string, unknown> }) => {
+    const trackData =
+      typeof s.serializedTrack === 'string' ? JSON.parse(s.serializedTrack) : s.serializedTrack
+    return deserializeLavalinkTrack(trackData)
   }
 
-  // Try to find recent Spotify tracks in history
-  const recentSpotifyTracks = allHistory
-    .filter((track: LavalinkTrack) => track.info.sourceName === 'spotify')
-    .slice(-5)
+  const deserializedHourly = hourlyHistory
+    .map(deserializeTrack)
+    .filter((t): t is LavalinkTrack => t !== null)
+
+  const deserializedMonthly = monthlyHistory
+    .map(deserializeTrack)
+    .filter((t): t is LavalinkTrack => t !== null)
+
+  const recentlyPlayedTracks = recentPlays
+    .map(deserializeTrack)
+    .filter((t): t is LavalinkTrack => t !== null)
 
   console.log(
-    `[getRecommendationsFromQueue] Found ${recentSpotifyTracks.length} Spotify tracks in history`
+    `[Recommendations] Pools — hourly: ${deserializedHourly.length}, monthly: ${deserializedMonthly.length}, recent: ${recentlyPlayedTracks.length}`
   )
 
-  if (recentSpotifyTracks.length > 0) {
-    console.log('[getRecommendationsFromQueue] Using Spotify tracks from history')
-    return getRecommendationsFromTracks(recentSpotifyTracks, musicManager, allHistory)
+  // -- 2. Build exclusion set ---------------------------------------------
+  const excludeIdentifiers = new Set<string>()
+  if (currentTrack) excludeIdentifiers.add(currentTrack.info.identifier)
+  for (const track of queueHistory) excludeIdentifiers.add(track.info.identifier)
+  for (const track of recentlyPlayedTracks) excludeIdentifiers.add(track.info.identifier)
+
+  console.log(`[Recommendations] Excluding ${excludeIdentifiers.size} recently played / queued`)
+
+  // -- 3. Build candidate pool (hourly preferred, fallback to monthly) -----
+  // Deduplicate across both pools, hourly first
+  const seenIds = new Set<string>()
+  const candidatePool: LavalinkTrack[] = []
+
+  const HOURLY_MIN = 10 // use monthly fallback if less than this many hourly results
+
+  for (const track of [...deserializedHourly, ...deserializedMonthly]) {
+    if (!seenIds.has(track.info.identifier)) {
+      seenIds.add(track.info.identifier)
+      candidatePool.push(track)
+    }
   }
 
-  // No Spotify tracks found - can't make recommendations
-  console.log('[getRecommendationsFromQueue] No Spotify tracks found in history')
-  return []
+  const usingHourly = deserializedHourly.length >= HOURLY_MIN
+  console.log(
+    `[Recommendations] Using ${usingHourly ? 'time-of-day (hourly)' : 'monthly'} as primary pool — ${candidatePool.length} unique candidates before exclusion`
+  )
+
+  // -- 4. Filter exclusions -----------------------------------------------
+  const eligible = candidatePool.filter((t) => !excludeIdentifiers.has(t.info.identifier))
+  console.log(`[Recommendations] ${eligible.length} eligible after exclusion`)
+
+  if (eligible.length === 0) {
+    console.log('[Recommendations] No eligible tracks')
+    return []
+  }
+
+  // -- 5. Score by what-came-next -----------------------------------------
+  const recentContext = currentTrack ? [currentTrack, ...queueHistory.slice(-4)] : queueHistory.slice(-5)
+  const fullHistory = [...queueHistory, ...deserializedMonthly]
+  const scores = scoreByWhatCameNext(eligible, recentContext, fullHistory)
+
+  // Sort: higher score first, shuffle within same score tier
+  const scored = eligible
+    .map((track) => ({ track, score: scores.get(track.info.identifier) ?? 0 }))
+    .sort((a, b) => b.score - a.score || Math.random() - 0.5)
+
+  const topScorers = scored.filter((x) => x.score > 0)
+  const rest = scored.filter((x) => x.score === 0)
+  console.log(`[Recommendations] ${topScorers.length} tracks boosted by what-came-next scoring`)
+
+  // Take up to 10 candidates (prefer boosted tracks first)
+  const selected = [...topScorers, ...rest].slice(0, 10).map((x) => x.track)
+
+  // -- 6. Load candidates -------------------------------------------------
+  const loaded = await loadCandidates(selected, musicManager)
+  console.log(`[Recommendations] Successfully loaded ${loaded.length} tracks`)
+
+  return loaded
 }
