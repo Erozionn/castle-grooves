@@ -59,21 +59,20 @@ async function loadCandidates(
       track.info.uri?.includes('spotify.com') ||
       track.info.identifier?.length === 22
 
-    if (isSpotify) {
-      try {
-        const url = track.info.uri?.startsWith('http')
+    try {
+      // All tracks must be re-resolved via Lavalink to get a valid `encoded` value.
+      // Deserialized history tracks have encoded: '' which Lavalink cannot play.
+      const searchQuery = isSpotify
+        ? track.info.uri?.startsWith('http')
           ? track.info.uri
           : `https://open.spotify.com/track/${track.info.identifier}`
-        const result = await musicManager.search(url)
-        if (result.tracks && result.tracks.length > 0) {
-          loaded.push(result.tracks[0])
-        }
-      } catch (error) {
-        console.error('[Recommendations] Error loading Spotify track:', error)
+        : track.info.uri || `${track.info.author} - ${track.info.title}`
+      const result = await musicManager.search(searchQuery)
+      if (result.tracks && result.tracks.length > 0) {
+        loaded.push(result.tracks[0])
       }
-    } else {
-      // Non-Spotify: the serialized track from history is fully usable as-is
-      loaded.push(track)
+    } catch (error) {
+      console.error('[Recommendations] Error loading track:', error)
     }
   }
 
@@ -106,7 +105,9 @@ export const getRecommendationsFromQueue = async (
   const hour = now.getHours()
   const dow = now.getDay() // 0=Sunday, 6=Saturday
   const isWeekend = dow === 0 || dow === 6
-  console.log(`[Recommendations] ${isWeekend ? 'Weekend' : 'Weekday'} hour=${hour}, fetching history...`)
+  console.log(
+    `[Recommendations] ${isWeekend ? 'Weekend' : 'Weekday'} hour=${hour}, fetching history...`
+  )
 
   const [hourlyHistory, monthlyHistory, recentPlays] = await Promise.all([
     getSongsPlayedAtHour(hour, isWeekend, 1, 60),
@@ -173,7 +174,9 @@ export const getRecommendationsFromQueue = async (
   }
 
   // -- 5. Score by what-came-next -----------------------------------------
-  const recentContext = currentTrack ? [currentTrack, ...queueHistory.slice(-4)] : queueHistory.slice(-5)
+  const recentContext = currentTrack
+    ? [currentTrack, ...queueHistory.slice(-4)]
+    : queueHistory.slice(-5)
   const fullHistory = [...queueHistory, ...deserializedMonthly]
   const scores = scoreByWhatCameNext(eligible, recentContext, fullHistory)
 
