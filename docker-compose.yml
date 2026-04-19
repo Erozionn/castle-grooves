@@ -33,7 +33,7 @@ services:
       - "1337:1337"
     depends_on:
       lavalink:
-        condition: service_started
+        condition: service_healthy
       influxdb:
         condition: service_healthy
     networks:
@@ -60,6 +60,12 @@ services:
       - "2333:2333"
     networks:
       - castle-grooves
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:2333/v4/info -H 'Authorization: ${LAVALINK_PASSWORD:-youshallnotpass}' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   # InfluxDB Time-Series Database
   influxdb:

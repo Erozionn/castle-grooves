@@ -96,6 +96,15 @@ export class MusicManager extends EventEmitter {
     this.shoukaku.on('disconnect', (name: string, count: number) => {
       console.warn(`[Lavalink] Node ${name} disconnected. Retry count: ${count}`)
       this.emit('nodeDisconnect', name, count)
+
+      // If no nodes remain connected, exit so Docker restarts the container
+      const connectedNodes = [...this.shoukaku.nodes.values()].filter(
+        (node) => node.state === 2 // NodeState.Connected = 2
+      )
+      if (connectedNodes.length === 0) {
+        console.error('[Lavalink] All nodes disconnected — exiting for container restart')
+        process.exit(1)
+      }
     })
 
     this.shoukaku.on('debug', (name: string, info: string) => {
