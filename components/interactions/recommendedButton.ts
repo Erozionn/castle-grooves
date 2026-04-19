@@ -46,7 +46,7 @@ export default async (queue: MusicQueue | null, interaction: ButtonInteraction) 
       if (channel && channel.isTextBased() && 'guild' in channel) {
         await sendMessage(channel, {
           content:
-            '❌ No recommendations found. Play some Spotify songs first to build your history!',
+            '❌ No recommendations found. Play some songs first to build your history!',
         })
       }
       return
@@ -89,7 +89,7 @@ export default async (queue: MusicQueue | null, interaction: ButtonInteraction) 
     })
 
     console.log(
-      `[recommendedButton] Filtered to ${uniqueRecommendations.length} unique tracks (removed ${recommendations.length - uniqueRecommendations.length} duplicates)`
+      `[recommendedButton] Filtered to ${uniqueRecommendations.length} unique tracks (removed ${recommendations.length - uniqueRecommendations.length} already-queued duplicates; recently played tracks were pre-filtered)`
     )
 
     if (uniqueRecommendations.length === 0) {
