@@ -24,6 +24,13 @@ services:
       - INFLUX_ORG=${INFLUX_ORG}
       - INFLUX_BUCKET=${INFLUX_BUCKET}
       - ENABLE_DB_WRITES_IN_DEV=true
+      - VOICE_COMMANDS_ENABLED=${VOICE_COMMANDS_ENABLED:-false}
+      - VOICE_LISTENER_BOT_TOKEN=${VOICE_LISTENER_BOT_TOKEN:-}
+      - VOSK_MODEL_PATH=${VOSK_MODEL_PATH:-./models/vosk-model-small-en-us}
+      - VOICE_WAKE_PHRASE=${VOICE_WAKE_PHRASE:-castle grooves}
+      - VOICE_COMMAND_PREFIX=${VOICE_COMMAND_PREFIX:-play}
+      - VOICE_CAPTURE_TIMEOUT_MS=${VOICE_CAPTURE_TIMEOUT_MS:-7000}
+      - VOICE_SILENCE_MS=${VOICE_SILENCE_MS:-1200}
       - WEBSERVER_PORT=${WEBSERVER_PORT:-1337}
       - NOW_PLAYING_MOCK_DATA=${NOW_PLAYING_MOCK_DATA:-false}
       - PRELOAD_SONG_DATA=${PRELOAD_SONG_DATA:-true}
@@ -38,6 +45,7 @@ services:
       - castle-grooves
     volumes:
       - ./recordings:/usr/src/app/recordings
+      - ./models:/usr/src/app/models:ro
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
@@ -50,6 +58,7 @@ services:
       - _JAVA_OPTIONS=-Xmx2G
       - SERVER_PORT=2333
       - LAVALINK_SERVER_PASSWORD=${LAVALINK_PASSWORD:-youshallnotpass}
+      - YOUTUBE_REFRESH_TOKEN=${YOUTUBE_REFRESH_TOKEN:-}
       - SPOTIFY_CLIENT_ID=${SPOTIFY_CLIENT_ID}
       - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET}
     volumes:

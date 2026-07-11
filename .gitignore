@@ -121,3 +121,6 @@ recordings/**
 *-player-script.js
 
 influx-backup/
+
+# Vosk speech recognition models
+models/

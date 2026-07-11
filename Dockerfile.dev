@@ -1,14 +1,18 @@
 # Development Dockerfile with hot reload support
-FROM node:lts-alpine
+FROM node:lts-slim
 
-# Install dependencies
-RUN apk update && \
-  apk add --no-cache \
+# Install native build/runtime dependencies for Vosk, canvas, and audio tooling
+RUN apt-get update && \
+  apt-get install -y --no-install-recommends \
   python3 \
   make \
   g++ \
+  pkg-config \
+  libffi-dev \
   fontconfig \
-  ffmpeg
+  ffmpeg \
+  ca-certificates && \
+  rm -rf /var/lib/apt/lists/*
 
 # Enable Yarn
 RUN corepack enable && corepack prepare yarn@stable --activate && yarn set version 4
@@ -20,8 +24,8 @@ WORKDIR /usr/src/app
 COPY package.json yarn.lock .yarnrc.yml ./
 COPY patches ./patches
 
-# Install dependencies (including dev dependencies)
-RUN yarn install --immutable
+# Install dependencies (including dev dependencies) and verify Vosk is loadable
+RUN yarn install --immutable && node -e "require('vosk'); require('@discordjs/opus'); require('@discordjs/voice'); require('@snazzah/davey')"
 
 # Copy source code (will be overridden by volume mount in dev)
 COPY . .
