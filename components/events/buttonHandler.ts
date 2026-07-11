@@ -7,6 +7,7 @@ import {
   backButtonInteractionHandler,
   historyInteractionHandler,
   recommendedButtonInteractionHandler,
+  dislikeButtonInteractionHandler,
   djButtonInteractionHandler,
 } from '@components/interactions'
 
@@ -46,6 +47,9 @@ export default async (interaction: Interaction<CacheType>) => {
         break
       case 'recommended_button':
         recommendedButtonInteractionHandler(queue, interaction as ButtonInteraction)
+        break
+      case 'dislike_button':
+        dislikeButtonInteractionHandler(queue, interaction as ButtonInteraction)
         break
       case 'dj_button':
         console.log('[buttonHandler] DJ button pressed')

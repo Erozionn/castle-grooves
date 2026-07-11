@@ -166,6 +166,8 @@ const queryCache = new Map<
   string,
   { data: SongHistory[] | SongRecommendation[] | any; expiry: number; hits: number }
 >()
+const devDislikeCounts = new Map<string, number>()
+const devDislikeUsers = new Set<string>()
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 const MAX_CACHE_SIZE = 100
 
@@ -237,6 +239,10 @@ const clearCache = () => {
   queryCache.clear()
   console.log('[Cache] Manual cache clear performed')
 }
+
+const escapeFluxRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const escapeFluxString = (value: string) => value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+const getDislikeUserKey = (songIdentifier: string, userId: string) => `${songIdentifier}:${userId}`
 
 // ============================================================================
 // TIME RANGE UTILITIES
@@ -673,6 +679,8 @@ const addSong = (playing: boolean, track?: LavalinkTrack, requestedBy?: GuildMem
     .close()
     .then(() => {
       console.log('[addSongV2] ✅ Write successful')
+      // Invalidate the history menu cache so the dropdown reflects the new song
+      queryCache.delete('history-v2-monthly-34')
     })
     .catch((e) => {
       console.warn('[addSongV2] ❌ Write failed:', e)
@@ -706,11 +714,203 @@ const addBotStateChange = (
 }
 
 /**
+ * Record a thumbs-down for a track.
+ * Each user can count once per song; repeated presses return the existing count.
+ */
+const hasUserDislikedSong = async (songIdentifier: string, userId: string): Promise<boolean> => {
+  if (!songIdentifier || !userId) return false
+
+  const dislikeUserKey = getDislikeUserKey(songIdentifier, userId)
+  if (devDislikeUsers.has(dislikeUserKey)) return true
+
+  const escapedId = escapeFluxRegex(songIdentifier)
+  const escapedUserId = escapeFluxString(userId)
+
+  try {
+    const query = `
+  from(bucket:"${INFLUX_BUCKET}")
+    |> range(start: -5y)
+    |> filter(fn: (r) => r["_measurement"] == "song_feedback")
+    |> filter(fn: (r) => r["feedbackType"] == "dislike")
+    |> filter(fn: (r) => r["songIdentifier"] =~ /^(${escapedId})$/)
+    |> filter(fn: (r) => r["userId"] == "${escapedUserId}")
+    |> limit(n: 1)`
+
+    const rows = await queryApi().collectRows(query)
+    return rows.length > 0
+  } catch (e) {
+    console.warn('[hasUserDislikedSong]', e)
+    return false
+  }
+}
+
+const addSongDislike = async (
+  track: LavalinkTrack,
+  userId: string,
+  guildId?: string
+): Promise<number> => {
+  if (!track?.info?.identifier || !userId) {
+    return 0
+  }
+
+  const songIdentifier = track.info.identifier
+  const cacheKey = `song-dislikes-v2-${songIdentifier}`
+  const dislikeUserKey = getDislikeUserKey(songIdentifier, userId)
+
+  if (ENV.TS_NODE_DEV && !process.env.ENABLE_DB_WRITES_IN_DEV) {
+    const previousDevCount = devDislikeCounts.get(songIdentifier) ?? 0
+    if (devDislikeUsers.has(dislikeUserKey)) return previousDevCount
+
+    const nextDevCount = previousDevCount + 1
+    console.log(
+      '[addSongDislike] Skipping DB write in dev mode (set ENABLE_DB_WRITES_IN_DEV=true to enable)'
+    )
+
+    devDislikeUsers.add(dislikeUserKey)
+    devDislikeCounts.set(songIdentifier, nextDevCount)
+    setCachedQuery(cacheKey, nextDevCount)
+    return nextDevCount
+  }
+
+  const previousCount = await getSongDislikeCount(songIdentifier)
+
+  if (await hasUserDislikedSong(songIdentifier, userId)) {
+    return previousCount
+  }
+
+  const nextCount = previousCount + 1
+  const point = new Point('song_feedback')
+    .tag('songIdentifier', songIdentifier)
+    .tag('feedbackType', 'dislike')
+    .tag('source', track.info.sourceName || 'unknown')
+    .tag('guildId', guildId || 'unknown')
+    .tag('userId', userId)
+    .stringField('songTitle', `${track.info.author} - ${track.info.title}`)
+    .intField('thumbsDown', 1)
+
+  const api = writeApi()
+  api.writePoint(point)
+
+  try {
+    await api.close()
+    console.log(`[addSongDislike] Recorded thumbs-down for ${songIdentifier}`)
+    devDislikeUsers.add(dislikeUserKey)
+    setCachedQuery(cacheKey, nextCount)
+    return nextCount
+  } catch (e) {
+    console.warn('[addSongDislike] Write failed:', e)
+    return previousCount
+  }
+}
+
+const getSongDislikeCount = async (songIdentifier: string): Promise<number> => {
+  if (!songIdentifier) {
+    return 0
+  }
+
+  const devCount = devDislikeCounts.get(songIdentifier)
+  if (typeof devCount === 'number') {
+    return devCount
+  }
+
+  const cacheKey = `song-dislikes-v2-${songIdentifier}`
+  const cached = getCachedQuery(cacheKey)
+  if (typeof cached === 'number') {
+    return cached
+  }
+
+  const escapedId = escapeFluxRegex(songIdentifier)
+
+  try {
+    const query = `
+  from(bucket:"${INFLUX_BUCKET}")
+    |> range(start: -5y)
+    |> filter(fn: (r) => r["_measurement"] == "song_feedback")
+    |> filter(fn: (r) => r["feedbackType"] == "dislike")
+    |> filter(fn: (r) => r["songIdentifier"] =~ /^(${escapedId})$/)
+    |> filter(fn: (r) => r["_field"] == "thumbsDown")
+    |> group(columns: ["songIdentifier"])
+    |> sum(column: "_value")`
+
+    const rows = await queryApi().collectRows(query)
+    const count = Number((rows?.[0] as { _value?: number } | undefined)?._value || 0)
+    setCachedQuery(cacheKey, count)
+    return count
+  } catch (e) {
+    console.warn('[getSongDislikeCount]', e)
+    return 0
+  }
+}
+
+const getSongDislikeCounts = async (songIdentifiers: string[]): Promise<Map<string, number>> => {
+  const result = new Map<string, number>()
+
+  const uniqueIds = Array.from(new Set(songIdentifiers.filter(Boolean)))
+  if (uniqueIds.length === 0) {
+    return result
+  }
+
+  const uncachedIds: string[] = []
+  for (const id of uniqueIds) {
+    const devCount = devDislikeCounts.get(id)
+    if (typeof devCount === 'number') {
+      result.set(id, devCount)
+      continue
+    }
+
+    const cached = getCachedQuery(`song-dislikes-v2-${id}`)
+    if (typeof cached === 'number') {
+      result.set(id, cached)
+    } else {
+      uncachedIds.push(id)
+    }
+  }
+
+  if (uncachedIds.length === 0) {
+    return result
+  }
+
+  const idRegex = uncachedIds.map(escapeFluxRegex).join('|')
+
+  try {
+    const query = `
+  from(bucket:"${INFLUX_BUCKET}")
+    |> range(start: -5y)
+    |> filter(fn: (r) => r["_measurement"] == "song_feedback")
+    |> filter(fn: (r) => r["feedbackType"] == "dislike")
+    |> filter(fn: (r) => r["songIdentifier"] =~ /^(${idRegex})$/)
+    |> filter(fn: (r) => r["_field"] == "thumbsDown")
+    |> group(columns: ["songIdentifier"])
+    |> sum(column: "_value")`
+
+    const rows = await queryApi().collectRows(query)
+    for (const row of rows as Array<{ songIdentifier?: string; _value?: number }>) {
+      if (!row.songIdentifier) continue
+      const count = Number(row._value || 0)
+      result.set(row.songIdentifier, count)
+      setCachedQuery(`song-dislikes-v2-${row.songIdentifier}`, count)
+    }
+
+    for (const id of uncachedIds) {
+      if (!result.has(id)) {
+        result.set(id, 0)
+        setCachedQuery(`song-dislikes-v2-${id}`, 0)
+      }
+    }
+
+    return result
+  } catch (e) {
+    console.warn('[getSongDislikeCounts]', e)
+    return result
+  }
+}
+
+/**
  * Generate history options for UI display - V2 version
  */
 const generateHistoryOptions = async () => {
   try {
-    const history = await getSongsPlayed('monthly', 34, true)
+    const history = await getSongsPlayed('monthly', 34)
 
     const songs = history
       .filter((s: SongHistory) => s.serializedTrack)
@@ -837,6 +1037,7 @@ export {
   getTotalSongsPlayedCount,
   addSong,
   addBotStateChange,
+  addSongDislike,
   generateHistoryOptions,
 
   // Query builders
@@ -849,6 +1050,8 @@ export {
   clearCache,
   preloadSongData,
   getRandomSongsFromCache,
+  getSongDislikeCount,
+  getSongDislikeCounts,
 
   // Serialization
   serializeLavalinkTrack,

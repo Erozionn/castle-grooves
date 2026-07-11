@@ -3,6 +3,7 @@ import { ButtonInteraction } from 'discord.js'
 import { useComponents } from '@constants/messageComponents'
 import { sendMessage } from '@utils/mainMessage'
 import { getRecommendationsFromQueue } from '@utils/spotifyRecommendations'
+
 import { MusicQueue } from '../lib'
 
 // Shared state across all instances

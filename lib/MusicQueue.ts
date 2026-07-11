@@ -1,6 +1,8 @@
 import { VoiceBasedChannel, GuildMember, Message } from 'discord.js'
 import { Player as ShoukakuPlayer } from 'shoukaku'
+
 import ENV from '@constants/Env'
+
 import type { MusicManager, LavalinkTrack } from './MusicManager'
 
 export interface QueueMetadata {

@@ -9,6 +9,7 @@ import {
   splitAtClosestSpace,
   truncateString,
 } from '@utils/utilities'
+import { getSongDislikeCount } from '@utils/songHistoryV2'
 
 import { LavalinkTrack } from '../lib'
 
@@ -21,6 +22,69 @@ GlobalFonts.registerFromPath(
   'Poppins-SemiBold'
 )
 GlobalFonts.registerFromPath(path.resolve('./assets/fonts/Poppins-Bold.ttf'), 'Poppins-Bold')
+
+type CanvasOptions = {
+  currentTrackDislikes?: number
+}
+
+let thumbsDownIconPromise: Promise<Awaited<ReturnType<typeof loadImage>>> | null = null
+
+const getThumbsDownIcon = () => {
+  thumbsDownIconPromise ??= loadImage('./assets/icons/thumbs-down.svg')
+  return thumbsDownIconPromise
+}
+
+const renderDislikeBadge = async (
+  canvas: Canvas,
+  dislikeCount = 0,
+  anchorX = 26,
+  anchorY = 26
+) => {
+  if (dislikeCount <= 0) return
+
+  const canv = canvas.getContext('2d')
+
+  canv.save()
+  canv.shadowColor = 'rgba(0, 0, 0, 0.45)'
+  canv.shadowBlur = 14
+
+  // Main emoji badge
+  canv.beginPath()
+  canv.arc(anchorX, anchorY, 18, 0, Math.PI * 2)
+  canv.closePath()
+  canv.fillStyle = '#DC2626'
+  canv.fill()
+
+  canv.shadowBlur = 0
+  canv.fillStyle = '#ffffff'
+  try {
+    const icon = await getThumbsDownIcon()
+    const iconSize = 20
+    canv.drawImage(icon, anchorX - iconSize / 2, anchorY - iconSize / 2, iconSize, iconSize)
+  } catch {
+    // Keep the red badge without icon if asset loading fails.
+  }
+
+  // Small count chip when more than one dislike exists
+  if (dislikeCount > 1) {
+    const label = `x${dislikeCount}`
+    canv.font = '600 14px Poppins'
+    const chipWidth = Math.max(30, canv.measureText(label).width + 12)
+    const chipHeight = 22
+    const chipX = anchorX + 12
+    const chipY = anchorY + 10
+
+    canv.fillStyle = '#7F1D1D'
+    canv.fillRect(chipX, chipY, chipWidth, chipHeight)
+
+    canv.fillStyle = '#FEE2E2'
+    canv.textAlign = 'center'
+    canv.textBaseline = 'middle'
+    canv.fillText(label, chipX + chipWidth / 2, chipY + chipHeight / 2 + 0.5)
+  }
+
+  canv.restore()
+}
 
 const getThumbnailUrl = (song: LavalinkTrack) => {
   // Check if artworkUrl is provided by Lavalink
@@ -89,7 +153,10 @@ const renderMultiLineTitle = (
   return lineHeight * multiLineArray.length
 }
 
-export const nowPlayingCanvasWithUpNext = async (songs: LavalinkTrack[]): Promise<Buffer> => {
+export const nowPlayingCanvasWithUpNext = async (
+  songs: LavalinkTrack[],
+  options?: CanvasOptions
+): Promise<Buffer> => {
   const canvas = new Canvas(700, 394)
   const canv = canvas.getContext('2d')
 
@@ -97,6 +164,9 @@ export const nowPlayingCanvasWithUpNext = async (songs: LavalinkTrack[]): Promis
   const { requestedBy } = song.userData || {}
   const thumbnailUrl = getThumbnailUrl(song)
   const isLocal = false // Local file detection not implemented for Lavalink yet
+  let thumbnailX = 25
+  const thumbnailY = 25
+  let thumbnailWidth = 270
 
   try {
     if (thumbnailUrl) {
@@ -115,7 +185,9 @@ export const nowPlayingCanvasWithUpNext = async (songs: LavalinkTrack[]): Promis
 
       // Render Thumbnail
       const _width = Math.min(169 * (thumbnail.width / thumbnail.height), 270)
-      canv.drawImage(thumbnail, 160 - _width / 2, 25, _width, 169)
+      thumbnailX = 160 - _width / 2
+      thumbnailWidth = _width
+      canv.drawImage(thumbnail, thumbnailX, thumbnailY, _width, 169)
     }
   } catch (e) {
     console.warn('[ThumbnailError] ', e)
@@ -248,11 +320,18 @@ export const nowPlayingCanvasWithUpNext = async (songs: LavalinkTrack[]): Promis
     // }
   })
 
+  await renderDislikeBadge(
+    canvas,
+    options?.currentTrackDislikes || 0,
+    thumbnailX + thumbnailWidth - 16,
+    thumbnailY + 16
+  )
+
   // Buffer canvas
   return await canvas.toBuffer('image/png')
 }
 
-export const nowPlayingCanvas = async (song: LavalinkTrack): Promise<Buffer> => {
+export const nowPlayingCanvas = async (song: LavalinkTrack, options?: CanvasOptions): Promise<Buffer> => {
   const canvas = new Canvas(700, 169)
   const canv = canvas.getContext('2d')
   const { requestedBy } = song.userData || {}
@@ -260,6 +339,7 @@ export const nowPlayingCanvas = async (song: LavalinkTrack): Promise<Buffer> => 
   const isLocal = false // Local file detection not implemented for Lavalink yet
 
   let _width = 0
+  const thumbnailY = 0
 
   try {
     if (thumbnailUrl) {
@@ -341,6 +421,14 @@ export const nowPlayingCanvas = async (song: LavalinkTrack): Promise<Buffer> => 
     }
   }
 
+  const visibleThumbnailWidth = _width > 0 ? _width : 169
+  await renderDislikeBadge(
+    canvas,
+    options?.currentTrackDislikes || 0,
+    visibleThumbnailWidth - 16,
+    thumbnailY + 16
+  )
+
   // Buffer canvas
   return await canvas.toBuffer('image/png')
 }
@@ -348,7 +436,10 @@ export const nowPlayingCanvas = async (song: LavalinkTrack): Promise<Buffer> => 
 let lastExecutionTime = 0
 let debounceTimeout: NodeJS.Timeout | null = null
 
-export const generateNowPlayingCanvas = async (tracks: LavalinkTrack[]): Promise<Buffer> => {
+export const generateNowPlayingCanvas = async (
+  tracks: LavalinkTrack[],
+  options?: CanvasOptions
+): Promise<Buffer> => {
   const now = Date.now()
   const cooldown = 1000
 
@@ -359,7 +450,7 @@ export const generateNowPlayingCanvas = async (tracks: LavalinkTrack[]): Promise
       debounceTimeout = setTimeout(
         async () => {
           lastExecutionTime = Date.now()
-          resolve(await processTracks(tracks))
+          resolve(await processTracks(tracks, options))
         },
         cooldown - (now - lastExecutionTime)
       )
@@ -367,22 +458,27 @@ export const generateNowPlayingCanvas = async (tracks: LavalinkTrack[]): Promise
   }
 
   lastExecutionTime = now
-  return await processTracks(tracks)
+  return await processTracks(tracks, options)
 }
 
-const processTracks = async (tracks: LavalinkTrack[]): Promise<Buffer> => {
+const processTracks = async (tracks: LavalinkTrack[], options?: CanvasOptions): Promise<Buffer> => {
   if (!tracks || tracks.length < 1)
     throw Error('Error: Cannot generate now playing canvas without songs')
 
   console.log(`[Canvas] Processing ${tracks.length} track(s)`)
 
+  const resolvedOptions: CanvasOptions = {
+    currentTrackDislikes:
+      options?.currentTrackDislikes ?? (await getSongDislikeCount(tracks[0].info.identifier)),
+  }
+
   if (tracks.length > 1) {
     console.log(`[Canvas] Using nowPlayingCanvasWithUpNext`)
-    return await nowPlayingCanvasWithUpNext(tracks)
+    return await nowPlayingCanvasWithUpNext(tracks, resolvedOptions)
   }
 
   console.log(`[Canvas] Using nowPlayingCanvas (single track)`)
-  return await nowPlayingCanvas(tracks[0])
+  return await nowPlayingCanvas(tracks[0], resolvedOptions)
 }
 
 export default generateNowPlayingCanvas
