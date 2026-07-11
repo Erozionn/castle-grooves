@@ -104,7 +104,7 @@ async function migrateData(dryRun = true, timeRange = '-365d') {
     for (const [timeStr, record] of recordsByTime.entries()) {
       // Skip records without playing=true or missing essential data
       if (record.playing !== true || !record.songTitle || !record.requestedById) {
-        skippedCount++
+        skippedCount += 1
         continue
       }
 
@@ -147,7 +147,7 @@ async function migrateData(dryRun = true, timeRange = '-365d') {
         writer.writePoint(point)
       }
 
-      migratedCount++
+      migratedCount += 1
 
       if (migratedCount % 100 === 0) {
         console.log(`⏳ Migrated ${migratedCount} records...`)

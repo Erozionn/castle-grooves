@@ -104,8 +104,9 @@ plugins:
     oauth:
       enabled: true
       skipInitialization: false
-      # refreshToken: "" # Will be populated after first OAuth login
-    # Use specific clients that work better and are less likely to be blocked
+      refreshToken: "${YOUTUBE_REFRESH_TOKEN:}" # OAuth refresh token
+    # See: https://github.com/lavalink-devs/youtube-source#available-clients
+    # TV is the only OAuth-compatible client and requires OAuth for playback
     clients:
       - TV # OAuth-compatible, requires sign-in for playback
       - WEB # Opus formats, livestream support

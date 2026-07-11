@@ -1,5 +1,6 @@
 import { getMainMessage, sendMessage } from '@utils/mainMessage'
 import { useComponents } from '@constants/messageComponents'
+
 import { MusicQueue } from '../../lib'
 
 export default async (queue: MusicQueue | null) => {
@@ -7,7 +8,7 @@ export default async (queue: MusicQueue | null) => {
   if (!queue) {
     if (!mainMessage || !mainMessage.channel.isTextBased() || !('guild' in mainMessage.channel))
       return
-    mainMessage && sendMessage(mainMessage.channel, { content: '❌ | No music is being played!' })
+    await sendMessage(mainMessage.channel, { content: '❌ | No music is being played!' })
     return
   }
 
