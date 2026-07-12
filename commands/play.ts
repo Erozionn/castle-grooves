@@ -8,11 +8,13 @@ import {
 import { isUrl, parseSongName } from '@utils/utilities'
 import { isNoTracksFoundError, queueSongQuery } from '@utils/queueSongQuery'
 
-import { useMusicManager, LavalinkTrack } from '../lib'
+import type { ClientType } from '@types'
+import type { LavalinkTrack } from '../lib'
 
 const deleteReplySoon = (interaction: ChatInputCommandInteraction, delay = 3000) => {
   setTimeout(
-    () => interaction.deleteReply().catch((e) => console.warn('[playCommand] deleteReply failed:', e)),
+    () =>
+      interaction.deleteReply().catch((e) => console.warn('[playCommand] deleteReply failed:', e)),
     delay
   )
 }
@@ -31,7 +33,7 @@ export default {
   async autoComplete(interaction: AutocompleteInteraction) {
     if (!interaction.isAutocomplete()) return
 
-    const musicManager = useMusicManager()
+    const musicManager = (interaction.client as ClientType).musicManager
 
     const focusedValue = interaction.options.getFocused()
 
@@ -124,7 +126,7 @@ export default {
 
     await interaction.deferReply()
 
-    const musicManager = useMusicManager()
+    const musicManager = (interaction.client as ClientType).musicManager
     const { member } = interaction
 
     const {

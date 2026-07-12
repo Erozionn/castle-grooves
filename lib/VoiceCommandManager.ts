@@ -198,7 +198,9 @@ export class VoiceCommandManager {
 
     connection.receiver.speaking.on('start', (userId) => {
       this.handleSpeakingStart(session, userId).catch((error) => {
-        Object.assign(session, { lastError: error instanceof Error ? error.message : String(error) })
+        Object.assign(session, {
+          lastError: error instanceof Error ? error.message : String(error),
+        })
         console.warn('[VoiceCommandManager] Speech handler failed:', error)
       })
     })

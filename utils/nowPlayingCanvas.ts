@@ -34,12 +34,7 @@ const getThumbsDownIcon = () => {
   return thumbsDownIconPromise
 }
 
-const renderDislikeBadge = async (
-  canvas: Canvas,
-  dislikeCount = 0,
-  anchorX = 26,
-  anchorY = 26
-) => {
+const renderDislikeBadge = async (canvas: Canvas, dislikeCount = 0, anchorX = 26, anchorY = 26) => {
   if (dislikeCount <= 0) return
 
   const canv = canvas.getContext('2d')
@@ -331,7 +326,10 @@ export const nowPlayingCanvasWithUpNext = async (
   return await canvas.toBuffer('image/png')
 }
 
-export const nowPlayingCanvas = async (song: LavalinkTrack, options?: CanvasOptions): Promise<Buffer> => {
+export const nowPlayingCanvas = async (
+  song: LavalinkTrack,
+  options?: CanvasOptions
+): Promise<Buffer> => {
   const canvas = new Canvas(700, 169)
   const canv = canvas.getContext('2d')
   const { requestedBy } = song.userData || {}

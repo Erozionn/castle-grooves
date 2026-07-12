@@ -100,11 +100,11 @@ plugins:
     allowDirectVideoIds: true # Whether just video IDs can match. If false, only complete URLs will be loaded.
     allowDirectPlaylistIds: true # Whether just playlist IDs can match. If false, only complete URLs will be loaded.
     remoteCipher:
-      url: "https://cipher.kikkia.dev/"
+      url: 'https://cipher.kikkia.dev/'
     oauth:
       enabled: true
       skipInitialization: false
-      refreshToken: "${YOUTUBE_REFRESH_TOKEN:}" # OAuth refresh token
+      refreshToken: '${YOUTUBE_REFRESH_TOKEN:}' # OAuth refresh token
     # See: https://github.com/lavalink-devs/youtube-source#available-clients
     # TV is the only OAuth-compatible client and requires OAuth for playback
     clients:

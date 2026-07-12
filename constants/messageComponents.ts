@@ -120,7 +120,9 @@ export const useComponents = async (queue?: MusicQueue) => {
     playerButtons.stop
   )
 
-  const feedbackActionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(playerButtons.dislike)
+  const feedbackActionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    playerButtons.dislike
+  )
 
   const historyActionRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
     playerHistory

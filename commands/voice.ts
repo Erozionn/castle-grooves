@@ -1,9 +1,9 @@
 import { ChatInputCommandInteraction, GuildMember, SlashCommandBuilder } from 'discord.js'
 
-import { useVoiceCommandManager } from '../lib'
+import type { ClientType } from '@types'
+import type { VoiceCommandManager } from '../lib'
 
-const formatStatus = (guildId: string): string => {
-  const voiceCommandManager = useVoiceCommandManager()
+const formatStatus = (guildId: string, voiceCommandManager: VoiceCommandManager): string => {
   const status = voiceCommandManager.getStatus(guildId)
 
   if (!status) {
@@ -48,11 +48,13 @@ export default {
 
     await interaction.deferReply({ ephemeral: true })
 
-    const voiceCommandManager = useVoiceCommandManager()
+    const voiceCommandManager = (interaction.client as ClientType).voiceCommandManager
     const subcommand = interaction.options.getSubcommand()
 
     if (subcommand === 'status') {
-      await interaction.editReply({ content: formatStatus(interaction.guild.id) })
+      await interaction.editReply({
+        content: formatStatus(interaction.guild.id, voiceCommandManager),
+      })
       return
     }
 
@@ -70,7 +72,9 @@ export default {
     const voiceChannel = member.voice.channel
 
     if (!voiceChannel) {
-      await interaction.editReply({ content: 'Join a voice channel before enabling voice commands.' })
+      await interaction.editReply({
+        content: 'Join a voice channel before enabling voice commands.',
+      })
       return
     }
 

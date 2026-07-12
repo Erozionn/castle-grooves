@@ -12,11 +12,26 @@ assert.deepEqual(parseVoiceSongCommand('castle grooves play blinding lights', op
   query: 'blinding lights',
 })
 
-assert.equal(parseVoiceSongCommand('Castle Grooves, play Blinding Lights!', options)?.query, 'blinding lights')
-assert.equal(parseVoiceSongCommand('castle groves play blinding lights', options)?.query, 'blinding lights')
-assert.equal(parseVoiceSongCommand('castle group play blinding lights', options)?.query, 'blinding lights')
-assert.equal(parseVoiceSongCommand('hey castle grooves play blinding lights', options)?.query, 'blinding lights')
-assert.equal(parseVoiceSongCommand('castle grooves pray blinding lights', options)?.query, 'blinding lights')
+assert.equal(
+  parseVoiceSongCommand('Castle Grooves, play Blinding Lights!', options)?.query,
+  'blinding lights'
+)
+assert.equal(
+  parseVoiceSongCommand('castle groves play blinding lights', options)?.query,
+  'blinding lights'
+)
+assert.equal(
+  parseVoiceSongCommand('castle group play blinding lights', options)?.query,
+  'blinding lights'
+)
+assert.equal(
+  parseVoiceSongCommand('hey castle grooves play blinding lights', options)?.query,
+  'blinding lights'
+)
+assert.equal(
+  parseVoiceSongCommand('castle grooves pray blinding lights', options)?.query,
+  'blinding lights'
+)
 
 assert.equal(isLikelyWakePhrase('castle groo', options), true)
 assert.equal(isLikelyWakePhrase('castle group', options), true)

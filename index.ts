@@ -33,7 +33,7 @@ import { commandInteractionHandler } from '@components/interactions'
 import { nowPlayingCanvas, nowPlayingCanvasWithUpNext } from '@utils/nowPlayingCanvas'
 import useMockTracks from '@data/dummies/songArray'
 
-import { MusicManager, setMusicManager, VoiceCommandManager, setVoiceCommandManager } from './lib'
+import { MusicManager, VoiceCommandManager } from './lib'
 import registerCommands from './deploy-commands'
 
 const {
@@ -82,19 +82,21 @@ const musicManager = new MusicManager(client, {
   ],
 })
 
-const voiceCommandManager = new VoiceCommandManager(client, musicManager, {
-  enabled: ENV.VOICE_COMMANDS_ENABLED,
-  modelPath: ENV.VOSK_MODEL_PATH,
-  wakePhrase: ENV.VOICE_WAKE_PHRASE,
-  commandPrefix: ENV.VOICE_COMMAND_PREFIX,
-  captureTimeoutMs: ENV.VOICE_CAPTURE_TIMEOUT_MS,
-  silenceMs: ENV.VOICE_SILENCE_MS,
-}, voiceListenerClient)
+const voiceCommandManager = new VoiceCommandManager(
+  client,
+  musicManager,
+  {
+    enabled: ENV.VOICE_COMMANDS_ENABLED,
+    modelPath: ENV.VOSK_MODEL_PATH,
+    wakePhrase: ENV.VOICE_WAKE_PHRASE,
+    commandPrefix: ENV.VOICE_COMMAND_PREFIX,
+    captureTimeoutMs: ENV.VOICE_CAPTURE_TIMEOUT_MS,
+    silenceMs: ENV.VOICE_SILENCE_MS,
+  },
+  voiceListenerClient
+)
 
-// Set global manager instances
-setMusicManager(musicManager)
-setVoiceCommandManager(voiceCommandManager)
-
+// Attach manager instances to the Discord client.
 client.musicManager = musicManager
 client.voiceCommandManager = voiceCommandManager
 
