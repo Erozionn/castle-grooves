@@ -64,7 +64,7 @@ services:
       test:
         [
           'CMD-SHELL',
-          "wget -qO- http://localhost:2333/v4/info -H 'Authorization: ${LAVALINK_PASSWORD:-youshallnotpass}' || exit 1",
+          "wget -qO- http://localhost:2333/v4/info --header 'Authorization: ${LAVALINK_PASSWORD:-youshallnotpass}' || exit 1",
         ]
       interval: 10s
       timeout: 5s
