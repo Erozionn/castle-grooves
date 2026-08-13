@@ -6,8 +6,18 @@ import {
 } from 'discord.js'
 
 import { isUrl, parseSongName } from '@utils/utilities'
+import { isNoTracksFoundError, queueSongQuery } from '@utils/queueSongQuery'
 
-import { useMusicManager, useQueue, LavalinkTrack } from '../lib'
+import type { ClientType } from '@types'
+import type { LavalinkTrack } from '../lib'
+
+const deleteReplySoon = (interaction: ChatInputCommandInteraction, delay = 3000) => {
+  setTimeout(
+    () =>
+      interaction.deleteReply().catch((e) => console.warn('[playCommand] deleteReply failed:', e)),
+    delay
+  )
+}
 
 export default {
   data: new SlashCommandBuilder()
@@ -23,7 +33,7 @@ export default {
   async autoComplete(interaction: AutocompleteInteraction) {
     if (!interaction.isAutocomplete()) return
 
-    const musicManager = useMusicManager()
+    const musicManager = (interaction.client as ClientType).musicManager
 
     const focusedValue = interaction.options.getFocused()
 
@@ -114,10 +124,9 @@ export default {
   async execute(interaction: ChatInputCommandInteraction) {
     if (!interaction.isChatInputCommand()) return
 
-    // Defer immediately to prevent timeout
     await interaction.deferReply()
 
-    const musicManager = useMusicManager()
+    const musicManager = (interaction.client as ClientType).musicManager
     const { member } = interaction
 
     const {
@@ -125,139 +134,68 @@ export default {
     } = member as GuildMember
 
     if (!voiceChannel) {
-      await interaction.editReply({
-        content: '❌ | You need to be in a voice channel!',
-      })
-      setTimeout(() => interaction.deleteReply().catch((e) => console.warn('[playCommand] deleteReply failed:', e)), 3000)
+      await interaction.editReply({ content: 'You need to be in a voice channel!' })
+      deleteReplySoon(interaction)
       return
     }
 
-    await interaction.editReply({ content: '⏱ | Loading...' })
+    await interaction.editReply({ content: 'Loading...' })
 
     const songName = interaction.options.get('song')?.value as string
-
     console.log(`[playCommand] Playing: "${songName}"`)
 
     try {
-      // Get or create queue
-      const guildId = interaction.guild?.id as string
-      const existingQueue = useQueue(guildId)
+      const result = await queueSongQuery({
+        musicManager,
+        voiceChannel,
+        query: songName,
+        requestedBy: member as GuildMember,
+        textChannel: interaction.channel,
+      })
 
-      if (!existingQueue) {
-        // Create new queue and play - MusicManager.play() handles search internally
-        const { track } = await musicManager.play(voiceChannel, songName.trim(), {
-          requestedBy: member as GuildMember,
-          metadata: {
-            channel: interaction.channel,
-          },
-        })
-
-        if (track?.info) {
-          console.log(`[playCommand] Now playing: "${track.info.title}" by "${track.info.author}"`)
-        }
-        setTimeout(() => interaction.deleteReply().catch((e) => console.warn('[playCommand] deleteReply failed:', e)), 1500)
-      } else {
-        // Ensure channel metadata is set for existing queue
-        if (!existingQueue.metadata.channel) {
-          existingQueue.metadata.channel = interaction.channel
-        }
-
-        // Search for the track manually to add to existing queue
-        const searchResult = await musicManager.search(songName.trim(), {
-          requester: member as GuildMember,
-        })
-
-        if (
-          searchResult.loadType === 'empty' ||
-          searchResult.loadType === 'error' ||
-          searchResult.tracks.length === 0
-        ) {
-          await interaction.editReply({ content: '❌ | No results found!' })
-          setTimeout(() => interaction.deleteReply().catch((e) => console.warn('[playCommand] deleteReply failed:', e)), 3000)
-          return
-        }
-
-        // Add to existing queue
-        if (searchResult.loadType === 'playlist' && searchResult.tracks.length > 1) {
-          // Add all playlist tracks
-          for (const track of searchResult.tracks) {
-            track.userData = track.userData || {}
-            track.userData.requestedBy = member as GuildMember
-            await existingQueue.addTrack(track)
-          }
-
-          // If nothing is playing, start playing
-          if (!existingQueue.isPlaying && !existingQueue.currentTrack) {
-            await existingQueue.play()
-          }
-
-          // If queue is paused, skip to new track and resume
-          if (existingQueue.isPaused) {
-            if (existingQueue.tracks.length >= 1) {
-              await existingQueue.skip()
-            }
-            existingQueue.resume()
-          }
-
-          setTimeout(() => interaction.deleteReply().catch((e) => console.warn('[playCommand] deleteReply failed:', e)), 1500)
-        } else {
-          // Add single track
-          const track = searchResult.tracks[0]
-          track.userData = track.userData || {}
-          track.userData.requestedBy = member as GuildMember
-          await existingQueue.addTrack(track)
-
-          // If nothing is playing, start playing
-          if (!existingQueue.isPlaying && !existingQueue.currentTrack) {
-            await existingQueue.play()
-          }
-
-          // If queue is paused, skip to new track and resume
-          if (existingQueue.isPaused) {
-            if (existingQueue.tracks.length >= 1) {
-              await existingQueue.skip()
-            }
-            existingQueue.resume()
-          }
-
-          if (track?.info) {
-            console.log(
-              `[playCommand] Added to queue: "${track.info.title}" by "${track.info.author}"`
-            )
-          }
-          setTimeout(() => interaction.deleteReply().catch((e) => console.warn('[playCommand] deleteReply failed:', e)), 1500)
-        }
+      if (result.firstTrack?.info) {
+        const action = result.createdQueue ? 'Now playing' : 'Added to queue'
+        console.log(
+          `[playCommand] ${action}: "${result.firstTrack.info.title}" by "${result.firstTrack.info.author}"`
+        )
       }
+
+      deleteReplySoon(interaction, 1500)
     } catch (e: any) {
-      // Handle AbortError specifically (happens when operations are cancelled)
       if (e instanceof Error && e.name === 'AbortError') {
         console.warn('[playCommand] Operation was aborted - likely due to timeout or cancellation')
-        // Try to update reply if interaction is still valid
         try {
-          await interaction.editReply({ content: '⚠️ | Operation was cancelled. Please try again.' })
-          setTimeout(() => interaction.deleteReply().catch(() => {}), 3000)
+          await interaction.editReply({ content: 'Operation was cancelled. Please try again.' })
+          deleteReplySoon(interaction)
         } catch {
           // Interaction may already be invalid, ignore
         }
         return
       }
 
-      // Handle Lavalink connection errors
       if (e?.status === 400 || e?.message?.includes('Bad Request')) {
         console.warn('[playCommand] Lavalink connection error (possibly reconnecting)')
         try {
-          await interaction.editReply({ content: '⚠️ | Music server reconnecting. Please try again in a moment.' })
-          setTimeout(() => interaction.deleteReply().catch(() => {}), 5000)
+          await interaction.editReply({
+            content: 'Music server reconnecting. Please try again in a moment.',
+          })
+          deleteReplySoon(interaction, 5000)
         } catch {
           // Interaction may already be invalid, ignore
         }
+        return
+      }
+
+      if (isNoTracksFoundError(e)) {
+        await interaction.editReply({ content: 'No results found!' })
+        deleteReplySoon(interaction)
         return
       }
 
       console.warn('[playCommand]', e)
       try {
-        await interaction.editReply({ content: '❌ | Error joining your channel.' })
-        setTimeout(() => interaction.deleteReply().catch(() => {}), 3000)
+        await interaction.editReply({ content: 'Error joining your channel.' })
+        deleteReplySoon(interaction)
       } catch {
         // Interaction may already be invalid, ignore
       }

@@ -1,9 +1,9 @@
 import path from 'path'
 
 import express from 'express'
-import { BaseGuildTextChannel, Client } from 'discord.js'
+import { BaseGuildTextChannel } from 'discord.js'
 
-import { useMusicManager, useQueue } from '../lib'
+import type { ClientType } from '@types'
 
 const { WEBSERVER_PORT, ADMIN_USER_ID, GUILD_ID, DEFAULT_TEXT_CHANNEL } = process.env
 
@@ -11,7 +11,7 @@ const app = express()
 
 app.use('/static', express.static(path.resolve('public')))
 
-function initApi(client?: Client) {
+function initApi(client?: ClientType) {
   if (!DEFAULT_TEXT_CHANNEL || !ADMIN_USER_ID || !GUILD_ID) {
     console.error('[api] Missing environment variables.')
     return
@@ -24,8 +24,8 @@ function initApi(client?: Client) {
 
   app.get('/play/:query/:userId?', async (req, res) => {
     const { query, userId } = req.params
-    const musicManager = useMusicManager()
-    const queue = useQueue(GUILD_ID as string)
+    const musicManager = client.musicManager
+    const queue = musicManager.getQueue(GUILD_ID as string) || null
 
     if (!queue) {
       res.status(400).json({ message: 'Queue not found.' })

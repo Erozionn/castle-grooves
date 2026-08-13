@@ -1,3 +1,38 @@
+# Dependencies and generated output
 node_modules
+build
+dist
+.cache
+.next
+.nuxt
+coverage
+*.tsbuildinfo
+
+# Git/editor metadata
+.git
+.github
+.agents
+.codex
+.vscode
+.idea
+
+# Local env and logs
+.env
+.env.*
+!.env.example
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime/generated files
 recordings
-npm-debug.log
+mockNowPlaying.png
+mockNowPlayingMulti.png
+public/musicplayer.png
+influx-backup
+lavalink/logs
+assets/audio/hello-responses
+
+# Large local speech models are mounted at runtime
+models

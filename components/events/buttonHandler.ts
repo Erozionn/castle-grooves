@@ -7,17 +7,20 @@ import {
   backButtonInteractionHandler,
   historyInteractionHandler,
   recommendedButtonInteractionHandler,
+  dislikeButtonInteractionHandler,
   djButtonInteractionHandler,
 } from '@components/interactions'
 
-import { useQueue } from '../../lib'
+import type { ClientType } from '@types'
 
 export default async (interaction: Interaction<CacheType>) => {
   if (!interaction.isButton() && !interaction.isStringSelectMenu()) return
   await interaction.deferUpdate()
 
   const { channel, customId } = interaction
-  const queue = useQueue(interaction.guild?.id as string)
+  const queue = interaction.guild
+    ? (interaction.client as ClientType).musicManager.getQueue(interaction.guild.id) || null
+    : null
 
   if (queue && channel) {
     queue.metadata = { ...queue.metadata, channel }
@@ -46,6 +49,9 @@ export default async (interaction: Interaction<CacheType>) => {
         break
       case 'recommended_button':
         recommendedButtonInteractionHandler(queue, interaction as ButtonInteraction)
+        break
+      case 'dislike_button':
+        dislikeButtonInteractionHandler(queue, interaction as ButtonInteraction)
         break
       case 'dj_button':
         console.log('[buttonHandler] DJ button pressed')

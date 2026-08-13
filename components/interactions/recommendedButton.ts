@@ -45,8 +45,7 @@ export default async (queue: MusicQueue | null, interaction: ButtonInteraction) 
     if (!recommendations || recommendations.length === 0) {
       if (channel && channel.isTextBased() && 'guild' in channel) {
         await sendMessage(channel, {
-          content:
-            '❌ No recommendations found. Play some songs first to build your history!',
+          content: '❌ No recommendations found. Play some songs first to build your history!',
         })
       }
       return

@@ -121,3 +121,11 @@ recordings/**
 *-player-script.js
 
 influx-backup/
+
+# Vosk speech recognition models
+models/
+
+# Local Lavalink plugin jars; application.yml declares plugin dependencies.
+lavalink/plugins/
+
+hello-responses/

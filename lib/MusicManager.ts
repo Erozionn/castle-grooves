@@ -1,6 +1,8 @@
+import { EventEmitter } from 'events'
+
 import { Shoukaku, Connectors, Node, Player as ShoukakuPlayer, NodeOption } from 'shoukaku'
 import { Client, VoiceBasedChannel, GuildMember, Interaction } from 'discord.js'
-import { EventEmitter } from 'events'
+
 import { MusicQueue } from './MusicQueue'
 
 export interface MusicManagerOptions {
@@ -172,10 +174,12 @@ export class MusicManager extends EventEmitter {
 
         if (options?.requester) {
           fallbackTracks.forEach((track: LavalinkTrack) => {
-            track.userData = {
-              ...track.userData,
-              requestedBy: options.requester,
-            }
+            Object.assign(track, {
+              userData: {
+                ...track.userData,
+                requestedBy: options.requester,
+              },
+            })
           })
         }
 
@@ -219,10 +223,12 @@ export class MusicManager extends EventEmitter {
 
             if (options?.requester) {
               fallbackTracks.forEach((track: LavalinkTrack) => {
-                track.userData = {
-                  ...track.userData,
-                  requestedBy: options.requester,
-                }
+                Object.assign(track, {
+                  userData: {
+                    ...track.userData,
+                    requestedBy: options.requester,
+                  },
+                })
               })
             }
 
@@ -246,10 +252,12 @@ export class MusicManager extends EventEmitter {
       if (options?.requester) {
         // Directly assign userData to preserve track structure
         tracks.forEach((track: LavalinkTrack) => {
-          track.userData = {
-            ...track.userData,
-            requestedBy: options.requester,
-          }
+          Object.assign(track, {
+            userData: {
+              ...track.userData,
+              requestedBy: options.requester,
+            },
+          })
         })
       }
 

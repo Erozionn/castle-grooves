@@ -33,7 +33,7 @@ import { commandInteractionHandler } from '@components/interactions'
 import { nowPlayingCanvas, nowPlayingCanvasWithUpNext } from '@utils/nowPlayingCanvas'
 import useMockTracks from '@data/dummies/songArray'
 
-import { MusicManager, setMusicManager } from './lib'
+import { MusicManager, VoiceCommandManager } from './lib'
 import registerCommands from './deploy-commands'
 
 const {
@@ -54,6 +54,22 @@ const client = new Client({
   partials: [Partials.Channel],
 }) as ClientType
 
+const voiceListenerClient = (() => {
+  if (!ENV.VOICE_LISTENER_BOT_TOKEN) return undefined
+
+  if (ENV.VOICE_LISTENER_BOT_TOKEN === BOT_TOKEN) {
+    console.warn(
+      '[VoiceListener] VOICE_LISTENER_BOT_TOKEN matches BOT_TOKEN; falling back to experimental same-bot receiver.'
+    )
+    return undefined
+  }
+
+  return new Client({
+    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],
+    partials: [Partials.Channel],
+  })
+})()
+
 // Initialize Music Manager with Lavalink connection
 const musicManager = new MusicManager(client, {
   nodes: [
@@ -66,10 +82,24 @@ const musicManager = new MusicManager(client, {
   ],
 })
 
-// Set global music manager instance
-setMusicManager(musicManager)
+const voiceCommandManager = new VoiceCommandManager(
+  client,
+  musicManager,
+  {
+    enabled: ENV.VOICE_COMMANDS_ENABLED,
+    helloResponsesEnabled: ENV.VOICE_HELLO_RESPONSES_ENABLED,
+    wakeWordConfirmSoundEnabled: ENV.VOICE_WAKE_WORD_CONFIRM_SOUND_ENABLED,
+    modelPath: ENV.VOSK_MODEL_PATH,
+    wakePhrase: ENV.VOICE_WAKE_PHRASE,
+    captureTimeoutMs: ENV.VOICE_CAPTURE_TIMEOUT_MS,
+    silenceMs: ENV.VOICE_SILENCE_MS,
+  },
+  voiceListenerClient
+)
 
+// Attach manager instances to the Discord client.
 client.musicManager = musicManager
+client.voiceCommandManager = voiceCommandManager
 
 client.commands = new Collection<string, CommandObject['default']>()
 
@@ -229,6 +259,16 @@ process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason)
 })
 
+process.on('SIGINT', () => {
+  voiceCommandManager.destroy()
+  process.exit(0)
+})
+
+process.on('SIGTERM', () => {
+  voiceCommandManager.destroy()
+  process.exit(0)
+})
+
 // player.on('debug', async (message) => {
 //   // Emitted when the player sends debug info
 //   // Useful for seeing what dependencies, extractors, etc are loaded
@@ -262,5 +302,15 @@ client.on('messageCreate', (msg) => {
     msgResetCount = 0
   }
 })
+
+if (voiceListenerClient) {
+  voiceListenerClient.once('ready', () => {
+    console.log(`[VoiceListener] Ready as ${voiceListenerClient.user?.tag}`)
+  })
+
+  voiceListenerClient.login(ENV.VOICE_LISTENER_BOT_TOKEN).catch((error) => {
+    console.error('[VoiceListener] Login failed:', error)
+  })
+}
 
 client.login(BOT_TOKEN)

@@ -1,6 +1,6 @@
 import { GuildMember, ChatInputCommandInteraction, SlashCommandBuilder } from 'discord.js'
 
-import { useMusicManager, useQueue } from '../lib'
+import type { ClientType } from '@types'
 
 export default {
   data: new SlashCommandBuilder()
@@ -15,8 +15,8 @@ export default {
     // Defer immediately to prevent timeout
     await interaction.deferReply()
 
-    const musicManager = useMusicManager()
-    const queue = useQueue(interaction.guild?.id as string)
+    const musicManager = (interaction.client as ClientType).musicManager
+    const queue = interaction.guild ? musicManager.getQueue(interaction.guild.id) || null : null
     const { member } = interaction
 
     const {

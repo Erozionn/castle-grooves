@@ -1,115 +1,112 @@
 # Castle Grooves Docker Compose Setup
 
-This project uses Docker Compose to orchestrate all services needed for the Castle Grooves Discord bot.
+This project uses Docker Compose v2 to run the bot, Lavalink, and InfluxDB. Compose is split into a shared base file plus environment-specific overrides:
 
-## Services
+- `docker-compose.yml`: shared service configuration, network, volumes, health checks, and environment mapping.
+- `docker-compose.dev.yml`: local development build target, hot reload mounts, debugger port, and dev volume names.
+- `docker-compose.prod.yml`: published Docker Hub image plus Watchtower auto-updates.
 
-- **bot**: Discord bot application (Node.js)
-- **lavalink**: Audio server for music playback
-- **influxdb**: Time-series database for song history
+## Local Development
 
-## Quick Start
+1. Copy the example environment:
 
-1. **Copy environment variables:**
+```bash
+cp .env.example .env.dev
+```
 
-   ```bash
-   cp .env.example .env
-   ```
+2. Fill `.env.dev` with your Discord, Spotify, Lavalink, and InfluxDB values.
 
-2. **Edit `.env` file** with your credentials:
+3. Start the stack with hot reload:
 
-   - Discord bot token and client credentials
-   - Spotify API credentials
-   - InfluxDB configuration (use the defaults or customize)
-   - Lavalink password
+```bash
+yarn docker:dev
+```
 
-3. **Ensure Lavalink configuration exists:**
-   Make sure `lavalink/application.yml` is present with your Lavalink configuration.
+Useful commands:
 
-4. **Start all services:**
+```bash
+yarn docker:dev:detached
+yarn docker:dev:logs
+yarn docker:dev:down
+```
 
-   ```bash
-   docker-compose up -d
-   ```
+The dev stack uses the `dev` target in the main `Dockerfile`, mounts the repo into `/usr/src/app`, and keeps container `node_modules` in a named volume so the host checkout is not overwritten.
 
-5. **View logs:**
+## Production
 
-   ```bash
-   # All services
-   docker-compose logs -f
+Production pulls the published image from Docker Hub and starts Watchtower for automatic bot updates:
 
-   # Specific service
-   docker-compose logs -f bot
-   docker-compose logs -f lavalink
-   docker-compose logs -f influxdb
-   ```
+```bash
+cp .env.example .env
+# edit .env, including DOCKER_HUB_USERNAME
+yarn docker:prod
+```
 
-6. **Stop all services:**
+Useful commands:
 
-   ```bash
-   docker-compose down
-   ```
+```bash
+yarn docker:prod:pull
+yarn docker:prod:logs
+yarn docker:prod:down
+```
 
-7. **Stop and remove volumes (clean slate):**
-   ```bash
-   docker-compose down -v
-   ```
+## Direct Compose Commands
+
+The package scripts wrap these commands:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml --env-file .env.dev up --build
+docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env up -d
+```
 
 ## Service URLs
 
-- **Bot API**: http://localhost:1337
-- **Lavalink**: http://localhost:2333
-- **InfluxDB UI**: http://localhost:8086
+- Bot API: `http://localhost:${WEBSERVER_PORT}`
+- Lavalink: `http://localhost:2333`
+- InfluxDB UI: `http://localhost:8086`
 
-## Building
+## Building Images
 
-To rebuild the bot after code changes:
+Build the production image locally:
 
 ```bash
-docker-compose build bot
-docker-compose up -d bot
+yarn docker:build
 ```
 
-## Environment Variables
+Build specific Dockerfile targets manually:
 
-See `.env.example` for all required environment variables.
-
-### Critical Variables:
-
-- `DISCORD_TOKEN`: Your Discord bot token
-- `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET`: Spotify API credentials
-- `INFLUX_TOKEN`: InfluxDB authentication token (auto-generated on first run)
-- `LAVALINK_PASSWORD`: Password for Lavalink connection
+```bash
+docker build --target dev -t castle-grooves:dev-test .
+docker build --target production -t castle-grooves:prod-test .
+```
 
 ## Volumes
 
-- `influxdb-data`: Persistent storage for InfluxDB data
-- `influxdb-config`: InfluxDB configuration files
-- `./recordings`: Bot voice recordings (if enabled)
-
-## Networks
-
-All services communicate over the `castle-grooves` bridge network.
-
-## Health Checks
-
-- **InfluxDB**: Automatic health check ensures it's ready before bot starts
-- **Lavalink**: Bot waits for Lavalink to be started
+- `influxdb-data` / `influxdb-config`: persistent production InfluxDB data and config.
+- `influxdb-data-dev` / `influxdb-config-dev`: isolated local development InfluxDB data and config.
+- `node_modules` / `yarn_cache`: dev-only container dependency volumes.
+- `./recordings`: persisted bot voice recordings.
+- `./models`: read-only Vosk model mount.
+- `./lavalink/logs`: Lavalink logs.
 
 ## Troubleshooting
 
-### Bot can't connect to Lavalink
+### Bot cannot connect to Lavalink
 
-- Check `SHOUKAKU_HOST=lavalink` in bot environment (matches service name)
-- Verify `LAVALINK_PASSWORD` matches in both bot and Lavalink services
+- Check `LAVALINK_HOST=lavalink` and `LAVALINK_PASSWORD` in your env file.
+- In production, Lavalink must pass its healthcheck before the bot starts.
 
 ### InfluxDB initialization fails
 
-- First run sets up admin user with `INFLUX_ADMIN_USERNAME` and `INFLUX_ADMIN_PASSWORD`
-- Generate a secure `INFLUX_TOKEN` or let InfluxDB generate one
+- First run initializes the admin user and bucket from `INFLUX_ADMIN_USERNAME`, `INFLUX_ADMIN_PASSWORD`, `INFLUX_ORG`, `INFLUX_BUCKET`, and `INFLUX_TOKEN`.
+- If you change initialization values after the first run, remove the matching InfluxDB volumes and start again.
 
 ### Bot crashes on startup
 
-- Check logs: `docker-compose logs bot`
-- Ensure all environment variables are set correctly
-- Verify InfluxDB is healthy: `docker-compose ps`
+```bash
+yarn docker:dev:logs
+# or
+yarn docker:prod:logs
+```
+
+Check that required env vars are set and the Vosk model path exists if voice commands are enabled.
