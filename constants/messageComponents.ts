@@ -33,6 +33,11 @@ const defaultPlayerButtons = {
     .setStyle(ButtonStyle.Secondary)
     .setDisabled(false)
     .setEmoji('lightninganimated:1418830322996351027'),
+  dislike: new ButtonBuilder()
+    .setCustomId('dislike_button')
+    .setStyle(ButtonStyle.Secondary)
+    .setDisabled(true)
+    .setEmoji('👎'),
   dj: new ButtonBuilder()
     .setCustomId('dj_button')
     .setStyle(ButtonStyle.Secondary)
@@ -54,6 +59,7 @@ const resetToDefaults = () => {
     .setStyle(ButtonStyle.Secondary)
     .setDisabled(false)
     .setEmoji('lightninganimated:1418830322996351027')
+  defaultPlayerButtons.dislike.setStyle(ButtonStyle.Secondary).setDisabled(true).setEmoji('👎')
   defaultPlayerButtons.stop
     .setStyle(ButtonStyle.Danger)
     .setDisabled(false)
@@ -114,11 +120,15 @@ export const useComponents = async (queue?: MusicQueue) => {
     playerButtons.stop
   )
 
+  const feedbackActionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    playerButtons.dislike
+  )
+
   const historyActionRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
     playerHistory
   )
 
-  if (!queue) return [buttonsActionRow1, historyActionRow]
+  if (!queue) return [buttonsActionRow1, feedbackActionRow, historyActionRow]
 
   const { customId } = queue.metadata as ButtonInteraction | StringSelectMenuInteraction
 
@@ -133,12 +143,14 @@ export const useComponents = async (queue?: MusicQueue) => {
     playerButtons.skip.setDisabled(true)
     playerButtons.back.setDisabled(true)
     playerButtons.playPause.setDisabled(true)
+    playerButtons.dislike.setDisabled(true)
     playerButtons.stop.setEmoji('disconnect:1043629464166355015')
     playerButtons.recommended.setEmoji('lightninganimated:1418830322996351027')
   } else {
     playerButtons.skip.setDisabled(false)
     playerButtons.back.setDisabled(false)
     playerButtons.playPause.setDisabled(false)
+    playerButtons.dislike.setDisabled(false)
     playerButtons.playPause.setStyle(ButtonStyle.Primary)
     playerButtons.stop.setEmoji('musicoff:909248235623825439')
     playerButtons.recommended.setEmoji('lightning:1414112607933304973')
@@ -171,7 +183,7 @@ export const useComponents = async (queue?: MusicQueue) => {
       break
   }
 
-  return [buttonsActionRow1, historyActionRow]
+  return [buttonsActionRow1, feedbackActionRow, historyActionRow]
 }
 
 // export const components = [buttonsActionRow, historyActionRow]

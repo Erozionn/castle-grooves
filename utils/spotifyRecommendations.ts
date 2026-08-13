@@ -2,7 +2,12 @@ import type { LavalinkTrack } from '@types'
 
 import type { MusicManager } from '../lib/MusicManager'
 import type { MusicQueue } from '../lib/MusicQueue'
-import { getSongsPlayed, getSongsPlayedAtHour, deserializeLavalinkTrack } from './songHistoryV2'
+import {
+  getSongsPlayed,
+  getSongsPlayedAtHour,
+  deserializeLavalinkTrack,
+  getSongDislikeCounts,
+} from './songHistoryV2'
 
 // ============================================================================
 // SCORING
@@ -112,7 +117,7 @@ export const getRecommendationsFromQueue = async (
   const [hourlyHistory, monthlyHistory, recentPlays] = await Promise.all([
     getSongsPlayedAtHour(hour, isWeekend, 1, 60),
     getSongsPlayed('monthly', 80),
-    getSongsPlayed('1h', 20),
+    getSongsPlayed('24h', 20),
   ])
 
   const deserializeTrack = (s: { serializedTrack?: string | Record<string, unknown> }) => {
@@ -173,24 +178,52 @@ export const getRecommendationsFromQueue = async (
     return []
   }
 
+  // -- 4.5. Apply thumbs-down penalties ----------------------------------
+  const dislikeCounts = await getSongDislikeCounts(eligible.map((t) => t.info.identifier))
+  const selectionPool = eligible.filter(
+    (track) => (dislikeCounts.get(track.info.identifier) ?? 0) < 2
+  )
+  const blockedByDislikes = eligible.length - selectionPool.length
+  const reducedByDislikes = selectionPool.filter(
+    (track) => (dislikeCounts.get(track.info.identifier) ?? 0) === 1
+  ).length
+
+  console.log(
+    '[Recommendations] Dislike penalties - blocked(2+): ' +
+      blockedByDislikes +
+      ', reduced(1): ' +
+      reducedByDislikes +
+      ', remaining: ' +
+      selectionPool.length
+  )
+
+  if (selectionPool.length === 0) {
+    console.log('[Recommendations] No tracks left after dislike filtering')
+    return []
+  }
+
   // -- 5. Score by what-came-next -----------------------------------------
   const recentContext = currentTrack
     ? [currentTrack, ...queueHistory.slice(-4)]
     : queueHistory.slice(-5)
   const fullHistory = [...queueHistory, ...deserializedMonthly]
-  const scores = scoreByWhatCameNext(eligible, recentContext, fullHistory)
+  const scores = scoreByWhatCameNext(selectionPool, recentContext, fullHistory)
 
   // Sort: higher score first, shuffle within same score tier
-  const scored = eligible
-    .map((track) => ({ track, score: scores.get(track.info.identifier) ?? 0 }))
-    .sort((a, b) => b.score - a.score || Math.random() - 0.5)
+  const scored = selectionPool
+    .map((track) => ({
+      track,
+      score: scores.get(track.info.identifier) ?? 0,
+      dislikeCount: dislikeCounts.get(track.info.identifier) ?? 0,
+    }))
+    .sort((a, b) => b.score - a.score || a.dislikeCount - b.dislikeCount || Math.random() - 0.5)
 
   const topScorers = scored.filter((x) => x.score > 0)
   const rest = scored.filter((x) => x.score === 0)
   console.log(`[Recommendations] ${topScorers.length} tracks boosted by what-came-next scoring`)
 
-  // Take up to 10 candidates (prefer boosted tracks first)
-  const selected = [...topScorers, ...rest].slice(0, 10).map((x) => x.track)
+  // Take up to 5 candidates (prefer boosted tracks first)
+  const selected = [...topScorers, ...rest].slice(0, 5).map((x) => x.track)
 
   // -- 6. Load candidates -------------------------------------------------
   const loaded = await loadCandidates(selected, musicManager)

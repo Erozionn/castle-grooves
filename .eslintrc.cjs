@@ -46,6 +46,7 @@ module.exports = {
     'no-debugger': ['warn'],
     'no-param-reassign': ['error', { props: true, ignorePropertyModificationsFor: ['state'] }],
     '@typescript-eslint/no-unused-vars': ['warn'],
+    '@typescript-eslint/no-explicit-any': ['warn'],
     'import/extensions': [
       'error',
       'always',

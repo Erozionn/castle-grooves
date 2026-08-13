@@ -1,6 +1,8 @@
 import { VoiceBasedChannel, GuildMember, Message } from 'discord.js'
 import { Player as ShoukakuPlayer } from 'shoukaku'
+
 import ENV from '@constants/Env'
+
 import type { MusicManager, LavalinkTrack } from './MusicManager'
 
 export interface QueueMetadata {
@@ -65,7 +67,8 @@ export class MusicQueue {
     const existingPlayer = this.manager.shoukaku.players.get(this.guildId)
     if (existingPlayer) {
       if (ENV.DEBUG_QUEUE) console.log('[Queue] Found existing player, destroying directly...')
-      try {        // Destroy on Lavalink first, then remove from map
+      try {
+        // Destroy on Lavalink first, then remove from map
         await node.rest.destroyPlayer(this.guildId).catch(() => {})
         this.manager.shoukaku.players.delete(this.guildId)
         // Give Lavalink time to process the destruction
@@ -179,7 +182,8 @@ export class MusicQueue {
 
       // Play next track
       if (this.tracks.length > 0) {
-        if (ENV.DEBUG_QUEUE) console.log(`[Queue] Playing next track from queue (${this.tracks.length} remaining)`)
+        if (ENV.DEBUG_QUEUE)
+          console.log(`[Queue] Playing next track from queue (${this.tracks.length} remaining)`)
         this.play().catch((err) => console.error('[Queue] Error playing next track:', err))
       } else {
         if (ENV.DEBUG_QUEUE) console.log(`[Queue] No more tracks in queue, emitting emptyQueue`)
@@ -218,13 +222,13 @@ export class MusicQueue {
 
     this.player.on('closed', (data) => {
       console.warn(`[Queue] Player closed in ${this.guildId}:`, data)
-      
+
       // Clean up player references to allow reconnection
       if (ENV.DEBUG_QUEUE) console.log('[Queue] Cleaning up closed player...')
       this.manager.shoukaku.players.delete(this.guildId)
       this.player = null
       this.connection = null
-      
+
       this.manager.emit('disconnect', this)
     })
   }
@@ -259,7 +263,8 @@ export class MusicQueue {
       if (this.isBotAlone()) {
         // Bot is alone - start countdown if not already started
         if (!this.emptyChannelTimeout) {
-          if (ENV.DEBUG_QUEUE) console.log('[Queue] Bot is alone in voice channel, starting 10s countdown...')
+          if (ENV.DEBUG_QUEUE)
+            console.log('[Queue] Bot is alone in voice channel, starting 10s countdown...')
           this.emptyChannelTimeout = setTimeout(() => {
             if (ENV.DEBUG_QUEUE) console.log('[Queue] Bot was alone for 10s, disconnecting...')
             this.destroy()
@@ -357,21 +362,24 @@ export class MusicQueue {
       }
     } catch (error: any) {
       // If playback fails due to dead connection, clean up and retry once
-      if (error?.message?.includes('No available guild node') || error?.message?.includes('Player not found')) {
+      if (
+        error?.message?.includes('No available guild node') ||
+        error?.message?.includes('Player not found')
+      ) {
         if (ENV.DEBUG_QUEUE) console.log('[Queue] Connection dead, cleaning up and retrying...')
-        
+
         // Clean up dead player
         this.manager.shoukaku.players.delete(this.guildId)
         this.player = null
         this.connection = null
-        
+
         // Wait a bit for cleanup
         await new Promise((resolve) => setTimeout(resolve, 500))
-        
+
         // Reconnect and retry
         await this.connect()
         await this.player!.playTrack({ track: { encoded: this.currentTrack!.encoded } })
-        
+
         if (this.volume !== 100) {
           await this.player!.setGlobalVolume(this.volume)
         }

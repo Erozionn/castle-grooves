@@ -2,7 +2,7 @@ import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js'
 
 import { moveMainMessage, sendMessage } from '@utils/mainMessage'
 import { useComponents } from '@constants/messageComponents'
-import { useQueue } from '../lib'
+import type { ClientType } from '@types'
 
 export default {
   data: new SlashCommandBuilder()
@@ -12,7 +12,8 @@ export default {
     if (!interaction.guild) return
 
     const { channel } = interaction
-    const queue = useQueue(interaction.guild.id) || undefined
+    const queue =
+      (interaction.client as ClientType).musicManager.getQueue(interaction.guild.id) || undefined
     const components = await useComponents(queue)
     await interaction.deferReply()
 
