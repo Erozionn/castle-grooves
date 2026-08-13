@@ -28,7 +28,8 @@
     "lint": "eslint --ext .ts,.js,.cts,.cjs .",
     "lint:fix": "eslint --fix --ext .ts,.js,.cts,.cjs .",
     "p": "prettier . --write",
-    "test:voice": "ts-node -r tsconfig-paths/register scripts/testVoiceCommandParser.ts"
+    "test:voice": "ts-node -r tsconfig-paths/register scripts/testVoiceCommandParser.ts",
+    "download:hello-sounds": "ts-node -r tsconfig-paths/register scripts/downloadHelloSounds.ts"
   },
   "repository": {
     "type": "git",

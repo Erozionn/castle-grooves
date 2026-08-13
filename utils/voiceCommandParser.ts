@@ -2,12 +2,19 @@ import { ratio } from 'fuzzball'
 
 export interface VoiceSongCommandOptions {
   wakePhrase: string
-  commandPrefix: string
   minQueryLength?: number
   wakePhraseThreshold?: number
   partialWakeThreshold?: number
-  commandPrefixThreshold?: number
+  commandThreshold?: number
   maxWakeStartIndex?: number
+}
+
+export type VoiceCommandAction = 'add' | 'pause' | 'skip' | 'stop'
+
+export interface ParsedVoiceCommand {
+  transcript: string
+  action: VoiceCommandAction
+  query?: string
 }
 
 export interface ParsedVoiceSongCommand {
@@ -18,6 +25,12 @@ export interface ParsedVoiceSongCommand {
 interface PhraseMatch {
   startIndex: number
   endIndex: number
+  score: number
+}
+
+interface VoiceCommandMatch {
+  action: VoiceCommandAction
+  tokenLength: number
   score: number
 }
 
@@ -74,6 +87,37 @@ const findPhraseMatch = (
   return bestMatch && bestMatch.score >= threshold ? bestMatch : null
 }
 
+const findVoiceCommandMatch = (
+  commandTokens: string[],
+  threshold: number
+): VoiceCommandMatch | null => {
+  const candidates: Array<{ action: VoiceCommandAction; tokens: string[] }> = [
+    { action: 'add', tokens: ['add'] },
+    // Keep existing deployments working after `add` becomes the default phrase.
+    { action: 'add', tokens: ['play'] },
+    { action: 'pause', tokens: ['pause'] },
+    { action: 'skip', tokens: ['skip'] },
+    { action: 'stop', tokens: ['stop'] },
+  ]
+
+  let bestMatch: VoiceCommandMatch | null = null
+
+  for (const candidate of candidates) {
+    if (commandTokens.length < candidate.tokens.length) continue
+
+    const score = scorePhrase(commandTokens.slice(0, candidate.tokens.length), candidate.tokens)
+    if (score < threshold || (bestMatch && score <= bestMatch.score)) continue
+
+    bestMatch = {
+      action: candidate.action,
+      tokenLength: candidate.tokens.length,
+      score,
+    }
+  }
+
+  return bestMatch
+}
+
 export const isLikelyWakePhrase = (
   transcript: string,
   options: Pick<
@@ -89,21 +133,19 @@ export const isLikelyWakePhrase = (
   return Boolean(findPhraseMatch(transcriptTokens, wakePhraseTokens, threshold, maxWakeStartIndex))
 }
 
-export const parseVoiceSongCommand = (
+export const parseVoiceCommand = (
   transcript: string,
   options: VoiceSongCommandOptions
-): ParsedVoiceSongCommand | null => {
+): ParsedVoiceCommand | null => {
   const normalizedTranscript = normalizeSpeech(transcript)
   const transcriptTokens = tokenize(normalizedTranscript)
   const wakePhraseTokens = tokenize(options.wakePhrase)
-  const commandPrefixTokens = tokenize(options.commandPrefix)
   const minQueryLength = options.minQueryLength ?? 2
   const wakePhraseThreshold = options.wakePhraseThreshold ?? 74
-  const commandPrefixThreshold = options.commandPrefixThreshold ?? 75
+  const commandThreshold = options.commandThreshold ?? 75
   const maxWakeStartIndex = options.maxWakeStartIndex ?? 1
 
-  if (!transcriptTokens.length || !wakePhraseTokens.length || !commandPrefixTokens.length)
-    return null
+  if (!transcriptTokens.length || !wakePhraseTokens.length) return null
 
   const wakeMatch = findPhraseMatch(
     transcriptTokens,
@@ -113,23 +155,41 @@ export const parseVoiceSongCommand = (
   )
   if (!wakeMatch) return null
 
-  const commandTokens = transcriptTokens.slice(
-    wakeMatch.endIndex,
-    wakeMatch.endIndex + commandPrefixTokens.length
+  const commandMatch = findVoiceCommandMatch(
+    transcriptTokens.slice(wakeMatch.endIndex),
+    commandThreshold
   )
-  if (commandTokens.length < commandPrefixTokens.length) return null
+  if (!commandMatch) return null
 
-  const commandScore = scorePhrase(commandTokens, commandPrefixTokens)
-  if (commandScore < commandPrefixThreshold) return null
+  if (commandMatch.action !== 'add') {
+    return {
+      transcript: normalizedTranscript,
+      action: commandMatch.action,
+    }
+  }
 
   const query = transcriptTokens
-    .slice(wakeMatch.endIndex + commandPrefixTokens.length)
+    .slice(wakeMatch.endIndex + commandMatch.tokenLength)
     .join(' ')
     .trim()
   if (query.length < minQueryLength) return null
 
   return {
     transcript: normalizedTranscript,
+    action: 'add',
     query,
+  }
+}
+
+export const parseVoiceSongCommand = (
+  transcript: string,
+  options: VoiceSongCommandOptions
+): ParsedVoiceSongCommand | null => {
+  const command = parseVoiceCommand(transcript, options)
+  if (!command || command.action !== 'add' || !command.query) return null
+
+  return {
+    transcript: command.transcript,
+    query: command.query,
   }
 }

@@ -42,4 +42,4 @@ ENV NODE_ENV=production
 COPY --from=builder /usr/src/app/assets ./assets
 COPY --from=builder /usr/src/app/build ./build
 EXPOSE ${PORT}
-CMD ["node", "build/index.js"]
+CMD ["sh", "-c", "if [ \"$VOICE_HELLO_RESPONSES_ENABLED\" = \"true\" ]; then node build/scripts/downloadHelloSounds.js || echo '[hello-responses] Download failed; replies remain unavailable.'; fi; exec node build/index.js"]

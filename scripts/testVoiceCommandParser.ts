@@ -4,7 +4,6 @@ import { fuzzyRatio, isLikelyWakePhrase, parseVoiceSongCommand } from '@utils/vo
 
 const options = {
   wakePhrase: 'castle grooves',
-  commandPrefix: 'play',
 }
 
 assert.deepEqual(parseVoiceSongCommand('castle grooves play blinding lights', options), {

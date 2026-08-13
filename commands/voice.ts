@@ -1,6 +1,7 @@
 import { ChatInputCommandInteraction, GuildMember, SlashCommandBuilder } from 'discord.js'
 
 import type { ClientType } from '@types'
+
 import type { VoiceCommandManager } from '../lib'
 
 const formatStatus = (guildId: string, voiceCommandManager: VoiceCommandManager): string => {
@@ -19,7 +20,7 @@ const formatStatus = (guildId: string, voiceCommandManager: VoiceCommandManager)
   return [
     `Voice commands are listening in #${status.channelName}.`,
     `Receiver mode: ${status.receiverMode}`,
-    `Wake phrase: ${status.wakePhrase} ${status.commandPrefix} <song>`,
+    `Say: ${status.wakePhrase} add <song>, pause, skip, or stop.`,
     `Model path: ${status.modelPath}`,
     `Active speech streams: ${status.activeStreams}`,
     status.lastTranscript ? `Last transcript: ${status.lastTranscript}` : undefined,
@@ -85,7 +86,7 @@ export default {
       await interaction.editReply({
         content: [
           `Voice commands enabled in #${status.channelName}.`,
-          `Say: ${status.wakePhrase} ${status.commandPrefix} <song name>`,
+          `Say: ${status.wakePhrase} add <song name>, pause, skip, or stop.`,
         ].join('\n'),
       })
     } catch (error) {

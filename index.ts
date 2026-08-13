@@ -87,9 +87,10 @@ const voiceCommandManager = new VoiceCommandManager(
   musicManager,
   {
     enabled: ENV.VOICE_COMMANDS_ENABLED,
+    helloResponsesEnabled: ENV.VOICE_HELLO_RESPONSES_ENABLED,
+    wakeWordConfirmSoundEnabled: ENV.VOICE_WAKE_WORD_CONFIRM_SOUND_ENABLED,
     modelPath: ENV.VOSK_MODEL_PATH,
     wakePhrase: ENV.VOICE_WAKE_PHRASE,
-    commandPrefix: ENV.VOICE_COMMAND_PREFIX,
     captureTimeoutMs: ENV.VOICE_CAPTURE_TIMEOUT_MS,
     silenceMs: ENV.VOICE_SILENCE_MS,
   },

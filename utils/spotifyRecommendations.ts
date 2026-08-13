@@ -117,7 +117,7 @@ export const getRecommendationsFromQueue = async (
   const [hourlyHistory, monthlyHistory, recentPlays] = await Promise.all([
     getSongsPlayedAtHour(hour, isWeekend, 1, 60),
     getSongsPlayed('monthly', 80),
-    getSongsPlayed('1h', 20),
+    getSongsPlayed('24h', 20),
   ])
 
   const deserializeTrack = (s: { serializedTrack?: string | Record<string, unknown> }) => {

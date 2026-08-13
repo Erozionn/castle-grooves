@@ -72,7 +72,9 @@ yarn docker:build
 
 ## Experimental Voice Commands
 
-Voice commands are disabled by default. Set `VOICE_COMMANDS_ENABLED=true`, join a Discord voice channel, then run `/voice enable`. For Lavalink setups, set `VOICE_LISTENER_BOT_TOKEN` to a second Discord bot token and invite that listener bot to the same server so audio receive does not fight the music bot voice connection. The v1 grammar is strict: say `castle grooves play <song query>` and the bot will immediately queue the best match using the same search and queue path as `/play`.
+Voice commands are disabled by default. Set `VOICE_COMMANDS_ENABLED=true`, join a Discord voice channel, then run `/voice enable`. For Lavalink setups, set `VOICE_LISTENER_BOT_TOKEN` to a second Discord bot token and invite that listener bot to the same server so audio receive does not fight the music bot voice connection. Say `castle grooves add <song query>` to queue music, or say `castle grooves pause`, `castle grooves skip`, or `castle grooves stop` to control playback. `play <song query>` remains supported as an alias for `add`.
+
+Hello replies are an opt-in joke feature. Set `VOICE_HELLO_RESPONSES_ENABLED=true` to respond to a standalone `hello` with a random sound (15-second per-user cooldown). Docker deployments download and persist the ignored `assets/audio/hello-responses/` files automatically; non-Docker setups can run `yarn download:hello-sounds`. Use only sounds you are permitted to download and use.
 
 Vosk model files are not committed to this repository. Download an English small Vosk model and place or mount it at `./models/vosk-model-small-en-us`, or set `VOSK_MODEL_PATH` to another Vosk-compatible model directory. The Docker image uses Debian `node:lts-slim` with native build/runtime packages for Vosk plus ffmpeg.
 
@@ -91,9 +93,10 @@ Vosk model files are not committed to this repository. Download an English small
 - `WEBSERVER_PORT` is the port for the integrated API
 - `DOCKER_HUB_USERNAME` is required for production Docker Compose pulls
 - `VOICE_COMMANDS_ENABLED` enables the experimental `/voice` commands when set to `true`
+- `VOICE_HELLO_RESPONSES_ENABLED` enables the opt-in standalone `hello` sound replies (defaults to `false`)
+- `VOICE_WAKE_WORD_CONFIRM_SOUND_ENABLED` plays the wake-word confirmation sound when set to `true` (defaults to `false`)
 - `VOICE_LISTENER_BOT_TOKEN` optionally runs voice receive through a second Discord bot, recommended with Lavalink
 - `VOSK_MODEL_PATH` points to the local Vosk model directory
 - `VOICE_WAKE_PHRASE` defaults to `castle grooves`
-- `VOICE_COMMAND_PREFIX` defaults to `play`
 - `VOICE_CAPTURE_TIMEOUT_MS` limits each speech capture window
 - `VOICE_SILENCE_MS` controls how long silence ends a speech capture

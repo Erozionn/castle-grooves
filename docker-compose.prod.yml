@@ -16,6 +16,7 @@ services:
       WATCHTOWER_INCLUDE_RESTARTING: 'true'
       WATCHTOWER_POLL_INTERVAL: '300'
       WATCHTOWER_LABEL_ENABLE: 'true'
+      DOCKER_MIN_API_VERSION: '1.24'
       TZ: ${TZ:-America/Toronto}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

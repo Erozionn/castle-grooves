@@ -12,9 +12,13 @@ import {
 } from 'discord.js'
 import {
   AudioReceiveStream,
+  AudioPlayer,
   EndBehaviorType,
+  NoSubscriberBehavior,
   VoiceConnection,
   VoiceConnectionStatus,
+  createAudioPlayer,
+  createAudioResource,
   entersState,
   generateDependencyReport,
   getVoiceConnection,
@@ -22,8 +26,14 @@ import {
 } from '@discordjs/voice'
 import * as prism from 'prism-media'
 
-import { isLikelyWakePhrase, parseVoiceSongCommand } from '@utils/voiceCommandParser'
+import {
+  isLikelyWakePhrase,
+  normalizeSpeech,
+  parseVoiceCommand,
+  VoiceCommandAction,
+} from '@utils/voiceCommandParser'
 import { isNoTracksFoundError, queueSongQuery } from '@utils/queueSongQuery'
+import { useDJMode } from '@hooks/useDJMode'
 
 import type { MusicManager } from './MusicManager'
 
@@ -47,9 +57,10 @@ interface VoskModule {
 
 export interface VoiceCommandManagerOptions {
   enabled: boolean
+  helloResponsesEnabled: boolean
+  wakeWordConfirmSoundEnabled: boolean
   modelPath: string
   wakePhrase: string
-  commandPrefix: string
   captureTimeoutMs: number
   silenceMs: number
 }
@@ -61,7 +72,6 @@ export interface VoiceCommandSessionStatus {
   channelName: string
   receiverMode: 'listener-bot' | 'same-bot'
   wakePhrase: string
-  commandPrefix: string
   modelPath: string
   activeStreams: number
   lastTranscript?: string
@@ -79,11 +89,16 @@ interface VoiceCommandSession {
   voiceChannel: VoiceBasedChannel
   textChannel?: TextBasedChannel | null
   connection: VoiceConnection
+  voiceSoundPlayer?: AudioPlayer
   activeStreams: Map<string, ActiveSpeechStream>
+  helloResponseCooldowns: Map<string, number>
   lastTranscript?: string
   lastCommand?: string
   lastError?: string
 }
+
+const helloResponseCooldownMs = 15_000
+const helloResponseFileExtensions = new Set(['.mp3', '.ogg', '.wav', '.webm', '.m4a'])
 
 export class VoiceCommandManager {
   private client: Client
@@ -115,16 +130,16 @@ export class VoiceCommandManager {
     return this.options.wakePhrase
   }
 
-  get commandPrefix(): string {
-    return this.options.commandPrefix
-  }
-
   get modelPath(): string {
     return this.options.modelPath
   }
 
   get receiverMode(): 'listener-bot' | 'same-bot' {
     return this.listenerClient ? 'listener-bot' : 'same-bot'
+  }
+
+  private get voiceSoundsEnabled(): boolean {
+    return this.options.helloResponsesEnabled || this.options.wakeWordConfirmSoundEnabled
   }
 
   async enable(
@@ -152,16 +167,6 @@ export class VoiceCommandManager {
       console.warn('[VoiceCommandManager] Voice connection error:', error)
     })
 
-    connection.on('debug', (message) => {
-      console.log(`[VoiceCommandManager:${this.receiverMode}] ${message}`)
-    })
-
-    connection.on('stateChange', (oldState, newState) => {
-      console.log(
-        `[VoiceCommandManager:${this.receiverMode}] voice state ${oldState.status} -> ${newState.status}`
-      )
-    })
-
     connection.on(VoiceConnectionStatus.Disconnected, (_oldState, newState) => {
       const details = this.describeVoiceConnectionState(newState)
       const session = this.sessions.get(voiceChannel.guild.id)
@@ -185,7 +190,7 @@ export class VoiceCommandManager {
     }
 
     console.log(
-      `[VoiceCommandManager:${this.receiverMode}] ready in #${voiceChannel.name}; listening for "${this.options.wakePhrase} ${this.options.commandPrefix} <song>"`
+      `[VoiceCommandManager:${this.receiverMode}] ready in #${voiceChannel.name}; listening for add, pause, skip, and stop commands`
     )
 
     const session: VoiceCommandSession = {
@@ -194,6 +199,22 @@ export class VoiceCommandManager {
       textChannel,
       connection,
       activeStreams: new Map(),
+      helloResponseCooldowns: new Map(),
+    }
+
+    if (this.voiceSoundsEnabled) {
+      const voiceSoundPlayer = createAudioPlayer({
+        behaviors: {
+          noSubscriber: NoSubscriberBehavior.Stop,
+        },
+      })
+
+      voiceSoundPlayer.on('error', (error) => {
+        session.lastError = `Voice sound playback failed: ${error.message}`
+        console.warn('[VoiceCommandManager] Voice sound playback failed:', error)
+      })
+      session.voiceSoundPlayer = voiceSoundPlayer
+      connection.subscribe(voiceSoundPlayer)
     }
 
     connection.receiver.speaking.on('start', (userId) => {
@@ -223,6 +244,7 @@ export class VoiceCommandManager {
     }
 
     session.activeStreams.clear()
+    session.voiceSoundPlayer?.stop(true)
     session.connection.destroy()
     this.sessions.delete(guildId)
     return true
@@ -239,7 +261,6 @@ export class VoiceCommandManager {
       channelName: session.voiceChannel.name,
       receiverMode: this.receiverMode,
       wakePhrase: this.options.wakePhrase,
-      commandPrefix: this.options.commandPrefix,
       modelPath: this.resolveModelPath(),
       activeStreams: session.activeStreams.size,
       lastTranscript: session.lastTranscript,
@@ -275,8 +296,8 @@ export class VoiceCommandManager {
         guildId: voiceChannel.guild.id,
         adapterCreator: voiceChannel.guild.voiceAdapterCreator as any,
         selfDeaf: false,
-        selfMute: true,
-        debug: true,
+        selfMute: !this.voiceSoundsEnabled,
+        debug: false,
         daveEncryption: true,
         group: `same-bot-${this.client.user?.id || 'main'}`,
       })
@@ -317,13 +338,17 @@ export class VoiceCommandManager {
       throw new Error('Voice listener bot is missing Connect permission for that voice channel.')
     }
 
+    if (this.voiceSoundsEnabled && !permissions.has(PermissionsBitField.Flags.Speak)) {
+      throw new Error('Voice listener bot is missing Speak permission for that voice channel.')
+    }
+
     return joinVoiceChannel({
       channelId: voiceChannel.id,
       guildId: voiceChannel.guild.id,
       adapterCreator: listenerGuild.voiceAdapterCreator as any,
       selfDeaf: false,
-      selfMute: true,
-      debug: true,
+      selfMute: !this.voiceSoundsEnabled,
+      debug: false,
       daveEncryption: true,
       group: `voice-listener-${this.listenerClient.user?.id || 'listener'}`,
     })
@@ -344,10 +369,6 @@ export class VoiceCommandManager {
     const member = await this.resolveGuildMember(session, userId)
     if (!member || member.user.bot) return
 
-    console.log(
-      `[VoiceCommandManager:${this.receiverMode}] speech start from ${member.user.tag} (${userId})`
-    )
-
     const opusStream = session.connection.receiver.subscribe(userId, {
       end: {
         behavior: EndBehaviorType.AfterSilence,
@@ -364,9 +385,9 @@ export class VoiceCommandManager {
     session.activeStreams.set(userId, { opusStream, timeout })
 
     try {
-      let wakePhraseLogged = false
+      let wakePhraseDetected = false
       const transcript = await this.transcribeOpusStream(opusStream, (partialTranscript) => {
-        if (wakePhraseLogged) return
+        if (wakePhraseDetected) return
 
         const wakeDetected = isLikelyWakePhrase(partialTranscript, {
           wakePhrase: this.options.wakePhrase,
@@ -376,36 +397,135 @@ export class VoiceCommandManager {
 
         if (!wakeDetected) return
 
-        wakePhraseLogged = true
-        console.log(
-          `[VoiceCommandManager:${this.receiverMode}] fuzzy wake phrase detected from ${member.user.tag}: ${partialTranscript}`
-        )
+        wakePhraseDetected = true
+        this.playWakeWordSound(session)
       })
       Object.assign(session, { lastTranscript: transcript })
-      console.log(
-        `[VoiceCommandManager:${this.receiverMode}] transcript from ${member.user.tag}: ${transcript || '(empty)'}`
-      )
 
-      const command = parseVoiceSongCommand(transcript, {
-        wakePhrase: this.options.wakePhrase,
-        commandPrefix: this.options.commandPrefix,
-      })
-
-      if (!command) {
-        console.log(
-          `[VoiceCommandManager:${this.receiverMode}] transcript ignored; wake command did not match`
-        )
+      if (normalizeSpeech(transcript) === 'hello') {
+        Object.assign(session, { lastCommand: 'hello' })
+        this.playHelloResponse(session, userId)
         return
       }
 
-      Object.assign(session, { lastCommand: command.query })
-      console.log(
-        `[VoiceCommandManager:${this.receiverMode}] parsed voice command: ${command.query}`
-      )
-      await this.queueVoiceCommand(session, member, command.query)
+      const command = parseVoiceCommand(transcript, {
+        wakePhrase: this.options.wakePhrase,
+      })
+
+      if (!command) {
+        return
+      }
+
+      const commandLabel = command.query ? `${command.action} ${command.query}` : command.action
+      Object.assign(session, { lastCommand: commandLabel })
+      console.log(`[VoiceCommandManager:${this.receiverMode}] parsed voice command: ${command.action}`)
+      await this.executeVoiceCommand(session, member, command.action, command.query)
     } finally {
       clearTimeout(timeout)
       session.activeStreams.delete(userId)
+    }
+  }
+
+  private async executeVoiceCommand(
+    session: VoiceCommandSession,
+    member: GuildMember,
+    action: VoiceCommandAction,
+    query?: string
+  ): Promise<void> {
+    if (action === 'add') {
+      await this.queueVoiceCommand(session, member, query!)
+      return
+    }
+
+    const queue = this.musicManager.getQueue(session.guildId)
+
+    if (!queue || !queue.currentTrack) {
+      return
+    }
+
+    switch (action) {
+      case 'pause':
+        if (queue.isPaused) {
+          return
+        }
+
+        queue.pause()
+        return
+      case 'skip':
+        queue.skip()
+        return
+      case 'stop':
+        useDJMode(queue).stopDJMode()
+        queue.stop()
+        return
+    }
+  }
+
+  private playWakeWordSound(session: VoiceCommandSession): void {
+    if (!this.options.wakeWordConfirmSoundEnabled) return
+
+    const voiceSoundPlayer = session.voiceSoundPlayer
+    if (!voiceSoundPlayer || voiceSoundPlayer.state.status !== 'idle') return
+
+    const soundPath = this.resolveWakeWordSoundPath()
+    if (!fs.existsSync(soundPath)) {
+      session.lastError = `Wake sound file not found at ${soundPath}`
+      console.warn(`[VoiceCommandManager] ${session.lastError}`)
+      return
+    }
+
+    voiceSoundPlayer.play(createAudioResource(soundPath))
+  }
+
+  private playHelloResponse(session: VoiceCommandSession, userId: string): void {
+    if (!this.options.helloResponsesEnabled) return
+
+    const voiceSoundPlayer = session.voiceSoundPlayer
+    if (!voiceSoundPlayer) return
+
+    const lastResponseAt = session.helloResponseCooldowns.get(userId)
+    if (lastResponseAt && Date.now() - lastResponseAt < helloResponseCooldownMs) {
+      return
+    }
+
+    if (voiceSoundPlayer.state.status !== 'idle') return
+
+    const responseDirectory = this.resolveHelloResponseDirectory()
+    let responseFiles: string[]
+
+    try {
+      responseFiles = fs
+        .readdirSync(responseDirectory, { withFileTypes: true })
+        .filter(
+          (entry) =>
+            entry.isFile() && helloResponseFileExtensions.has(path.extname(entry.name).toLowerCase())
+        )
+        .map((entry) => entry.name)
+    } catch (error) {
+      session.lastError = `Unable to read hello responses: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+      console.warn(`[VoiceCommandManager] ${session.lastError}`)
+      return
+    }
+
+    if (!responseFiles.length) {
+      session.lastError = `No hello response audio files found in ${responseDirectory}`
+      console.warn(`[VoiceCommandManager] ${session.lastError}`)
+      return
+    }
+
+    const selectedFile = responseFiles[Math.floor(Math.random() * responseFiles.length)]
+    const selectedPath = path.join(responseDirectory, selectedFile)
+
+    try {
+      voiceSoundPlayer.play(createAudioResource(selectedPath))
+      session.helloResponseCooldowns.set(userId, Date.now())
+    } catch (error) {
+      session.lastError = `Hello response playback failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+      console.warn(`[VoiceCommandManager] ${session.lastError}`)
     }
   }
 
@@ -427,27 +547,13 @@ export class VoiceCommandManager {
       console.log(
         `[VoiceCommandManager:${this.receiverMode}] queued voice command result: ${title}`
       )
-      await this.sendTextNotice(session, `Voice command queued: ${title}`)
     } catch (error: any) {
       if (isNoTracksFoundError(error)) {
-        await this.sendTextNotice(session, `Voice command found no results for: ${query}`)
         return
       }
 
       Object.assign(session, { lastError: error instanceof Error ? error.message : String(error) })
       console.warn('[VoiceCommandManager] Failed to queue voice command:', error)
-      await this.sendTextNotice(session, 'Voice command failed while queueing the song.')
-    }
-  }
-
-  private async sendTextNotice(session: VoiceCommandSession, content: string): Promise<void> {
-    if (!session.textChannel || !('send' in session.textChannel)) return
-
-    try {
-      const message = await session.textChannel.send({ content })
-      setTimeout(() => message.delete().catch(() => {}), 5000)
-    } catch (error) {
-      Object.assign(session, { lastError: error instanceof Error ? error.message : String(error) })
     }
   }
 
@@ -563,6 +669,14 @@ export class VoiceCommandManager {
 
   private resolveModelPath(): string {
     return path.resolve(process.cwd(), this.options.modelPath)
+  }
+
+  private resolveWakeWordSoundPath(): string {
+    return path.resolve(process.cwd(), 'assets', 'audio', 'wake_word_confirm.ogg')
+  }
+
+  private resolveHelloResponseDirectory(): string {
+    return path.resolve(process.cwd(), 'assets', 'audio', 'hello-responses')
   }
 
   private async resolveGuildMember(

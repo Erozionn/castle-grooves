@@ -32,6 +32,7 @@ mockNowPlayingMulti.png
 public/musicplayer.png
 influx-backup
 lavalink/logs
+assets/audio/hello-responses
 
 # Large local speech models are mounted at runtime
 models

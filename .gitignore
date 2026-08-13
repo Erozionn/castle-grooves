@@ -127,3 +127,5 @@ models/
 
 # Local Lavalink plugin jars; application.yml declares plugin dependencies.
 lavalink/plugins/
+
+hello-responses/
