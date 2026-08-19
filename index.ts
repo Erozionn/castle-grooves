@@ -100,6 +100,10 @@ const voiceCommandManager = new VoiceCommandManager(
 // Attach manager instances to the Discord client.
 client.musicManager = musicManager
 client.voiceCommandManager = voiceCommandManager
+musicManager.isVoiceCommandsEnabled = (guildId) => Boolean(voiceCommandManager.getStatus(guildId))
+musicManager.disableVoiceCommands = (guildId) => {
+  voiceCommandManager.disable(guildId)
+}
 
 client.commands = new Collection<string, CommandObject['default']>()
 
@@ -245,6 +249,9 @@ client.on('voiceStateUpdate', (oldState, newState) => recordVoiceStateChange(old
 musicManager.on('playerStart', playSongEventHandler)
 musicManager.on('audioTrackAdd', addSongEventHandler)
 musicManager.on('audioTracksAdd', addSongEventHandler) // For playlists
+musicManager.on('disconnect', (queue) => {
+  voiceCommandManager.disable(queue.guildId)
+})
 musicManager.on('disconnect', disconnectEventHandler)
 musicManager.on('emptyQueue', emptyEventHandler)
 musicManager.on('emptyQueue', songFinishEventHandler)

@@ -507,6 +507,7 @@ export class MusicQueue {
    * Destroy queue and disconnect
    */
   destroy(): void {
+    this.manager.disableVoiceCommands(this.guildId)
     this.stop()
 
     if (this.player) {

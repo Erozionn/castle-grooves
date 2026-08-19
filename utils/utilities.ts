@@ -1,9 +1,41 @@
 import crypto from 'crypto'
 
 const splitAtClosestSpace = (str: string, charsPerLine: number) => {
-  const c = charsPerLine || 10
-  const regex = new RegExp(`.{${c}}\\S*\\s+`, 'g')
-  return str.replace(regex, '$&@').split(/\s+@/)
+  const maxChars = Math.max(charsPerLine || 10, 1)
+  const words = str.trim().split(/\s+/).filter(Boolean)
+  const lines: string[] = []
+  let line = ''
+
+  const addWord = (word: string) => {
+    if (!line) {
+      if (word.length <= maxChars) {
+        line = word
+        return
+      }
+
+      let remainingWord = word
+      while (remainingWord.length > maxChars) {
+        lines.push(remainingWord.slice(0, maxChars))
+        remainingWord = remainingWord.slice(maxChars)
+      }
+      line = remainingWord
+      return
+    }
+
+    if (`${line} ${word}`.length <= maxChars) {
+      line = `${line} ${word}`
+      return
+    }
+
+    lines.push(line)
+    line = ''
+    addWord(word)
+  }
+
+  words.forEach(addWord)
+  if (line) lines.push(line)
+
+  return lines
 }
 
 export const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()

@@ -418,7 +418,9 @@ export class VoiceCommandManager {
 
       const commandLabel = command.query ? `${command.action} ${command.query}` : command.action
       Object.assign(session, { lastCommand: commandLabel })
-      console.log(`[VoiceCommandManager:${this.receiverMode}] parsed voice command: ${command.action}`)
+      console.log(
+        `[VoiceCommandManager:${this.receiverMode}] parsed voice command: ${command.action}`
+      )
       await this.executeVoiceCommand(session, member, command.action, command.query)
     } finally {
       clearTimeout(timeout)
@@ -469,8 +471,10 @@ export class VoiceCommandManager {
 
     const soundPath = this.resolveWakeWordSoundPath()
     if (!fs.existsSync(soundPath)) {
-      session.lastError = `Wake sound file not found at ${soundPath}`
-      console.warn(`[VoiceCommandManager] ${session.lastError}`)
+      const errorMessage = `Wake sound file not found at ${soundPath}`
+      // eslint-disable-next-line no-param-reassign
+      session.lastError = errorMessage
+      console.warn(`[VoiceCommandManager] ${errorMessage}`)
       return
     }
 
@@ -492,26 +496,30 @@ export class VoiceCommandManager {
 
     const responseDirectory = this.resolveHelloResponseDirectory()
     let responseFiles: string[]
+    // eslint-disable-next-line no-param-reassign
+
+    const mutableSession = session
 
     try {
       responseFiles = fs
         .readdirSync(responseDirectory, { withFileTypes: true })
         .filter(
           (entry) =>
-            entry.isFile() && helloResponseFileExtensions.has(path.extname(entry.name).toLowerCase())
+            entry.isFile() &&
+            helloResponseFileExtensions.has(path.extname(entry.name).toLowerCase())
         )
         .map((entry) => entry.name)
     } catch (error) {
-      session.lastError = `Unable to read hello responses: ${
+      mutableSession.lastError = `Unable to read hello responses: ${
         error instanceof Error ? error.message : String(error)
       }`
-      console.warn(`[VoiceCommandManager] ${session.lastError}`)
+      console.warn(`[VoiceCommandManager] ${mutableSession.lastError}`)
       return
     }
 
     if (!responseFiles.length) {
-      session.lastError = `No hello response audio files found in ${responseDirectory}`
-      console.warn(`[VoiceCommandManager] ${session.lastError}`)
+      mutableSession.lastError = `No hello response audio files found in ${responseDirectory}`
+      console.warn(`[VoiceCommandManager] ${mutableSession.lastError}`)
       return
     }
 
@@ -520,12 +528,12 @@ export class VoiceCommandManager {
 
     try {
       voiceSoundPlayer.play(createAudioResource(selectedPath))
-      session.helloResponseCooldowns.set(userId, Date.now())
+      mutableSession.helloResponseCooldowns.set(userId, Date.now())
     } catch (error) {
-      session.lastError = `Hello response playback failed: ${
+      mutableSession.lastError = `Hello response playback failed: ${
         error instanceof Error ? error.message : String(error)
       }`
-      console.warn(`[VoiceCommandManager] ${session.lastError}`)
+      console.warn(`[VoiceCommandManager] ${mutableSession.lastError}`)
     }
   }
 

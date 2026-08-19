@@ -25,6 +25,7 @@ GlobalFonts.registerFromPath(path.resolve('./assets/fonts/Poppins-Bold.ttf'), 'P
 
 type CanvasOptions = {
   currentTrackDislikes?: number
+  playlistTitle?: string
 }
 
 let thumbsDownIconPromise: Promise<Awaited<ReturnType<typeof loadImage>>> | null = null
@@ -81,6 +82,54 @@ const renderDislikeBadge = async (canvas: Canvas, dislikeCount = 0, anchorX = 26
   canv.restore()
 }
 
+const playlistTitleCharsPerLine = 21
+const playlistTitleLineHeight = 24
+const playlistTitleTopPadding = 5
+const playlistTitleBottomPadding = 5
+
+const getPlaylistBannerHeight = (playlistTitle: string | undefined) => {
+  if (!playlistTitle) return 0
+
+  const lineCount = Math.min(
+    splitAtClosestSpace(playlistTitle, playlistTitleCharsPerLine).length,
+    2
+  )
+  return playlistTitleTopPadding + lineCount * playlistTitleLineHeight + playlistTitleBottomPadding
+}
+
+const renderPlaylistTitle = (
+  canvas: Canvas,
+  playlistTitle: string | undefined,
+  x: number,
+  y: number,
+  width: number,
+  height: number
+) => {
+  if (!playlistTitle) return
+
+  const canv = canvas.getContext('2d')
+  const lines = splitAtClosestSpace(playlistTitle, playlistTitleCharsPerLine).slice(0, 2)
+  const maxTextWidth = Math.max(width - 16, 1)
+
+  canv.font = '600 22px Poppins'
+  const widestLine = Math.max(...lines.map((line) => canv.measureText(line).width))
+  const fontSize = Math.max(10, Math.min(22, Math.floor((22 * maxTextWidth) / widestLine)))
+
+  canv.fillStyle = 'rgba(0, 0, 0, 0.45)'
+  canv.fillRect(x, y, width, height)
+
+  renderMultiLineTitle(canvas, playlistTitle, {
+    fillStyle: '#ffffff',
+    y: y + playlistTitleTopPadding + 22,
+    font: `600 ${fontSize}px Poppins`,
+    charsPerLine: playlistTitleCharsPerLine,
+    lineHeight: playlistTitleLineHeight,
+    maxLines: 2,
+    centerX: x,
+    centerWidth: width,
+  })
+}
+
 const getThumbnailUrl = (song: LavalinkTrack) => {
   // Check if artworkUrl is provided by Lavalink
   if (song.info.artworkUrl) {
@@ -112,6 +161,9 @@ const renderMultiLineTitle = (
     textAlign?: CanvasTextAlign
     charsPerLine?: number
     lineHeight?: number
+    maxLines?: number
+    centerX?: number
+    centerWidth?: number
     font: string
     fillStyle: CanvasFillStrokeStyles['fillStyle']
   }
@@ -125,7 +177,7 @@ const renderMultiLineTitle = (
   const x = options.x || 30
   const lineHeight = options.lineHeight || 30
 
-  const multiLineArray = splitAtClosestSpace(str, charsPerLine)
+  const multiLineArray = splitAtClosestSpace(str, charsPerLine).slice(0, options.maxLines)
 
   let textBoxWidth = 0
 
@@ -135,7 +187,9 @@ const renderMultiLineTitle = (
     textBoxWidth = lineWidth > textBoxWidth ? lineWidth : textBoxWidth
   }
 
-  const xCentered = (320 - textBoxWidth) / 2 + textBoxWidth / 2
+  const centerX = options.centerX || 0
+  const centerWidth = options.centerWidth || 320
+  const xCentered = centerX + (centerWidth - textBoxWidth) / 2 + textBoxWidth / 2
 
   // render the text
   for (let i = 0; i < multiLineArray.length; i++) {
@@ -162,6 +216,8 @@ export const nowPlayingCanvasWithUpNext = async (
   let thumbnailX = 25
   const thumbnailY = 25
   let thumbnailWidth = 270
+  const playlistBannerHeight = getPlaylistBannerHeight(options?.playlistTitle)
+  const artworkHeight = 169 - playlistBannerHeight
 
   try {
     if (thumbnailUrl) {
@@ -176,17 +232,26 @@ export const nowPlayingCanvasWithUpNext = async (
       canv.fillStyle = 'rgba(0, 0, 0, 0.4)'
       canv.fillRect(0, 0, 700, 394)
       canv.fillStyle = 'rgba(255, 255, 255, 1)'
-      canv.fillRect(320, 25, 1, 344)
+      canv.fillRect(320, thumbnailY, 1, 344)
 
       // Render Thumbnail
-      const _width = Math.min(169 * (thumbnail.width / thumbnail.height), 270)
+      const _width = Math.min(artworkHeight * (thumbnail.width / thumbnail.height), 270)
       thumbnailX = 160 - _width / 2
       thumbnailWidth = _width
-      canv.drawImage(thumbnail, thumbnailX, thumbnailY, _width, 169)
+      canv.drawImage(thumbnail, thumbnailX, thumbnailY + playlistBannerHeight, _width, artworkHeight)
     }
   } catch (e) {
     console.warn('[ThumbnailError] ', e)
   }
+
+  renderPlaylistTitle(
+    canvas,
+    options?.playlistTitle,
+    thumbnailX,
+    thumbnailY,
+    thumbnailWidth,
+    playlistBannerHeight
+  )
 
   // Split artist and title
   let { author: artist, title } = song.info
@@ -319,7 +384,7 @@ export const nowPlayingCanvasWithUpNext = async (
     canvas,
     options?.currentTrackDislikes || 0,
     thumbnailX + thumbnailWidth - 16,
-    thumbnailY + 16
+    thumbnailY + playlistBannerHeight + 16
   )
 
   // Buffer canvas
@@ -338,11 +403,13 @@ export const nowPlayingCanvas = async (
 
   let _width = 0
   const thumbnailY = 0
+  const playlistBannerHeight = getPlaylistBannerHeight(options?.playlistTitle)
+  const artworkHeight = 169 - playlistBannerHeight
 
   try {
     if (thumbnailUrl) {
       const thumbnail = await loadImage(thumbnailUrl)
-      _width = 169 * (thumbnail.width / thumbnail.height)
+      _width = artworkHeight * (thumbnail.width / thumbnail.height)
 
       // Blur thumbnail for background
       canv.filter = 'blur(32px)'
@@ -353,11 +420,21 @@ export const nowPlayingCanvas = async (
       canv.fillStyle = 'rgba(0, 0, 0, 0.4)'
       canv.fillRect(0, 0, 700, 169)
       // Render Thumbnail
-      canv.drawImage(thumbnail, 0, 0, _width, 169)
+      canv.drawImage(thumbnail, 0, thumbnailY + playlistBannerHeight, _width, artworkHeight)
     }
   } catch (e) {
     console.warn('[ThumbnailError]', e)
   }
+
+  const visibleThumbnailWidth = _width > 0 ? _width : 169
+  renderPlaylistTitle(
+    canvas,
+    options?.playlistTitle,
+    0,
+    thumbnailY,
+    visibleThumbnailWidth,
+    playlistBannerHeight
+  )
 
   // Split artist and title
   let { author: artist, title } = song.info
@@ -411,7 +488,11 @@ export const nowPlayingCanvas = async (
     canv.fillStyle = '#ffffff'
     canv.textAlign = 'left'
     canv.font = '600 18px Poppins'
-    canv.fillText(capitalize(requestedBy.user.username), _width + 25 + 32 + 12, 139)
+    canv.fillText(
+      capitalize(requestedBy.user.username),
+      _width + 25 + 32 + 12,
+      139
+    )
 
     if (isLocal) {
       const isLocalIcon = await loadImage('./assets/icons/downloaded.png')
@@ -419,12 +500,11 @@ export const nowPlayingCanvas = async (
     }
   }
 
-  const visibleThumbnailWidth = _width > 0 ? _width : 169
   await renderDislikeBadge(
     canvas,
     options?.currentTrackDislikes || 0,
     visibleThumbnailWidth - 16,
-    thumbnailY + 16
+    thumbnailY + playlistBannerHeight + 16
   )
 
   // Buffer canvas
@@ -468,6 +548,8 @@ const processTracks = async (tracks: LavalinkTrack[], options?: CanvasOptions): 
   const resolvedOptions: CanvasOptions = {
     currentTrackDislikes:
       options?.currentTrackDislikes ?? (await getSongDislikeCount(tracks[0].info.identifier)),
+    playlistTitle:
+      tracks.length > 1 ? options?.playlistTitle ?? tracks[0].userData?.playlistTitle : undefined,
   }
 
   if (tracks.length > 1) {

@@ -29,9 +29,7 @@
 | **/skip**           |          Skip to the current song          |                                 |
 | **/top-songs list** |     Lists top songs for server or user     | \<number> \<time-range> \<user> |
 | **/top-songs play** |     Plays top songs for server or user     | \<number> \<time-range> \<user> |
-| **/voice enable**   | Start experimental voice command listening |                                 |
-| **/voice disable**  | Stop experimental voice command listening  |                                 |
-| **/voice status**   |    Show voice command listening status     |                                 |
+| **/voice**          |    Show voice command listening status     |                                 |
 
 ## Install
 
@@ -72,7 +70,7 @@ yarn docker:build
 
 ## Experimental Voice Commands
 
-Voice commands are disabled by default. Set `VOICE_COMMANDS_ENABLED=true`, join a Discord voice channel, then run `/voice enable`. For Lavalink setups, set `VOICE_LISTENER_BOT_TOKEN` to a second Discord bot token and invite that listener bot to the same server so audio receive does not fight the music bot voice connection. Say `castle grooves add <song query>` to queue music, or say `castle grooves pause`, `castle grooves skip`, or `castle grooves stop` to control playback. `play <song query>` remains supported as an alias for `add`.
+Voice commands are disabled by default. Set `VOICE_COMMANDS_ENABLED=true`, join a Discord voice channel, then use the `Voice: Off` button beside the thumbs-down button to toggle listening. For Lavalink setups, set `VOICE_LISTENER_BOT_TOKEN` to a second Discord bot token and invite that listener bot to the same server so audio receive does not fight the music bot voice connection. Say `castle grooves add <song query>` to queue music, or say `castle grooves pause`, `castle grooves skip`, or `castle grooves stop` to control playback. `play <song query>` remains supported as an alias for `add`.
 
 Hello replies are an opt-in joke feature. Set `VOICE_HELLO_RESPONSES_ENABLED=true` to respond to a standalone `hello` with a random sound (15-second per-user cooldown). Docker deployments download and persist the ignored `assets/audio/hello-responses/` files automatically; non-Docker setups can run `yarn download:hello-sounds`. Use only sounds you are permitted to download and use.
 
@@ -92,7 +90,7 @@ Vosk model files are not committed to this repository. Download an English small
 - `INFLUX_TOKEN` is your InfluxDB Access Token
 - `WEBSERVER_PORT` is the port for the integrated API
 - `DOCKER_HUB_USERNAME` is required for production Docker Compose pulls
-- `VOICE_COMMANDS_ENABLED` enables the experimental `/voice` commands when set to `true`
+- `VOICE_COMMANDS_ENABLED` enables the experimental voice toggle when set to `true`
 - `VOICE_HELLO_RESPONSES_ENABLED` enables the opt-in standalone `hello` sound replies (defaults to `false`)
 - `VOICE_WAKE_WORD_CONFIRM_SOUND_ENABLED` plays the wake-word confirmation sound when set to `true` (defaults to `false`)
 - `VOICE_LISTENER_BOT_TOKEN` optionally runs voice receive through a second Discord bot, recommended with Lavalink
