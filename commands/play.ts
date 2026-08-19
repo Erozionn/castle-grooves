@@ -7,9 +7,44 @@ import {
 
 import { isUrl, parseSongName } from '@utils/utilities'
 import { isNoTracksFoundError, queueSongQuery } from '@utils/queueSongQuery'
+import { logLatency, startLatencyTimer } from '@utils/latency'
 import type { ClientType } from '@types'
 
 import type { LavalinkTrack } from '../lib'
+
+interface AutocompleteChoice {
+  name: string
+  value: string
+}
+
+const AUTOCOMPLETE_CACHE_TTL_MS = 30_000
+const AUTOCOMPLETE_REQUEST_INTERVAL_MS = 250
+const autocompleteCache = new Map<string, { choices: AutocompleteChoice[]; expiresAt: number }>()
+const lastAutocompleteRequest = new Map<string, number>()
+
+const filterChoices = (choices: AutocompleteChoice[], query: string) => {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean)
+  return choices
+    .filter((choice) => words.every((word) => choice.name.toLowerCase().includes(word)))
+    .slice(0, 25)
+}
+
+const getCachedChoices = (query: string): AutocompleteChoice[] | null => {
+  const now = Date.now()
+  let bestMatch: { key: string; choices: AutocompleteChoice[] } | null = null
+
+  for (const [key, entry] of autocompleteCache) {
+    if (entry.expiresAt <= now) {
+      autocompleteCache.delete(key)
+      continue
+    }
+    if (query.startsWith(key) && (!bestMatch || key.length > bestMatch.key.length)) {
+      bestMatch = { key, choices: entry.choices }
+    }
+  }
+
+  return bestMatch ? filterChoices(bestMatch.choices, query) : null
+}
 
 const deleteReplySoon = (interaction: ChatInputCommandInteraction, delay = 3000) => {
   setTimeout(
@@ -49,6 +84,24 @@ export default {
       return
     }
 
+    const cacheKey = focusedValue.trim().toLowerCase()
+    const cachedChoices = getCachedChoices(cacheKey)
+    if (cachedChoices) {
+      await interaction.respond(cachedChoices).catch(() => {})
+      return
+    }
+
+    // Discord sends an interaction for every keystroke. A tiny per-user
+    // throttle prevents overlapping Lavalink searches without delaying cached results.
+    const requestKey = `${interaction.guildId || 'dm'}:${interaction.user.id}`
+    const now = Date.now()
+    const lastRequestAt = lastAutocompleteRequest.get(requestKey) || 0
+    if (now - lastRequestAt < AUTOCOMPLETE_REQUEST_INTERVAL_MS) {
+      await interaction.respond([]).catch(() => {})
+      return
+    }
+    lastAutocompleteRequest.set(requestKey, now)
+
     try {
       // Use focused value or fallback to a default search
       const searchQuery = focusedValue || 'popular music'
@@ -58,9 +111,11 @@ export default {
         setTimeout(() => resolve(null), 2500)
       })
 
+      const searchStartedAt = startLatencyTimer()
       const searchPromise = musicManager.search(searchQuery, { source: 'ytsearch' })
 
       const searchResults = await Promise.race([searchPromise, timeoutPromise])
+      logLatency('autocomplete.search', searchStartedAt, { timedOut: !searchResults })
 
       // If timed out or no results, respond with empty array
       if (
@@ -93,19 +148,19 @@ export default {
           }
         })
 
-      const splitValue = focusedValue.split(' ')
-
       // Remove duplicates and filter by search query words
-      interface Choice {
-        name: string
-        value: string
+      const uniqueChoices = [
+        ...new Map(choices.map((item: AutocompleteChoice) => [item.value, item])).values(),
+      ]
+      autocompleteCache.set(cacheKey, {
+        choices: uniqueChoices,
+        expiresAt: Date.now() + AUTOCOMPLETE_CACHE_TTL_MS,
+      })
+      if (autocompleteCache.size > 100) {
+        const oldestKey = autocompleteCache.keys().next().value
+        if (oldestKey) autocompleteCache.delete(oldestKey)
       }
-
-      const filtered = [...new Map(choices.map((item: Choice) => [item.value, item])).values()]
-        .filter((choice: Choice) =>
-          splitValue.some((word) => choice.name.toLowerCase().includes(word.toLowerCase()))
-        )
-        .slice(0, 25)
+      const filtered = filterChoices(uniqueChoices, cacheKey)
 
       await interaction.respond(filtered).catch(() => {
         // Interaction may have already expired, silently fail
@@ -124,7 +179,9 @@ export default {
   async execute(interaction: ChatInputCommandInteraction) {
     if (!interaction.isChatInputCommand()) return
 
+    const commandStartedAt = startLatencyTimer()
     await interaction.deferReply()
+    logLatency('play.defer-reply', commandStartedAt)
 
     const musicManager = (interaction.client as ClientType).musicManager
     const { member } = interaction
@@ -145,12 +202,17 @@ export default {
     console.log(`[playCommand] Playing: "${songName}"`)
 
     try {
+      const queueStartedAt = startLatencyTimer()
       const result = await queueSongQuery({
         musicManager,
         voiceChannel,
         query: songName,
         requestedBy: member as GuildMember,
         textChannel: interaction.channel,
+      })
+      logLatency('play.queue-song', queueStartedAt, {
+        createdQueue: result.createdQueue,
+        playlist: result.playlist,
       })
 
       if (result.firstTrack?.info) {
@@ -161,6 +223,7 @@ export default {
       }
 
       deleteReplySoon(interaction, 1500)
+      logLatency('play.total', commandStartedAt)
     } catch (e: any) {
       if (e instanceof Error && e.name === 'AbortError') {
         console.warn('[playCommand] Operation was aborted - likely due to timeout or cancellation')

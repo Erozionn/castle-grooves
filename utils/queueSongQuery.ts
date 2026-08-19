@@ -88,9 +88,9 @@ export const queueSongQuery = async ({
       ? searchResult.tracks
       : [searchResult.tracks[0]]
 
-  for (const track of tracks) {
-    await existingQueue.addTrack(setRequester(track, requestedBy))
-  }
+  // One queue event for a playlist/batch prevents an expensive dashboard render
+  // for every individual track.
+  await existingQueue.addTracks(tracks.map((track) => setRequester(track, requestedBy)))
 
   if (!existingQueue.isPlaying && !existingQueue.currentTrack) {
     await existingQueue.play()

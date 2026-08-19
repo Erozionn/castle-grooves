@@ -30,6 +30,7 @@ services:
       WEBSERVER_PORT: ${WEBSERVER_PORT:-1337}
       NOW_PLAYING_MOCK_DATA: ${NOW_PLAYING_MOCK_DATA:-false}
       PRELOAD_SONG_DATA: ${PRELOAD_SONG_DATA:-true}
+      PERF_LOGGING: ${PERF_LOGGING:-false}
     depends_on:
       lavalink:
         condition: service_healthy

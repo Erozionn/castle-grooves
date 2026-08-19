@@ -28,7 +28,31 @@ type CanvasOptions = {
   playlistTitle?: string
 }
 
+type LoadedImage = Awaited<ReturnType<typeof loadImage>>
+
 let thumbsDownIconPromise: Promise<Awaited<ReturnType<typeof loadImage>>> | null = null
+const imageCache = new Map<string, Promise<LoadedImage>>()
+const IMAGE_CACHE_LIMIT = 200
+
+// Artwork and avatar URLs are immutable/versioned in normal Discord and YouTube
+// usage. Caching them avoids a new HTTP request for every dashboard refresh.
+const loadCachedImage = (source: string): Promise<LoadedImage> => {
+  const cached = imageCache.get(source)
+  if (cached) return cached
+
+  const imagePromise = loadImage(source).catch((error) => {
+    imageCache.delete(source)
+    throw error
+  })
+  imageCache.set(source, imagePromise)
+
+  if (imageCache.size > IMAGE_CACHE_LIMIT) {
+    const oldestKey = imageCache.keys().next().value
+    if (oldestKey) imageCache.delete(oldestKey)
+  }
+
+  return imagePromise
+}
 
 const getThumbsDownIcon = () => {
   thumbsDownIconPromise ??= loadImage('./assets/icons/thumbs-down.svg')
@@ -221,7 +245,7 @@ export const nowPlayingCanvasWithUpNext = async (
 
   try {
     if (thumbnailUrl) {
-      const thumbnail = await loadImage(thumbnailUrl)
+      const thumbnail = await loadCachedImage(thumbnailUrl)
 
       // Blur thumbnail for background
       canv.filter = 'blur(32px)'
@@ -303,7 +327,9 @@ export const nowPlayingCanvasWithUpNext = async (
     canv.clip()
 
     try {
-      const avatar = await loadImage(requestedBy.displayAvatarURL({ extension: 'png', size: 64 }))
+      const avatar = await loadCachedImage(
+        requestedBy.displayAvatarURL({ extension: 'png', size: 64 })
+      )
       canv.drawImage(avatar, 25, 343, 32, 32)
     } catch (e) {
       console.warn('[AvatarError] ', e)
@@ -327,7 +353,7 @@ export const nowPlayingCanvasWithUpNext = async (
       const pics = await Promise.all(
         songs.slice(1, 7).map((s) => {
           return s.userData?.requestedBy
-            ? loadImage(s.userData.requestedBy.displayAvatarURL({ extension: 'png', size: 64 }))
+            ? loadCachedImage(s.userData.requestedBy.displayAvatarURL({ extension: 'png', size: 64 }))
             : null
         })
       )
@@ -350,7 +376,7 @@ export const nowPlayingCanvasWithUpNext = async (
     }
   }
 
-  await songs.slice(1, 6).forEach(async (songObj, index) => {
+  for (const [index, songObj] of songs.slice(1, 6).entries()) {
     const i = index + 1
     canv.fillStyle = `#ffffff`
     canv.font = '300 22px Poppins'
@@ -385,7 +411,7 @@ export const nowPlayingCanvasWithUpNext = async (
     //   canv.fillRect(345, 60 + 66 * i, 325, 1)
     //   canv.fillStyle = `#ffffff`
     // }
-  })
+  }
 
   await renderDislikeBadge(
     canvas,
@@ -415,7 +441,7 @@ export const nowPlayingCanvas = async (
 
   try {
     if (thumbnailUrl) {
-      const thumbnail = await loadImage(thumbnailUrl)
+      const thumbnail = await loadCachedImage(thumbnailUrl)
       _width = artworkHeight * (thumbnail.width / thumbnail.height)
 
       // Blur thumbnail for background
@@ -483,7 +509,9 @@ export const nowPlayingCanvas = async (
     canv.clip()
 
     try {
-      const avatar = await loadImage(requestedBy.displayAvatarURL({ extension: 'png', size: 64 }))
+      const avatar = await loadCachedImage(
+        requestedBy.displayAvatarURL({ extension: 'png', size: 64 })
+      )
       canv.drawImage(avatar, _width + 25, 117, 32, 32)
     } catch (e) {
       console.warn('[AvatarError]', e)
@@ -514,33 +542,10 @@ export const nowPlayingCanvas = async (
   return await canvas.toBuffer('image/png')
 }
 
-let lastExecutionTime = 0
-let debounceTimeout: NodeJS.Timeout | null = null
-
 export const generateNowPlayingCanvas = async (
   tracks: LavalinkTrack[],
   options?: CanvasOptions
-): Promise<Buffer> => {
-  const now = Date.now()
-  const cooldown = 1000
-
-  if (now - lastExecutionTime < cooldown) {
-    if (debounceTimeout) clearTimeout(debounceTimeout)
-
-    return new Promise((resolve) => {
-      debounceTimeout = setTimeout(
-        async () => {
-          lastExecutionTime = Date.now()
-          resolve(await processTracks(tracks, options))
-        },
-        cooldown - (now - lastExecutionTime)
-      )
-    })
-  }
-
-  lastExecutionTime = now
-  return await processTracks(tracks, options)
-}
+): Promise<Buffer> => processTracks(tracks, options)
 
 const processTracks = async (tracks: LavalinkTrack[], options?: CanvasOptions): Promise<Buffer> => {
   if (!tracks || tracks.length < 1)

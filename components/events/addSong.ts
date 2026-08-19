@@ -1,7 +1,5 @@
-import { useComponents } from '@constants/messageComponents'
-import { sendMessage } from '@utils/mainMessage'
-import { generateNowPlayingCanvas } from '@utils/nowPlayingCanvas'
 import { triggerTrackAdd } from '@utils/djTriggers'
+import { scheduleNowPlayingMessage } from '@utils/nowPlayingMessage'
 
 import type { MusicQueue, LavalinkTrack } from '../../lib'
 
@@ -14,9 +12,6 @@ export default async (queue: MusicQueue, track: LavalinkTrack | LavalinkTrack[])
     return
   }
 
-  const components = await useComponents(queue)
-  const { channel } = queue.metadata
-
   const log = (track: LavalinkTrack) =>
     console.log(
       `[addSong] Adding song: ${track.info.title?.substring(0, 90)} ${track.info.author.substring(0, 90)}`
@@ -28,21 +23,5 @@ export default async (queue: MusicQueue, track: LavalinkTrack | LavalinkTrack[])
     log(track)
   }
 
-  if (queue.tracks.length + (queue.currentTrack ? 1 : 0) >= 1 && channel) {
-    const tracks = [...queue.tracks]
-    if (queue.currentTrack) tracks.unshift(queue.currentTrack)
-
-    console.log(`[addSong] Generating canvas with ${tracks.length} tracks`)
-    const buffer = await generateNowPlayingCanvas(tracks)
-    if (!channel || !channel.isTextBased() || !('guild' in channel)) return
-
-    await sendMessage(channel, {
-      files: [buffer],
-      components,
-    })
-  } else {
-    console.log(
-      `[addSong] Not generating canvas - tracks: ${queue.tracks.length}, currentTrack: ${!!queue.currentTrack}, channel: ${!!channel}`
-    )
-  }
+  scheduleNowPlayingMessage(queue)
 }
