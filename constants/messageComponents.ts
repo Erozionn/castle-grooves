@@ -9,6 +9,7 @@ import {
 
 import { generateHistoryOptions } from '@utils/songHistoryV2'
 import { useDJMode } from '@hooks/useDJMode'
+import ENV from '@constants/Env'
 
 import { MusicQueue } from '../lib'
 
@@ -38,6 +39,24 @@ const defaultPlayerButtons = {
     .setStyle(ButtonStyle.Secondary)
     .setDisabled(true)
     .setEmoji('👎'),
+  voice: new ButtonBuilder()
+    .setCustomId('voice_button')
+    .setStyle(ButtonStyle.Secondary)
+    .setDisabled(!ENV.VOICE_COMMANDS_ENABLED)
+    .setLabel('Voice: Off')
+    .setEmoji('🎙️'),
+  topSongs: new ButtonBuilder()
+    .setCustomId('top_songs_button')
+    .setStyle(ButtonStyle.Secondary)
+    .setDisabled(false)
+    .setLabel('My Top 10')
+    .setEmoji('🏆'),
+  radio: new ButtonBuilder()
+    .setCustomId('radio_button')
+    .setStyle(ButtonStyle.Secondary)
+    .setDisabled(false)
+    .setLabel('Radio')
+    .setEmoji('📻'),
   dj: new ButtonBuilder()
     .setCustomId('dj_button')
     .setStyle(ButtonStyle.Secondary)
@@ -60,6 +79,12 @@ const resetToDefaults = () => {
     .setDisabled(false)
     .setEmoji('lightninganimated:1418830322996351027')
   defaultPlayerButtons.dislike.setStyle(ButtonStyle.Secondary).setDisabled(true).setEmoji('👎')
+  defaultPlayerButtons.voice
+    .setStyle(ButtonStyle.Secondary)
+    .setDisabled(!ENV.VOICE_COMMANDS_ENABLED)
+    .setLabel('Voice: Off')
+  defaultPlayerButtons.topSongs.setStyle(ButtonStyle.Secondary).setDisabled(false)
+  defaultPlayerButtons.radio.setStyle(ButtonStyle.Secondary).setDisabled(false)
   defaultPlayerButtons.stop
     .setStyle(ButtonStyle.Danger)
     .setDisabled(false)
@@ -71,7 +96,7 @@ const resetToDefaults = () => {
     .setEmoji('lightninganimated:1418830322996351027')
 }
 
-export const useComponents = async (queue?: MusicQueue) => {
+export const useComponents = async (queue?: MusicQueue, voiceCommandsEnabled?: boolean) => {
   console.log('[useComponents] Starting...')
   const playerButtons = defaultPlayerButtons
 
@@ -82,6 +107,14 @@ export const useComponents = async (queue?: MusicQueue) => {
     .setPlaceholder('-- Song History --')
 
   resetToDefaults()
+
+  const isVoiceCommandsEnabled =
+    voiceCommandsEnabled ?? (queue ? queue.manager.isVoiceCommandsEnabled(queue.guildId) : false)
+
+  playerButtons.voice
+    .setStyle(isVoiceCommandsEnabled ? ButtonStyle.Success : ButtonStyle.Secondary)
+    .setDisabled(!ENV.VOICE_COMMANDS_ENABLED)
+    .setLabel(isVoiceCommandsEnabled ? 'Voice: On' : 'Voice: Off')
 
   console.log('[useComponents] Calling generateHistoryOptions...')
   const { options } = await generateHistoryOptions()
@@ -123,6 +156,13 @@ export const useComponents = async (queue?: MusicQueue) => {
   const feedbackActionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
     playerButtons.dislike
   )
+
+  if (ENV.VOICE_COMMANDS_ENABLED) {
+    feedbackActionRow.addComponents(playerButtons.voice)
+  }
+
+  feedbackActionRow.addComponents(playerButtons.topSongs)
+  feedbackActionRow.addComponents(playerButtons.radio)
 
   const historyActionRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
     playerHistory
@@ -167,6 +207,10 @@ export const useComponents = async (queue?: MusicQueue) => {
     playerButtons.recommended.setStyle(ButtonStyle.Success)
   } else {
     playerButtons.recommended.setStyle(ButtonStyle.Secondary)
+  }
+
+  if (queue?.metadata.radio) {
+    playerButtons.radio.setStyle(ButtonStyle.Success)
   }
 
   switch (customId) {

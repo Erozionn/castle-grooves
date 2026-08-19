@@ -7,8 +7,8 @@ import {
 
 import { isUrl, parseSongName } from '@utils/utilities'
 import { isNoTracksFoundError, queueSongQuery } from '@utils/queueSongQuery'
-
 import type { ClientType } from '@types'
+
 import type { LavalinkTrack } from '../lib'
 
 const deleteReplySoon = (interaction: ChatInputCommandInteraction, delay = 3000) => {

@@ -47,12 +47,16 @@ export interface LavalinkTrack {
   userData?: {
     requestedBy?: GuildMember
     thumbnail?: string
+    playlistTitle?: string
+    radioStationId?: string
   }
 }
 
 export class MusicManager extends EventEmitter {
   public shoukaku: Shoukaku
   public queues: Map<string, MusicQueue>
+  public isVoiceCommandsEnabled: (guildId: string) => boolean
+  public disableVoiceCommands: (guildId: string) => void
   private options: MusicManagerOptions
 
   constructor(client: Client, options: MusicManagerOptions) {
@@ -60,6 +64,8 @@ export class MusicManager extends EventEmitter {
 
     this.options = options
     this.queues = new Map()
+    this.isVoiceCommandsEnabled = () => false
+    this.disableVoiceCommands = () => {}
 
     // Initialize Shoukaku with absolute minimal config
     this.shoukaku = new Shoukaku(new Connectors.DiscordJS(client), options.nodes)
@@ -405,9 +411,19 @@ export class MusicManager extends EventEmitter {
       throw new Error('No tracks found')
     }
 
+    const addRequester = (track: LavalinkTrack): LavalinkTrack => {
+      if (options?.requestedBy) {
+        return {
+          ...track,
+          userData: { ...track.userData, requestedBy: options.requestedBy },
+        }
+      }
+      return track
+    }
+
     // Handle playlist
     if (searchResult.loadType === 'playlist' && searchResult.tracks.length > 1) {
-      const tracks = searchResult.tracks
+      const tracks = searchResult.tracks.map(addRequester)
       await queue.addTracks(tracks)
       this.emit('audioTracksAdd', queue, tracks)
 
@@ -419,7 +435,7 @@ export class MusicManager extends EventEmitter {
     }
 
     // Single track
-    const track = searchResult.tracks[0]
+    const track = addRequester(searchResult.tracks[0])
     await queue.addTrack(track)
     this.emit('audioTrackAdd', queue, track)
 

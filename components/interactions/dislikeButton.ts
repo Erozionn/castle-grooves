@@ -1,4 +1,4 @@
-﻿import { ButtonInteraction } from 'discord.js'
+import { ButtonInteraction } from 'discord.js'
 
 import { useComponents } from '@constants/messageComponents'
 import { sendMessage } from '@utils/mainMessage'
@@ -34,15 +34,24 @@ export default async (queue: MusicQueue | null, interaction: ButtonInteraction) 
         tracks.unshift(queue.currentTrack)
       }
 
-      const buffer = await generateNowPlayingCanvas(tracks, {
-        currentTrackDislikes: dislikeCount,
-      })
+      try {
+        const buffer = await generateNowPlayingCanvas(tracks, {
+          currentTrackDislikes: dislikeCount,
+        })
 
-      await sendMessage(channel, {
-        content: '',
-        files: [buffer],
-        components: await useComponents(queue || undefined),
-      })
+        await sendMessage(channel, {
+          content: '',
+          files: [buffer],
+          components: await useComponents(queue || undefined),
+        })
+      } catch (renderError) {
+        console.warn('[dislikeButton] Failed to refresh player artwork:', renderError)
+        await sendMessage(channel, {
+          content: '👎 | Thumbs-down saved.',
+          files: [],
+          components: await useComponents(queue || undefined),
+        })
+      }
     }
   } catch (error) {
     console.error('[dislikeButton]', error)

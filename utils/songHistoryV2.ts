@@ -587,13 +587,69 @@ const getUserTopSongs = async (userId: string, timeRange = 'monthly', limit = 20
   }
 
   try {
-    const results: (SongHistory & { count: number })[] = await queryApi().collectRows(
-      buildSongQuery(timeRange, limit, userId, 'userTopSongs')
-    )
+    const { startTime, endTime } = getTimeRangeParams(timeRange)
+    const escapedUserId = escapeFluxString(userId)
+    const rows = await queryApi().collectRows(`
+  from(bucket:"${INFLUX_BUCKET}")
+    |> range(start: ${startTime}, stop: ${endTime})
+    |> filter(fn: (r) => r["_measurement"] == "song_play")
+    |> filter(fn: (r) => r["requestedById"] == "${escapedUserId}")
+    |> filter(fn: (r) => r["_field"] == "serializedTrack")`)
 
-    const shuffledResults = results.sort(() => Math.random() - 0.5)
-    setCachedQuery(cacheKey, shuffledResults)
-    return shuffledResults
+    const songsByHash = new Map<
+      string,
+      { serializedTrack: string; lastPlayed: string; count: number }
+    >()
+
+    for (const row of rows as Array<{ songHash?: string; _time?: string | Date; _value?: unknown }>) {
+      const songHash = row.songHash
+      const serializedTrack = typeof row._value === 'string' ? row._value : ''
+      const playedAt =
+        typeof row._time === 'string' ? row._time : row._time?.toISOString() || ''
+
+      if (!songHash || !serializedTrack || !playedAt) continue
+
+      const song = songsByHash.get(songHash)
+      if (song) {
+        song.count += 1
+        if (new Date(playedAt).getTime() > new Date(song.lastPlayed).getTime()) {
+          song.lastPlayed = playedAt
+          song.serializedTrack = serializedTrack
+        }
+      } else {
+        songsByHash.set(songHash, { serializedTrack, lastPlayed: playedAt, count: 1 })
+      }
+    }
+
+    const results = [...songsByHash.values()]
+      .map((song) => {
+        const track = deserializeLavalinkTrack(song.serializedTrack)
+        if (!track) return null
+
+        return {
+          songTitle: `${track.info.author} - ${track.info.title}`,
+          songUrl: track.info.uri || '',
+          songThumbnail: track.info.artworkUrl || '',
+          requestedById: userId,
+          requestedByUsername: '',
+          requestedByAvatar: '',
+          serializedTrack: song.serializedTrack,
+          source: track.info.sourceName,
+          _time: song.lastPlayed,
+          playing: true,
+          count: song.count,
+        }
+      })
+      .filter((song): song is SongHistory & { count: number } => song !== null)
+      .sort(
+        (first, second) =>
+          second.count - first.count ||
+          new Date(second._time).getTime() - new Date(first._time).getTime()
+      )
+      .slice(0, limit)
+
+    setCachedQuery(cacheKey, results)
+    return results
   } catch (e) {
     console.warn('[getUserTopSongsV2]', e)
     return []

@@ -32,6 +32,7 @@ import { recordVoiceStateChange } from '@utils/recordActivity'
 import { commandInteractionHandler } from '@components/interactions'
 import { nowPlayingCanvas, nowPlayingCanvasWithUpNext } from '@utils/nowPlayingCanvas'
 import useMockTracks from '@data/dummies/songArray'
+import { refillRadio } from '@utils/radio'
 
 import { MusicManager, VoiceCommandManager } from './lib'
 import registerCommands from './deploy-commands'
@@ -100,6 +101,10 @@ const voiceCommandManager = new VoiceCommandManager(
 // Attach manager instances to the Discord client.
 client.musicManager = musicManager
 client.voiceCommandManager = voiceCommandManager
+musicManager.isVoiceCommandsEnabled = (guildId) => Boolean(voiceCommandManager.getStatus(guildId))
+musicManager.disableVoiceCommands = (guildId) => {
+  voiceCommandManager.disable(guildId)
+}
 
 client.commands = new Collection<string, CommandObject['default']>()
 
@@ -243,8 +248,14 @@ client.on('voiceStateUpdate', (oldState, newState) => recordVoiceStateChange(old
 
 // Music Manager event listeners
 musicManager.on('playerStart', playSongEventHandler)
+musicManager.on('playerStart', (queue) => {
+  refillRadio(queue).catch((error) => console.error('[radio] Refill failed:', error))
+})
 musicManager.on('audioTrackAdd', addSongEventHandler)
 musicManager.on('audioTracksAdd', addSongEventHandler) // For playlists
+musicManager.on('disconnect', (queue) => {
+  voiceCommandManager.disable(queue.guildId)
+})
 musicManager.on('disconnect', disconnectEventHandler)
 musicManager.on('emptyQueue', emptyEventHandler)
 musicManager.on('emptyQueue', songFinishEventHandler)
