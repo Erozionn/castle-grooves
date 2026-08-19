@@ -3,8 +3,10 @@ server: # REST and WS server
   address: 0.0.0.0
 lavalink:
   plugins:
-    - dependency: 'dev.lavalink.youtube:youtube-plugin:1.18.2'
-      repository: 'https://maven.lavalink.dev/releases'
+    # Pinned snapshot containing the YouTube client compatibility fixes released after 1.18.2.
+    # Move back to the releases repository when the next stable youtube-plugin release is available.
+    - dependency: 'dev.lavalink.youtube:youtube-plugin:f45bbb7aebfcbc1c553769e04af6cd43afa8b7c3'
+      repository: 'https://maven.lavalink.dev/snapshots'
     - dependency: 'com.github.topi314.lavasrc:lavasrc-plugin:4.8.3' # For Spotify, Apple Music, Deezer, Yandex Music
       repository: 'https://maven.lavalink.dev/releases'
     # LavaSearch can be added if needed (now compatible with LavaSrc 4.8.1+)
@@ -109,9 +111,8 @@ plugins:
     # TV is the only OAuth-compatible client and requires OAuth for playback
     clients:
       - TV # OAuth-compatible, requires sign-in for playback
+      - IOS # Compatible fallback after recent YouTube client changes
       - WEB # Opus formats, livestream support
-      - TVHTML5_SIMPLY # Opus formats, livestream support
-      - ANDROID_VR # Opus formats, livestream support (backup)
 metrics:
   prometheus:
     enabled: false

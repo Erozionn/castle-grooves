@@ -51,6 +51,12 @@ const defaultPlayerButtons = {
     .setDisabled(false)
     .setLabel('My Top 10')
     .setEmoji('🏆'),
+  radio: new ButtonBuilder()
+    .setCustomId('radio_button')
+    .setStyle(ButtonStyle.Secondary)
+    .setDisabled(false)
+    .setLabel('Radio')
+    .setEmoji('📻'),
   dj: new ButtonBuilder()
     .setCustomId('dj_button')
     .setStyle(ButtonStyle.Secondary)
@@ -78,6 +84,7 @@ const resetToDefaults = () => {
     .setDisabled(!ENV.VOICE_COMMANDS_ENABLED)
     .setLabel('Voice: Off')
   defaultPlayerButtons.topSongs.setStyle(ButtonStyle.Secondary).setDisabled(false)
+  defaultPlayerButtons.radio.setStyle(ButtonStyle.Secondary).setDisabled(false)
   defaultPlayerButtons.stop
     .setStyle(ButtonStyle.Danger)
     .setDisabled(false)
@@ -102,8 +109,7 @@ export const useComponents = async (queue?: MusicQueue, voiceCommandsEnabled?: b
   resetToDefaults()
 
   const isVoiceCommandsEnabled =
-    voiceCommandsEnabled ??
-    (queue ? queue.manager.isVoiceCommandsEnabled(queue.guildId) : false)
+    voiceCommandsEnabled ?? (queue ? queue.manager.isVoiceCommandsEnabled(queue.guildId) : false)
 
   playerButtons.voice
     .setStyle(isVoiceCommandsEnabled ? ButtonStyle.Success : ButtonStyle.Secondary)
@@ -156,6 +162,7 @@ export const useComponents = async (queue?: MusicQueue, voiceCommandsEnabled?: b
   }
 
   feedbackActionRow.addComponents(playerButtons.topSongs)
+  feedbackActionRow.addComponents(playerButtons.radio)
 
   const historyActionRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
     playerHistory
@@ -200,6 +207,10 @@ export const useComponents = async (queue?: MusicQueue, voiceCommandsEnabled?: b
     playerButtons.recommended.setStyle(ButtonStyle.Success)
   } else {
     playerButtons.recommended.setStyle(ButtonStyle.Secondary)
+  }
+
+  if (queue?.metadata.radio) {
+    playerButtons.radio.setStyle(ButtonStyle.Success)
   }
 
   switch (customId) {

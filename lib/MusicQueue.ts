@@ -5,9 +5,18 @@ import ENV from '@constants/Env'
 
 import type { MusicManager, LavalinkTrack } from './MusicManager'
 
+export interface RadioState {
+  stationId: string
+  seenTrackIds: Set<string>
+  nextSourceIndex: number
+  sourceBuffers: Map<string, LavalinkTrack[]>
+  isRefilling: boolean
+}
+
 export interface QueueMetadata {
   channel?: any
   interaction?: any
+  radio?: RadioState
   [key: string]: any
 }
 

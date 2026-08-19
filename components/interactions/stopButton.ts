@@ -1,6 +1,7 @@
 import { sendMessage } from '@utils/mainMessage'
 import { useComponents } from '@constants/messageComponents'
 import { useDJMode } from '@hooks/useDJMode'
+import { stopRadio } from '@utils/radio'
 
 import { MusicQueue } from '../../lib'
 
@@ -14,6 +15,7 @@ export default async (queue: MusicQueue | null) => {
   const { stopDJMode } = useDJMode(queue)
 
   stopDJMode()
+  stopRadio(queue)
 
   // If there's music playing or tracks in queue, just stop playback (stay in channel)
   if (queue.isPlaying || queue.currentTrack || queue.tracks.length > 0) {

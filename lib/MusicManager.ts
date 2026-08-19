@@ -48,6 +48,7 @@ export interface LavalinkTrack {
     requestedBy?: GuildMember
     thumbnail?: string
     playlistTitle?: string
+    radioStationId?: string
   }
 }
 

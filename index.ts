@@ -32,6 +32,7 @@ import { recordVoiceStateChange } from '@utils/recordActivity'
 import { commandInteractionHandler } from '@components/interactions'
 import { nowPlayingCanvas, nowPlayingCanvasWithUpNext } from '@utils/nowPlayingCanvas'
 import useMockTracks from '@data/dummies/songArray'
+import { refillRadio } from '@utils/radio'
 
 import { MusicManager, VoiceCommandManager } from './lib'
 import registerCommands from './deploy-commands'
@@ -247,6 +248,9 @@ client.on('voiceStateUpdate', (oldState, newState) => recordVoiceStateChange(old
 
 // Music Manager event listeners
 musicManager.on('playerStart', playSongEventHandler)
+musicManager.on('playerStart', (queue) => {
+  refillRadio(queue).catch((error) => console.error('[radio] Refill failed:', error))
+})
 musicManager.on('audioTrackAdd', addSongEventHandler)
 musicManager.on('audioTracksAdd', addSongEventHandler) // For playlists
 musicManager.on('disconnect', (queue) => {

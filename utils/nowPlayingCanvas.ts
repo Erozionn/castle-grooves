@@ -238,7 +238,13 @@ export const nowPlayingCanvasWithUpNext = async (
       const _width = Math.min(artworkHeight * (thumbnail.width / thumbnail.height), 270)
       thumbnailX = 160 - _width / 2
       thumbnailWidth = _width
-      canv.drawImage(thumbnail, thumbnailX, thumbnailY + playlistBannerHeight, _width, artworkHeight)
+      canv.drawImage(
+        thumbnail,
+        thumbnailX,
+        thumbnailY + playlistBannerHeight,
+        _width,
+        artworkHeight
+      )
     }
   } catch (e) {
     console.warn('[ThumbnailError] ', e)
@@ -280,6 +286,13 @@ export const nowPlayingCanvasWithUpNext = async (
     })
   }
 
+  // Radio tracks do not have a requesting user, but their queue should still
+  // receive the same Up Next heading as manually requested tracks.
+  canv.textAlign = 'left'
+  canv.fillStyle = '#ffffff'
+  canv.font = '18px Poppins'
+  canv.fillText('UP NEXT:', 345, 40)
+
   if (requestedBy) {
     // Render requester profile picture
     canv.save()
@@ -309,12 +322,6 @@ export const nowPlayingCanvasWithUpNext = async (
     canv.font = '600 18px Poppins'
     canv.fillText(capitalize(requestedBy.user.username), 70, 364)
     canv.fillStyle = '#ffffff'
-
-    // Render "Up Next"
-    canv.textAlign = 'left'
-    canv.fillStyle = `#ffffff`
-    canv.font = '18px Poppins'
-    canv.fillText('UP NEXT:', 345, 40)
 
     try {
       const pics = await Promise.all(
@@ -488,11 +495,7 @@ export const nowPlayingCanvas = async (
     canv.fillStyle = '#ffffff'
     canv.textAlign = 'left'
     canv.font = '600 18px Poppins'
-    canv.fillText(
-      capitalize(requestedBy.user.username),
-      _width + 25 + 32 + 12,
-      139
-    )
+    canv.fillText(capitalize(requestedBy.user.username), _width + 25 + 32 + 12, 139)
 
     if (isLocal) {
       const isLocalIcon = await loadImage('./assets/icons/downloaded.png')
@@ -549,7 +552,7 @@ const processTracks = async (tracks: LavalinkTrack[], options?: CanvasOptions): 
     currentTrackDislikes:
       options?.currentTrackDislikes ?? (await getSongDislikeCount(tracks[0].info.identifier)),
     playlistTitle:
-      tracks.length > 1 ? options?.playlistTitle ?? tracks[0].userData?.playlistTitle : undefined,
+      tracks.length > 1 ? (options?.playlistTitle ?? tracks[0].userData?.playlistTitle) : undefined,
   }
 
   if (tracks.length > 1) {
