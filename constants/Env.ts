@@ -27,6 +27,7 @@ const {
   VOICE_WAKE_PHRASE,
   VOICE_CAPTURE_TIMEOUT_MS,
   VOICE_SILENCE_MS,
+  PERF_LOGGING,
 } = process.env
 
 const ENV = {
@@ -58,6 +59,8 @@ const ENV = {
   VOICE_WAKE_PHRASE: VOICE_WAKE_PHRASE || 'castle grooves',
   VOICE_CAPTURE_TIMEOUT_MS: Number(VOICE_CAPTURE_TIMEOUT_MS || 7000),
   VOICE_SILENCE_MS: Number(VOICE_SILENCE_MS || 1200),
+  // Disabled by default: timing logs are useful during tuning, but should not add log noise normally.
+  PERF_LOGGING: PERF_LOGGING === 'true',
 }
 
 export default ENV

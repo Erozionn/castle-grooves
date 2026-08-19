@@ -7,48 +7,45 @@ import {
   MessagePayload,
   PartialGroupDMChannel,
   TextBasedChannel,
-  TextChannel,
 } from 'discord.js'
 
 import { MusicQueue } from '../lib'
 
 let mainMessage: Message | null = null
-let isProcessing = false // Lock to prevent race conditions
-let debounceTimeout: NodeJS.Timeout | null = null
-const DEBOUNCE_TIME = 1000
+let messageOperation: Promise<void> = Promise.resolve()
+
+// Discord message mutations must be ordered, but they do not need a fixed delay.
+// This queue replaces the old one-second debounce and polling lock.
+const runMessageOperation = async <T>(operation: () => Promise<T>): Promise<T> => {
+  let release!: () => void
+  const currentOperation = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const previousOperation = messageOperation
+  messageOperation = previousOperation.then(() => currentOperation)
+
+  await previousOperation
+  try {
+    return await operation()
+  } finally {
+    release()
+  }
+}
 
 const getMainMessage = () => mainMessage
 
-const deleteMessage = async () => {
-  if (isProcessing) return
-  isProcessing = true
-  try {
+const deleteMessage = async () =>
+  runMessageOperation(async () => {
     if (mainMessage) {
       await mainMessage.delete()
       mainMessage = null
     }
-  } catch (e) {
-    console.warn('[DeleteMessageError]', e)
-  } finally {
-    isProcessing = false
-  }
-}
+  }).catch((e) => console.warn('[DeleteMessageError]', e))
 
 const sendMessage = async (
   channel: Exclude<TextBasedChannel, PartialGroupDMChannel> | BaseGuildTextChannel,
   options: string | MessagePayload | MessageCreateOptions | MessageEditOptions
 ): Promise<Message | null> => {
-  // Clear any pending debounce
-  if (debounceTimeout) {
-    clearTimeout(debounceTimeout)
-    debounceTimeout = null
-  }
-
-  // Wait for any ongoing processing to complete
-  while (isProcessing) {
-    await new Promise((resolve) => setTimeout(resolve, 50))
-  }
-
   // Normalize options to always have a content property
   let normalizedOptions: MessageCreateOptions | MessageEditOptions
   if (typeof options === 'string') {
@@ -63,35 +60,30 @@ const sendMessage = async (
     }
   }
 
-  return new Promise((resolve) => {
-    debounceTimeout = setTimeout(async () => {
-      isProcessing = true
-      try {
-        if (mainMessage && channel.id === mainMessage.channel.id) {
-          mainMessage = await mainMessage.edit(normalizedOptions as BaseMessageOptions)
-        } else {
-          if (mainMessage) {
-            await mainMessage.delete().catch(() => {
-              /* Ignore delete errors */
-            })
-          }
-          // Handle the original options for sending new messages
-          if (typeof options === 'string' || options instanceof MessagePayload) {
-            mainMessage = await channel.send(
-              options as string | MessagePayload | MessageCreateOptions
-            )
-          } else {
-            mainMessage = await channel.send(options as MessageCreateOptions)
-          }
+  return runMessageOperation(async () => {
+    try {
+      if (mainMessage && channel.id === mainMessage.channel.id) {
+        mainMessage = await mainMessage.edit(normalizedOptions as BaseMessageOptions)
+      } else {
+        if (mainMessage) {
+          await mainMessage.delete().catch(() => {
+            /* Ignore delete errors */
+          })
         }
-        resolve(mainMessage)
-      } catch (e) {
-        console.warn('[SendMessageError]', e)
-        resolve(null)
-      } finally {
-        isProcessing = false
+        // Handle the original options for sending new messages
+        if (typeof options === 'string' || options instanceof MessagePayload) {
+          mainMessage = await channel.send(
+            options as string | MessagePayload | MessageCreateOptions
+          )
+        } else {
+          mainMessage = await channel.send(options as MessageCreateOptions)
+        }
       }
-    }, DEBOUNCE_TIME)
+      return mainMessage
+    } catch (e) {
+      console.warn('[SendMessageError]', e)
+      return null
+    }
   })
 }
 

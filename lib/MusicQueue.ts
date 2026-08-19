@@ -2,6 +2,7 @@ import { VoiceBasedChannel, GuildMember, Message } from 'discord.js'
 import { Player as ShoukakuPlayer } from 'shoukaku'
 
 import ENV from '@constants/Env'
+import { logLatency, startLatencyTimer } from '@utils/latency'
 
 import type { MusicManager, LavalinkTrack } from './MusicManager'
 
@@ -89,11 +90,13 @@ export class MusicQueue {
 
     try {
       // Create Shoukaku player - it handles the Discord voice connection internally
+      const joinStartedAt = startLatencyTimer()
       this.player = await this.manager.shoukaku.joinVoiceChannel({
         guildId: this.guildId,
         channelId: this.voiceChannel.id,
         shardId: this.voiceChannel.guild.shardId,
       })
+      logLatency('voice.join', joinStartedAt, { guildId: this.guildId })
 
       // Store connection reference (player acts as the connection in Shoukaku)
       this.connection = this.player as any
@@ -126,11 +129,13 @@ export class MusicQueue {
         if (ENV.DEBUG_QUEUE) console.log('[Queue] Retrying voice connection...')
 
         // Retry once with fresh state
+        const retryStartedAt = startLatencyTimer()
         this.player = await this.manager.shoukaku.joinVoiceChannel({
           guildId: this.guildId,
           channelId: this.voiceChannel.id,
           shardId: this.voiceChannel.guild.shardId,
         })
+        logLatency('voice.join-retry', retryStartedAt, { guildId: this.guildId })
 
         this.connection = this.player as any
         this.setupPlayerEvents()
@@ -207,26 +212,7 @@ export class MusicQueue {
     })
 
     this.player.on('exception', (data) => {
-      console.error(`[Queue] Track exception in ${this.guildId}:`, {
-        error: data.exception?.message || 'Unknown error',
-        severity: data.exception?.severity,
-        cause: data.exception?.cause,
-      })
-
-      // Notify user if channel exists
-      if (this.metadata?.channel) {
-        this.metadata.channel
-          .send({
-            content: `⚠️ | Failed to play **${this.currentTrack?.info?.title || 'track'}**. Skipping to next song...`,
-          })
-          .then((msg: Message) => {
-            setTimeout(() => msg.delete().catch(() => {}), 3000)
-          })
-          .catch((err: Error) => console.error('[Queue] Failed to send error message:', err))
-      }
-
-      // Skip to next track
-      this.skip()
+      void this.handleTrackException(data)
     })
 
     this.player.on('closed', (data) => {
@@ -248,6 +234,56 @@ export class MusicQueue {
 
     // Monitor voice channel for empty state
     this.startEmptyChannelMonitoring()
+  }
+
+  private async handleTrackException(data: any): Promise<void> {
+    const failedTrack = this.currentTrack
+    const error = data.exception?.message || 'Unknown error'
+
+    console.error(`[Queue] Track exception in ${this.guildId}:`, {
+      error,
+      severity: data.exception?.severity,
+      cause: data.exception?.cause,
+    })
+
+    if (failedTrack && error.includes('No mirror found for track')) {
+      try {
+        const fallback = await this.manager.findYoutubeMirror(failedTrack)
+        if (fallback) {
+          fallback.userData = { ...failedTrack.userData }
+          this.insertTrack(fallback)
+          console.log(
+            `[Queue] Queued YouTube fallback for "${failedTrack.info.author} - ${failedTrack.info.title}"`
+          )
+
+          // Lavalink emits TrackEndEvent with reason loadFailed itself. If it
+          // has already emptied the queue, resume with the fallback.
+          if (!this.isPlaying && !this.currentTrack) {
+            await this.play()
+          }
+          return
+        }
+      } catch (fallbackError) {
+        console.error('[Queue] Failed to resolve YouTube fallback:', fallbackError)
+      }
+    }
+
+    // Notify user if channel exists
+    if (this.metadata?.channel) {
+      this.metadata.channel
+        .send({
+          content: `⚠️ | Failed to play **${failedTrack?.info?.title || 'track'}**. Skipping to next song...`,
+        })
+        .then((msg: Message) => {
+          setTimeout(() => msg.delete().catch(() => {}), 3000)
+        })
+        .catch((sendError: Error) =>
+          console.error('[Queue] Failed to send error message:', sendError)
+        )
+    }
+
+    // Lavalink sends TrackEndEvent with reason loadFailed after an exception.
+    // Calling stopTrack here races that event and can skip the following track.
   }
 
   /**

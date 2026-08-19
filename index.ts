@@ -235,7 +235,7 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   if (interaction.isChatInputCommand()) {
-    commandInteractionHandler(interaction, client)
+    await commandInteractionHandler(interaction, client)
   }
 
   if (interaction.isButton() || interaction.isStringSelectMenu()) {

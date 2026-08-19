@@ -3,6 +3,8 @@ import { EventEmitter } from 'events'
 import { Shoukaku, Connectors, Node, Player as ShoukakuPlayer, NodeOption } from 'shoukaku'
 import { Client, VoiceBasedChannel, GuildMember, Interaction } from 'discord.js'
 
+import { logLatency, startLatencyTimer } from '@utils/latency'
+
 import { MusicQueue } from './MusicQueue'
 
 export interface MusicManagerOptions {
@@ -121,9 +123,60 @@ export class MusicManager extends EventEmitter {
     })
 
     this.shoukaku.on('raw', (name: string, json: unknown) => {
-      console.log(`[Lavalink Raw] ${name}:`, JSON.stringify(json, null, 2))
+      // console.log(`[Lavalink Raw] ${name}:`, JSON.stringify(json, null, 2))
       this.emit('raw', name, json)
     })
+  }
+
+  private isSpotifyTrack(track: LavalinkTrack): boolean {
+    return track.info.sourceName === 'spotify' || track.info.uri?.includes('spotify.com') === true
+  }
+
+  /**
+   * Spotify supplies metadata rather than playable audio. Resolve a YouTube
+   * counterpart before a Spotify track is placed in the playback queue.
+   */
+  async findYoutubeMirror(track: LavalinkTrack): Promise<LavalinkTrack | null> {
+    const queries = [track.info.isrc, `${track.info.author} - ${track.info.title}`].filter(
+      (query): query is string => Boolean(query?.trim())
+    )
+
+    for (const query of queries) {
+      const result = await this.search(query, { source: 'ytsearch' })
+      const mirror = result.tracks.find((candidate) => !this.isSpotifyTrack(candidate))
+
+      if (mirror) return mirror
+    }
+
+    return null
+  }
+
+  private async resolveSpotifyTracks(tracks: LavalinkTrack[]): Promise<LavalinkTrack[]> {
+    const resolved: LavalinkTrack[] = []
+    const batchSize = 3
+
+    // Keep parallel YouTube searches small to avoid causing rate limits for
+    // Spotify playlists while ensuring every queued track is playable.
+    for (let index = 0; index < tracks.length; index += batchSize) {
+      const batch = tracks.slice(index, index + batchSize)
+      const mirrors = await Promise.all(
+        batch.map(async (track) => {
+          if (!this.isSpotifyTrack(track)) return track
+
+          const mirror = await this.findYoutubeMirror(track)
+          if (!mirror) {
+            console.warn(
+              `[MusicManager] No YouTube mirror found for Spotify track "${track.info.author} - ${track.info.title}"`
+            )
+          }
+          return mirror
+        })
+      )
+
+      resolved.push(...mirrors.filter((track): track is LavalinkTrack => track !== null))
+    }
+
+    return resolved
   }
 
   /**
@@ -136,6 +189,7 @@ export class MusicManager extends EventEmitter {
       requester?: GuildMember
     }
   ): Promise<SearchResult> {
+    const startedAt = startLatencyTimer()
     const node = this.shoukaku.getIdealNode()
 
     if (!node) {
@@ -157,12 +211,15 @@ export class MusicManager extends EventEmitter {
 
     try {
       const result = await node.rest.resolve(searchQuery)
+      logLatency('lavalink.resolve', startedAt, { queryType: isUrl ? 'url' : 'search' })
 
       // If Spotify search fails or returns nothing, fallback to YouTube
       if (!result || result.loadType === 'empty' || result.loadType === 'error') {
         console.log(`[MusicManager] Spotify search failed for "${query}", falling back to YouTube`)
         const fallbackQuery = isUrl ? query : `ytsearch:${query}`
+        const fallbackStartedAt = startLatencyTimer()
         const fallbackResult = await node.rest.resolve(fallbackQuery)
+        logLatency('lavalink.resolve-fallback', fallbackStartedAt, { queryType: 'youtube' })
 
         if (
           !fallbackResult ||
@@ -210,7 +267,9 @@ export class MusicManager extends EventEmitter {
             )
 
             const fallbackQuery = `ytsearch:${query}`
+            const fallbackStartedAt = startLatencyTimer()
             const fallbackResult = await node.rest.resolve(fallbackQuery)
+            logLatency('lavalink.resolve-fallback', fallbackStartedAt, { queryType: 'youtube' })
 
             if (
               !fallbackResult ||
@@ -252,8 +311,20 @@ export class MusicManager extends EventEmitter {
         }
       }
 
-      // Extract tracks from successful result
-      const tracks = this.extractTracksFromResult(result)
+      // Resolve Spotify metadata to YouTube tracks before queueing. LavaSrc
+      // can also mirror at playback time, but doing it here prevents a
+      // missing mirror from interrupting the active queue.
+      let tracks = this.extractTracksFromResult(result)
+      if (tracks.some((track) => this.isSpotifyTrack(track))) {
+        tracks = await this.resolveSpotifyTracks(tracks)
+
+        if (tracks.length === 0) {
+          return {
+            tracks: [],
+            loadType: 'empty',
+          }
+        }
+      }
 
       if (options?.requester) {
         // Directly assign userData to preserve track structure
@@ -274,6 +345,7 @@ export class MusicManager extends EventEmitter {
       }
     } catch (error) {
       console.error('[MusicManager] Search error:', error)
+      logLatency('lavalink.resolve-error', startedAt, { queryType: isUrl ? 'url' : 'search' })
       return {
         tracks: [],
         loadType: 'error',
@@ -425,7 +497,6 @@ export class MusicManager extends EventEmitter {
     if (searchResult.loadType === 'playlist' && searchResult.tracks.length > 1) {
       const tracks = searchResult.tracks.map(addRequester)
       await queue.addTracks(tracks)
-      this.emit('audioTracksAdd', queue, tracks)
 
       if (!queue.isPlaying) {
         await queue.play()
@@ -437,7 +508,6 @@ export class MusicManager extends EventEmitter {
     // Single track
     const track = addRequester(searchResult.tracks[0])
     await queue.addTrack(track)
-    this.emit('audioTrackAdd', queue, track)
 
     // Start playing if not already
     if (!queue.isPlaying) {
