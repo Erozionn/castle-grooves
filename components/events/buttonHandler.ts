@@ -36,33 +36,29 @@ export default async (interaction: Interaction<CacheType>) => {
 
   if (!interaction.guild) return
 
-  // Radio expands a picker in the main player message, so it cannot be
-  // deferred as a normal player-component update before the handler runs.
-  if (interaction.isButton() && customId === 'radio_button') {
-    await showRadioPicker(queue, interaction as ButtonInteraction)
-    return
-  }
-
-  if (interaction.isStringSelectMenu() && customId === RADIO_STATION_SELECT_ID) {
-    await selectRadioStation(queue, interaction as StringSelectMenuInteraction)
-    return
-  }
-
-  await interaction.deferUpdate()
-
   try {
+    // An interaction must be acknowledged in three seconds. Some handlers
+    // build components from Influx history and can legitimately take longer.
+    await interaction.deferUpdate()
+
     switch (customId) {
+      case 'radio_button':
+        await showRadioPicker(queue, interaction as ButtonInteraction)
+        break
+      case RADIO_STATION_SELECT_ID:
+        await selectRadioStation(queue, interaction as StringSelectMenuInteraction)
+        break
       case 'back_button':
-        backButtonInteractionHandler(queue)
+        await backButtonInteractionHandler(queue)
         break
       case 'play_pause_button':
-        playPauseButtonInteractionHandler(queue)
+        await playPauseButtonInteractionHandler(queue)
         break
       case 'skip_button':
-        skipButtonInteractionHandler(queue)
+        await skipButtonInteractionHandler(queue)
         break
       case 'stop_button':
-        stopButtonInteractionHandler(queue)
+        await stopButtonInteractionHandler(queue)
         break
       case 'recommended_button':
         recommendedButtonInteractionHandler(queue, interaction as ButtonInteraction)
@@ -78,15 +74,19 @@ export default async (interaction: Interaction<CacheType>) => {
         break
       case 'dj_button':
         console.log('[buttonHandler] DJ button pressed')
-        djButtonInteractionHandler(queue, interaction as ButtonInteraction)
+        await djButtonInteractionHandler(queue, interaction as ButtonInteraction)
         break
       case 'history':
-        historyInteractionHandler(queue, interaction as StringSelectMenuInteraction)
+        await historyInteractionHandler(queue, interaction as StringSelectMenuInteraction)
         break
       default:
         break
     }
   } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 10062) {
+      console.warn('[buttonHandler] Interaction expired before it could be acknowledged')
+      return
+    }
     console.error('[buttonHandler]', error)
   }
 }

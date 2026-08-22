@@ -18,9 +18,7 @@ interface AutocompleteChoice {
 }
 
 const AUTOCOMPLETE_CACHE_TTL_MS = 30_000
-const AUTOCOMPLETE_REQUEST_INTERVAL_MS = 250
 const autocompleteCache = new Map<string, { choices: AutocompleteChoice[]; expiresAt: number }>()
-const lastAutocompleteRequest = new Map<string, number>()
 
 const filterChoices = (choices: AutocompleteChoice[], query: string) => {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean)
@@ -86,21 +84,10 @@ export default {
 
     const cacheKey = focusedValue.trim().toLowerCase()
     const cachedChoices = getCachedChoices(cacheKey)
-    if (cachedChoices) {
+    if (cachedChoices?.length) {
       await interaction.respond(cachedChoices).catch(() => {})
       return
     }
-
-    // Discord sends an interaction for every keystroke. A tiny per-user
-    // throttle prevents overlapping Lavalink searches without delaying cached results.
-    const requestKey = `${interaction.guildId || 'dm'}:${interaction.user.id}`
-    const now = Date.now()
-    const lastRequestAt = lastAutocompleteRequest.get(requestKey) || 0
-    if (now - lastRequestAt < AUTOCOMPLETE_REQUEST_INTERVAL_MS) {
-      await interaction.respond([]).catch(() => {})
-      return
-    }
-    lastAutocompleteRequest.set(requestKey, now)
 
     try {
       // Use focused value or fallback to a default search
