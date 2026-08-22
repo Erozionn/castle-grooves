@@ -33,7 +33,7 @@ const radioStationPickerRow = () => {
 
 export const showRadioPicker = async (queue: MusicQueue | null, interaction: ButtonInteraction) => {
   const components = await useComponents(queue || undefined)
-  await interaction.update({ components: [...components, radioStationPickerRow()] })
+  await interaction.editReply({ components: [...components, radioStationPickerRow()] })
 }
 
 export const selectRadioStation = async (
@@ -45,11 +45,9 @@ export const selectRadioStation = async (
   const stationId = interaction.values[0]
 
   if (!voiceChannel || !stationId) {
-    await interaction.deferUpdate()
     return
   }
 
-  await interaction.deferUpdate()
   // Collapse the public picker before loading any Mixes. It can be opened
   // again with the Radio button whenever a listener wants to switch stations.
   await interaction.editReply({ components: await useComponents(queue || undefined) })
