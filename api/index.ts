@@ -8,11 +8,40 @@ import { createLogger } from '@utils/logger'
 
 const logger = createLogger('api')
 
-const { WEBSERVER_PORT, ADMIN_USER_ID, GUILD_ID, DEFAULT_TEXT_CHANNEL } = process.env
+const { WEBSERVER_PORT, ADMIN_USER_ID, GUILD_ID, DEFAULT_TEXT_CHANNEL, GRAFANA_PUBLIC_URL } = process.env
 
 const app = express()
 
 app.use('/static', express.static(path.resolve('public')))
+
+const grafanaOrigin = (() => {
+  if (!GRAFANA_PUBLIC_URL) return undefined
+
+  try {
+    return new URL(GRAFANA_PUBLIC_URL).origin
+  } catch {
+    logger.error('GRAFANA_PUBLIC_URL is not a valid URL')
+    return undefined
+  }
+})()
+
+app.use((req, res, next) => {
+  const origin = req.get('origin')
+
+  if (origin && origin === grafanaOrigin) {
+    res.setHeader('Access-Control-Allow-Origin', grafanaOrigin)
+    res.setHeader('Vary', 'Origin')
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Grafana-Action')
+  }
+
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(origin === grafanaOrigin ? 204 : 403)
+    return
+  }
+
+  next()
+})
 
 function initApi(client?: ClientType) {
   if (!DEFAULT_TEXT_CHANNEL || !ADMIN_USER_ID || !GUILD_ID) {
@@ -105,6 +134,60 @@ function initApi(client?: ClientType) {
 
   app.get('/play', playFromRequest)
   app.get('/play/:query/:userId?', playFromRequest)
+
+  app.post('/control/:action', async (req, res) => {
+    const origin = req.get('origin')
+    if (origin && origin !== grafanaOrigin) {
+      res.status(403).json({ message: 'Controls are only available from the configured Grafana origin.' })
+      return
+    }
+
+    const action = req.params.action
+    const queue = client.musicManager.getQueue(GUILD_ID)
+
+    if (!queue) {
+      res.status(409).json({ message: 'There is no active queue to control.' })
+      return
+    }
+
+    try {
+      switch (action) {
+        case 'pause':
+          if (queue.isPaused || !queue.currentTrack) {
+            res.status(409).json({ message: 'Playback is not currently running.' })
+            return
+          }
+          queue.pause()
+          break
+        case 'resume':
+          if (!queue.isPaused) {
+            res.status(409).json({ message: 'Playback is not paused.' })
+            return
+          }
+          queue.resume()
+          break
+        case 'skip':
+          if (!queue.currentTrack) {
+            res.status(409).json({ message: 'There is no current track to skip.' })
+            return
+          }
+          queue.skip()
+          break
+        case 'stop':
+          client.musicManager.deleteQueue(GUILD_ID)
+          break
+        default:
+          res.status(404).json({ message: 'Unknown control action.' })
+          return
+      }
+    } catch (error) {
+      logger.error('Playback control failed', error, { action })
+      res.status(500).json({ message: 'Playback control failed.' })
+      return
+    }
+
+    res.json({ message: `Playback ${action} requested.` })
+  })
 
   app.listen(WEBSERVER_PORT, () => logger.info('HTTP API listening', { port: WEBSERVER_PORT }))
 }

@@ -1,0 +1,128 @@
+{
+  "uid": "castle-grooves-recap",
+  "title": "Listening Recap",
+  "tags": ["castle-grooves", "music", "history"],
+  "timezone": "browser",
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "5m",
+  "time": { "from": "now-90d", "to": "now" },
+  "editable": true,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Plays",
+      "datasource": { "type": "influxdb", "uid": "castle-grooves-influxdb" },
+      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
+      "targets": [{ "refId": "A", "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"song_play\" and r._field == \"songTitle\")\n  |> group()\n  |> count(column: \"_value\")" }],
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "purple" } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value", "colorMode": "value", "graphMode": "none" }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Unique Requesters",
+      "datasource": { "type": "influxdb", "uid": "castle-grooves-influxdb" },
+      "gridPos": { "x": 4, "y": 0, "w": 4, "h": 4 },
+      "targets": [{ "refId": "A", "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"song_play\" and r._field == \"songTitle\")\n  |> group()\n  |> unique(column: \"requestedById\")\n  |> count(column: \"_value\")" }],
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "blue" } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value", "colorMode": "value", "graphMode": "none" }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Latest Song",
+      "datasource": { "type": "influxdb", "uid": "castle-grooves-influxdb" },
+      "gridPos": { "x": 8, "y": 0, "w": 10, "h": 4 },
+      "targets": [{ "refId": "A", "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"song_play\" and r._field == \"songTitle\")\n  |> group()\n  |> last()\n  |> keep(columns: [\"_value\"])" }],
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "green" } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value", "colorMode": "value", "graphMode": "none" }
+    },
+    {
+      "id": 4,
+      "type": "canvas",
+      "title": "",
+      "transparent": true,
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "targets": [],
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": { "inlineEditing": true, "showAdvancedTypes": true, "panZoom": false, "zoomToContent": true, "tooltip": { "mode": "none" }, "root": { "name": "Navigation", "type": "frame", "elements": [{ "name": "DJ Console", "type": "text", "placement": { "left": 20, "top": 25, "width": 330, "height": 80 }, "config": { "text": { "mode": "fixed", "fixed": "Return to DJ Console  →" }, "align": "center", "valign": "middle", "size": 18, "color": { "fixed": "#c4b5fd" } }, "background": { "color": { "fixed": "#21183a" } }, "border": { "color": { "fixed": "#6d4aff" }, "width": 1, "radius": 10 }, "links": [{ "title": "Return to DJ Console", "url": "/d/castle-grooves-dj-console/dj-console", "targetBlank": false }] }] } }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Listening Trend",
+      "description": "Tracks started over the selected period.",
+      "datasource": { "type": "influxdb", "uid": "castle-grooves-influxdb" },
+      "gridPos": { "x": 0, "y": 4, "w": 14, "h": 8 },
+      "targets": [{ "refId": "A", "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"song_play\" and r._field == \"songTitle\")\n  |> group()\n  |> aggregateWindow(every: v.windowPeriod, fn: count, createEmpty: false)\n  |> set(key: \"_field\", value: \"Plays\")" }],
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "purple" }, "custom": { "drawStyle": "bars", "fillOpacity": 62, "lineWidth": 1, "showPoints": "never" }, "min": 0 }, "overrides": [] },
+      "options": { "legend": { "showLegend": false }, "tooltip": { "mode": "single" } }
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "Playback Sources",
+      "datasource": { "type": "influxdb", "uid": "castle-grooves-influxdb" },
+      "gridPos": { "x": 14, "y": 4, "w": 10, "h": 8 },
+      "targets": [{ "refId": "A", "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"song_play\" and r._field == \"songTitle\")\n  |> group(columns: [\"source\"])\n  |> count(column: \"_value\")\n  |> rename(columns: {source: \"Source\", _value: \"Plays\"})\n  |> keep(columns: [\"Source\", \"Plays\"])\n  |> group()\n  |> sort(columns: [\"Plays\"], desc: true)" }],
+      "fieldConfig": { "defaults": {}, "overrides": [{ "matcher": { "id": "byName", "options": "Plays" }, "properties": [{ "id": "custom.cellOptions", "value": { "type": "gauge", "mode": "gradient" } }, { "id": "color", "value": { "mode": "continuous-Purples" } }] }] },
+      "options": { "showHeader": true, "cellHeight": "md", "footer": { "show": false } }
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "Popular Listening Times",
+      "description": "A local-time day × hour grid. Brighter cells mean more tracks started; blank cells had no plays.",
+      "datasource": { "type": "influxdb", "uid": "castle-grooves-influxdb" },
+      "gridPos": { "x": 0, "y": 12, "w": 24, "h": 8 },
+      "targets": [{ "refId": "A", "query": "import \"date\"\nimport \"timezone\"\noption location = timezone.location(name: \"America/Toronto\")\ndayName = (day) => if day == 0 then \"Sun\" else if day == 1 then \"Mon\" else if day == 2 then \"Tue\" else if day == 3 then \"Wed\" else if day == 4 then \"Thu\" else if day == 5 then \"Fri\" else \"Sat\"\nfrom(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"song_play\" and r._field == \"songTitle\")\n  |> map(fn: (r) => ({r with DayOrder: date.weekDay(t: r._time), Day: dayName(day: date.weekDay(t: r._time)), Hour: if date.hour(t: r._time) < 10 then \"0\" + string(v: date.hour(t: r._time)) else string(v: date.hour(t: r._time))}))\n  |> group(columns: [\"DayOrder\", \"Day\", \"Hour\"])\n  |> count(column: \"_value\")\n  |> keep(columns: [\"DayOrder\", \"Day\", \"Hour\", \"_value\"])\n  |> pivot(rowKey: [\"DayOrder\", \"Day\"], columnKey: [\"Hour\"], valueColumn: \"_value\")\n  |> sort(columns: [\"DayOrder\"])\n  |> drop(columns: [\"DayOrder\"])" }],
+      "fieldConfig": { "defaults": { "custom": { "align": "center", "cellOptions": { "type": "auto" } } }, "overrides": [{ "matcher": { "id": "byRegexp", "options": "^(0[0-9]|1[0-9]|2[0-3])$" }, "properties": [{ "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } }, { "id": "color", "value": { "mode": "continuous-YlOrRd" } }] }] },
+      "options": { "showHeader": true, "cellHeight": "md", "footer": { "show": false } }
+    },
+    {
+      "id": 8,
+      "type": "table",
+      "title": "Top Songs",
+      "description": "Click a song title to queue it for the configured Discord admin.",
+      "datasource": { "type": "influxdb", "uid": "castle-grooves-influxdb" },
+      "gridPos": { "x": 0, "y": 20, "w": 14, "h": 11 },
+      "targets": [{ "refId": "A", "query": "plays = from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"song_play\" and r._field == \"songTitle\")\n  |> group(columns: [\"songHash\"])\n  |> count(column: \"_value\")\n  |> keep(columns: [\"songHash\", \"_value\"])\n  |> rename(columns: {_value: \"Plays\"})\ndetails = from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"song_play\")\n  |> filter(fn: (r) => r._field == \"songTitle\" or r._field == \"songThumbnail\" or r._field == \"songUrl\" or r._field == \"artist\")\n  |> pivot(rowKey: [\"_time\", \"songHash\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> group(columns: [\"songHash\"])\n  |> sort(columns: [\"_time\"], desc: true)\n  |> limit(n: 1)\n  |> keep(columns: [\"songHash\", \"songTitle\", \"artist\", \"songThumbnail\", \"songUrl\"])\njoin(tables: {plays: plays, details: details}, on: [\"songHash\"])\n  |> rename(columns: {songTitle: \"Song\", artist: \"Artist\", songThumbnail: \"Artwork\", songUrl: \"Replay Query\"})\n  |> keep(columns: [\"Artwork\", \"Song\", \"Artist\", \"Plays\", \"Replay Query\"])\n  |> group()\n  |> sort(columns: [\"Plays\"], desc: true)\n  |> limit(n: 15)" }],
+      "fieldConfig": { "defaults": {}, "overrides": [{ "matcher": { "id": "byName", "options": "Artwork" }, "properties": [{ "id": "custom.cellOptions", "value": { "type": "image" } }] }, { "matcher": { "id": "byName", "options": "Song" }, "properties": [{ "id": "links", "value": [{ "title": "Play Song", "targetBlank": true, "url": "__BOT_PUBLIC_URL__/play?query=${__data.fields[\"Replay Query\"]:percentencode}" }] }] }, { "matcher": { "id": "byName", "options": "Replay Query" }, "properties": [{ "id": "custom.hidden", "value": true }] }] },
+      "options": { "showHeader": true, "cellHeight": "md", "footer": { "show": false }, "sortBy": [{ "displayName": "Plays", "desc": true }] }
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "title": "Top Requesters",
+      "datasource": { "type": "influxdb", "uid": "castle-grooves-influxdb" },
+      "gridPos": { "x": 14, "y": 20, "w": 10, "h": 11 },
+      "targets": [{ "refId": "A", "query": "plays = from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"song_play\" and r._field == \"songTitle\")\n  |> group(columns: [\"requestedById\"])\n  |> count(column: \"_value\")\n  |> keep(columns: [\"requestedById\", \"_value\"])\n  |> rename(columns: {_value: \"Plays\"})\npeople = from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"song_play\")\n  |> filter(fn: (r) => r._field == \"requestedByUsername\" or r._field == \"requestedByAvatar\")\n  |> pivot(rowKey: [\"_time\", \"requestedById\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> group(columns: [\"requestedById\"])\n  |> sort(columns: [\"_time\"], desc: true)\n  |> limit(n: 1)\n  |> keep(columns: [\"requestedById\", \"requestedByUsername\", \"requestedByAvatar\"])\njoin(tables: {plays: plays, people: people}, on: [\"requestedById\"])\n  |> rename(columns: {requestedByUsername: \"Requester\", requestedByAvatar: \"Avatar\"})\n  |> keep(columns: [\"Avatar\", \"Requester\", \"Plays\"])\n  |> group()\n  |> sort(columns: [\"Plays\"], desc: true)\n  |> limit(n: 12)" }],
+      "fieldConfig": { "defaults": {}, "overrides": [{ "matcher": { "id": "byName", "options": "Avatar" }, "properties": [{ "id": "custom.cellOptions", "value": { "type": "image" } }] }] },
+      "options": { "showHeader": true, "cellHeight": "md", "footer": { "show": false }, "sortBy": [{ "displayName": "Plays", "desc": true }] }
+    },
+    {
+      "id": 10,
+      "type": "table",
+      "title": "Recent History",
+      "description": "Click a song title to queue it for the configured Discord admin.",
+      "datasource": { "type": "influxdb", "uid": "castle-grooves-influxdb" },
+      "gridPos": { "x": 0, "y": 31, "w": 14, "h": 11 },
+      "targets": [{ "refId": "A", "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"song_play\")\n  |> filter(fn: (r) => r._field == \"songTitle\" or r._field == \"songThumbnail\" or r._field == \"songUrl\" or r._field == \"requestedByUsername\")\n  |> pivot(rowKey: [\"_time\", \"requestedById\", \"songHash\", \"source\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> rename(columns: {songThumbnail: \"Artwork\", songTitle: \"Song\", requestedByUsername: \"Requested By\", songUrl: \"Replay Query\", source: \"Source\"})\n  |> keep(columns: [\"_time\", \"Artwork\", \"Song\", \"Requested By\", \"Source\", \"Replay Query\"])\n  |> sort(columns: [\"_time\"], desc: true)\n  |> limit(n: 25)" }],
+      "fieldConfig": { "defaults": {}, "overrides": [{ "matcher": { "id": "byName", "options": "Artwork" }, "properties": [{ "id": "custom.cellOptions", "value": { "type": "image" } }] }, { "matcher": { "id": "byName", "options": "Song" }, "properties": [{ "id": "links", "value": [{ "title": "Play Song", "targetBlank": true, "url": "__BOT_PUBLIC_URL__/play?query=${__data.fields[\"Replay Query\"]:percentencode}" }] }] }, { "matcher": { "id": "byName", "options": "Replay Query" }, "properties": [{ "id": "custom.hidden", "value": true }] }] },
+      "options": { "showHeader": true, "cellHeight": "md", "footer": { "show": false }, "sortBy": [{ "displayName": "Time", "desc": true }] }
+    },
+    {
+      "id": 11,
+      "type": "table",
+      "title": "Voice Activity",
+      "datasource": { "type": "influxdb", "uid": "castle-grooves-influxdb" },
+      "gridPos": { "x": 14, "y": 31, "w": 10, "h": 11 },
+      "targets": [{ "refId": "A", "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"userVoiceStatus\" and r._field == \"voiceStateConnected\")\n  |> group(columns: [\"userId\"])\n  |> last()\n  |> map(fn: (r) => ({Member: r.username, Channel: r.voiceChannelName, Status: if r._value then \"Connected\" else \"Offline\", LastSeen: r._time}))\n  |> keep(columns: [\"Member\", \"Channel\", \"Status\", \"LastSeen\"])\n  |> group()\n  |> sort(columns: [\"Status\", \"Member\"])" }],
+      "fieldConfig": { "defaults": {}, "overrides": [{ "matcher": { "id": "byName", "options": "Status" }, "properties": [{ "id": "mappings", "value": [{ "type": "value", "options": { "Connected": { "text": "Connected", "color": "green" }, "Offline": { "text": "Offline", "color": "gray" } } }] }] }] },
+      "options": { "showHeader": true, "cellHeight": "md", "footer": { "show": false } }
+    }
+  ]
+}

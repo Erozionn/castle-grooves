@@ -32,6 +32,7 @@ services:
       PRELOAD_SONG_DATA: ${PRELOAD_SONG_DATA:-true}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       PERF_LOGGING: ${PERF_LOGGING:-false}
+      GRAFANA_PUBLIC_URL: ${GRAFANA_PUBLIC_URL:?Set GRAFANA_PUBLIC_URL to the LAN-accessible Grafana URL.}
     depends_on:
       lavalink:
         condition: service_healthy
@@ -122,18 +123,23 @@ services:
       INFLUX_BUCKET: ${INFLUX_BUCKET}
       INFLUX_TOKEN: ${INFLUX_TOKEN}
       BOT_PUBLIC_URL: ${BOT_PUBLIC_URL:?Set BOT_PUBLIC_URL to the LAN-accessible bot API URL.}
+      GRAFANA_PUBLIC_URL: ${GRAFANA_PUBLIC_URL:?Set GRAFANA_PUBLIC_URL to the LAN-accessible Grafana URL.}
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/dj-console.json
     entrypoint:
       - /bin/sh
       - -ec
       - |
-        render_dashboard() {
+        render_dashboards() {
           escaped_bot_url=$$(printf '%s' "$$BOT_PUBLIC_URL" | sed 's/[&|\\]/\\&/g')
           mkdir -p /var/lib/grafana/dashboards
-          sed "s|__BOT_PUBLIC_URL__|$$escaped_bot_url|g" /etc/grafana/dashboards/castle-grooves.json.template > /var/lib/grafana/dashboards/castle-grooves.json.tmp
-          mv /var/lib/grafana/dashboards/castle-grooves.json.tmp /var/lib/grafana/dashboards/castle-grooves.json
+          for dashboard in /etc/grafana/dashboards/*.template; do
+            filename=$$(basename "$$dashboard" .template)
+            sed "s|__BOT_PUBLIC_URL__|$$escaped_bot_url|g" "$$dashboard" > "/var/lib/grafana/dashboards/$$filename.tmp"
+            mv "/var/lib/grafana/dashboards/$$filename.tmp" "/var/lib/grafana/dashboards/$$filename"
+          done
         }
-        render_dashboard
-        while sleep 30; do render_dashboard; done &
+        render_dashboards
+        while sleep 30; do render_dashboards; done &
         exec /run.sh grafana-server --homepath=/usr/share/grafana
     depends_on:
       influxdb:
