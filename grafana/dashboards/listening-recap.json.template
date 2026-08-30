@@ -48,7 +48,7 @@
       "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
       "targets": [],
       "fieldConfig": { "defaults": {}, "overrides": [] },
-      "options": { "inlineEditing": true, "showAdvancedTypes": true, "panZoom": false, "zoomToContent": true, "tooltip": { "mode": "none" }, "root": { "name": "Navigation", "type": "frame", "elements": [{ "name": "DJ Console", "type": "text", "placement": { "left": 20, "top": 25, "width": 330, "height": 80 }, "config": { "text": { "mode": "fixed", "fixed": "Return to DJ Console  →" }, "align": "center", "valign": "middle", "size": 18, "color": { "fixed": "#c4b5fd" } }, "background": { "color": { "fixed": "#21183a" } }, "border": { "color": { "fixed": "#6d4aff" }, "width": 1, "radius": 10 }, "links": [{ "title": "Return to DJ Console", "url": "/d/castle-grooves-dj-console/dj-console", "targetBlank": false }] }] } }
+      "options": { "inlineEditing": false, "showAdvancedTypes": true, "panZoom": false, "zoomToContent": true, "tooltip": { "mode": "none" }, "root": { "name": "Navigation", "type": "frame", "elements": [{ "name": "DJ Console", "type": "text", "placement": { "left": 20, "top": 25, "width": 330, "height": 80 }, "config": { "text": { "mode": "fixed", "fixed": "Return to DJ Console  →" }, "align": "center", "valign": "middle", "size": 18, "color": { "fixed": "#c4b5fd" } }, "background": { "color": { "fixed": "#21183a" } }, "border": { "color": { "fixed": "#6d4aff" }, "width": 1, "radius": 10 }, "links": [{ "title": "Return to DJ Console", "url": "/d/castle-grooves-dj-console/dj-console", "targetBlank": false }] }] } }
     },
     {
       "id": 5,
