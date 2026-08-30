@@ -25,7 +25,7 @@ import {
 import { ClientType, CommandObject } from '@types'
 import { useComponents } from '@constants/messageComponents'
 import { getMainMessage, sendMessage, deleteMessage } from '@utils/mainMessage'
-import { preloadSongData } from '@utils/songHistoryV2'
+import { addBotStateChange, preloadSongData } from '@utils/songHistoryV2'
 import initApi from '@api'
 import ENV from '@constants/Env'
 import { recordVoiceStateChange } from '@utils/recordActivity'
@@ -34,6 +34,7 @@ import { nowPlayingCanvas, nowPlayingCanvasWithUpNext } from '@utils/nowPlayingC
 import useMockTracks from '@data/dummies/songArray'
 import { refillRadio } from '@utils/radio'
 import { createLogger, installLegacyConsoleBridge } from '@utils/logger'
+import { recordLavalinkState, recordRuntimeHeartbeat } from '@utils/observability'
 
 import { MusicManager, VoiceCommandManager } from './lib'
 import registerCommands from './deploy-commands'
@@ -227,6 +228,24 @@ client.once('ready', async () => {
 
   // eslint-disable-next-line no-console
   logger.info('Discord client ready', { guildId: mainGuild.id })
+
+  const recordHeartbeat = () => {
+    const queues = [...musicManager.queues.values()]
+    const lavalinkConnected = [...musicManager.shoukaku.nodes.values()].some((node) => node.state === 2)
+
+    recordRuntimeHeartbeat({
+      guildId: mainGuild.id,
+      connectedGuilds: client.guilds.cache.size,
+      activeQueues: queues.length,
+      playingQueues: queues.filter((queue) => queue.isPlaying).length,
+      voiceCommandSessions: voiceCommandManager.getActiveSessionCount(),
+      lavalinkConnected,
+    })
+  }
+
+  recordHeartbeat()
+  const heartbeatTimer = setInterval(recordHeartbeat, 60_000)
+  heartbeatTimer.unref()
 })
 
 client.on('interactionCreate', async (interaction) => {
@@ -250,17 +269,31 @@ client.on('voiceStateUpdate', (oldState, newState) => recordVoiceStateChange(old
 // Music Manager event listeners
 musicManager.on('playerStart', playSongEventHandler)
 musicManager.on('playerStart', (queue) => {
+  addBotStateChange(queue.guildId, 'playing', queue.tracks.length + (queue.currentTrack ? 1 : 0))
   refillRadio(queue).catch((error) => logger.error('Radio refill failed', error))
 })
 musicManager.on('audioTrackAdd', addSongEventHandler)
 musicManager.on('audioTracksAdd', addSongEventHandler) // For playlists
 musicManager.on('disconnect', (queue) => {
   voiceCommandManager.disable(queue.guildId)
+  addBotStateChange(queue.guildId, 'stopped', queue.tracks.length)
 })
 musicManager.on('disconnect', disconnectEventHandler)
 musicManager.on('emptyQueue', emptyEventHandler)
 musicManager.on('emptyQueue', songFinishEventHandler)
+musicManager.on('emptyQueue', (queue) => addBotStateChange(queue.guildId, 'idle', 0))
 musicManager.on('queueCreate', queueCreatedEventHandler)
+
+musicManager.on('nodeReady', (node: string) => recordLavalinkState(node, 'ready'))
+musicManager.on('nodeDisconnect', (node: string, retryCount: number) =>
+  recordLavalinkState(node, 'disconnected', `retryCount=${retryCount}`)
+)
+musicManager.on('nodeClose', (node: string, code: number, reason: string) =>
+  recordLavalinkState(node, 'closed', `code=${code} reason=${reason}`)
+)
+musicManager.on('nodeError', (node: string, error: Error) =>
+  recordLavalinkState(node, 'error', error.message)
+)
 
 // Error handlers
 musicManager.on('error', (guildId: string, error: Error) => {
