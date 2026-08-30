@@ -32,7 +32,10 @@ app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', grafanaOrigin)
     res.setHeader('Vary', 'Origin')
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Grafana-Action')
+    res.setHeader(
+      'Access-Control-Allow-Headers',
+      'Content-Type, X-Grafana-Action, X-Grafana-Device-Id'
+    )
   }
 
   if (req.method === 'OPTIONS') {
