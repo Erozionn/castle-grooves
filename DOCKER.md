@@ -73,6 +73,8 @@ Grafana listens on all host interfaces so trusted LAN devices can reach it. On f
 
 `BOT_PUBLIC_URL` must point at the bot API from a browser on that LAN, for example `http://192.168.1.100:1337`. Dashboard Play Song links queue music for `ADMIN_USER_ID`; that Discord user must already be in a voice channel. The bot API is network-protected only, so do not expose it to untrusted networks.
 
+The bot-health panels need a bot image built from this revision: it writes the `bot_runtime`, `bot_state`, and `lavalink_state` measurements. Deploy the updated bot image before expecting those panels to show data; listening history, top songs, requesters, and voice activity use existing data immediately.
+
 ## Logging
 
 The bot emits timestamped, human-readable logs to container stdout. Set `LOG_LEVEL=debug` temporarily to include queue, cache, and Lavalink diagnostics; the production default is `info`. `PERF_LOGGING=true` adds opt-in timing events.
