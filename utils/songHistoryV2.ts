@@ -760,6 +760,7 @@ const addBotStateChange = (
     .tag('guildId', guildId)
     .tag('state', state)
     .intField('queueLength', queueLength)
+    .stringField('playbackState', state)
 
   writeApi().writePoint(point)
   writeApi()

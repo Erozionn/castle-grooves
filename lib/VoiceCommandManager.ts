@@ -269,6 +269,10 @@ export class VoiceCommandManager {
     }
   }
 
+  getActiveSessionCount(): number {
+    return this.sessions.size
+  }
+
   destroy(): void {
     for (const guildId of [...this.sessions.keys()]) {
       this.disable(guildId)

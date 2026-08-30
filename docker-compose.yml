@@ -112,6 +112,47 @@ services:
         max-size: 10m
         max-file: '3'
 
+  grafana:
+    image: grafana/grafana-oss:13.2.0
+    restart: unless-stopped
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      INFLUX_ORG: ${INFLUX_ORG}
+      INFLUX_BUCKET: ${INFLUX_BUCKET}
+      INFLUX_TOKEN: ${INFLUX_TOKEN}
+      BOT_PUBLIC_URL: ${BOT_PUBLIC_URL:?Set BOT_PUBLIC_URL to the LAN-accessible bot API URL.}
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        render_dashboard() {
+          escaped_bot_url=$$(printf '%s' "$$BOT_PUBLIC_URL" | sed 's/[&|\\]/\\&/g')
+          mkdir -p /var/lib/grafana/dashboards
+          sed "s|__BOT_PUBLIC_URL__|$$escaped_bot_url|g" /etc/grafana/dashboards/castle-grooves.json.template > /var/lib/grafana/dashboards/castle-grooves.json.tmp
+          mv /var/lib/grafana/dashboards/castle-grooves.json.tmp /var/lib/grafana/dashboards/castle-grooves.json
+        }
+        render_dashboard
+        while sleep 30; do render_dashboard; done &
+        exec /run.sh grafana-server --homepath=/usr/share/grafana
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    ports:
+      - '${GRAFANA_PORT:-3000}:3000'
+    networks:
+      - castle-grooves
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
 networks:
   castle-grooves:
     driver: bridge
@@ -120,3 +161,4 @@ volumes:
   hello-responses:
   influxdb-data:
   influxdb-config:
+  grafana-data:

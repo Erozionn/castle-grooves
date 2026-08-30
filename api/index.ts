@@ -25,15 +25,35 @@ function initApi(client?: ClientType) {
     return
   }
 
-  app.get('/play/:query/:userId?', async (req, res) => {
-    const { query, userId } = req.params
-    const musicManager = client.musicManager
-    const queue = musicManager.getQueue(GUILD_ID as string) || null
+  const playFromRequest = async (req: express.Request, res: express.Response) => {
+    const pathQuery = req.params.query
+    const queryParameter = req.query.query
+    const pathUserId = req.params.userId
+    const userIdParameter = req.query.userId
+    const query =
+      typeof pathQuery === 'string'
+        ? pathQuery
+        : typeof queryParameter === 'string'
+          ? queryParameter
+          : undefined
+    const userId =
+      typeof pathUserId === 'string'
+        ? pathUserId
+        : typeof userIdParameter === 'string'
+          ? userIdParameter
+          : ADMIN_USER_ID
 
-    if (!queue) {
-      res.status(400).json({ message: 'Queue not found.' })
+    if (!query?.trim()) {
+      res.status(400).send('A song query is required.')
       return
     }
+
+    if (!userId) {
+      res.status(500).send('No playback user is configured.')
+      return
+    }
+
+    const musicManager = client.musicManager
 
     const guild = client.guilds.cache.get(GUILD_ID as string)
 
@@ -44,7 +64,7 @@ function initApi(client?: ClientType) {
 
     const channel = (await guild.channels.fetch(DEFAULT_TEXT_CHANNEL)) as BaseGuildTextChannel
     // Get Member from userId
-    const member = await guild.members.fetch(userId || ADMIN_USER_ID)
+    const member = await guild.members.fetch(userId)
 
     if (!member) {
       res.status(400).json({ message: 'User not found.' })
@@ -65,9 +85,9 @@ function initApi(client?: ClientType) {
     }
 
     try {
-      await musicManager.play(member.voice.channel, query)
+      const { queue } = await musicManager.play(member.voice.channel, query)
 
-      if (queue && queue.isPaused) {
+      if (queue.isPaused) {
         if (queue.tracks.length + (queue.currentTrack ? 1 : 0) >= 1) {
           await queue.skip()
         }
@@ -75,12 +95,16 @@ function initApi(client?: ClientType) {
       }
     } catch (e) {
       logger.error('Playback request failed', e)
-      res.status(400).json({ message: 'Error joining your channel.' })
+      res.status(400).send('Error joining your channel.')
+      return
     }
 
     res.set('Content-Type', 'text/html')
-    res.send('<script>window.close();</script>')
-  })
+    res.send('<script>window.close();</script><p>Song queued. You can close this tab.</p>')
+  }
+
+  app.get('/play', playFromRequest)
+  app.get('/play/:query/:userId?', playFromRequest)
 
   app.listen(WEBSERVER_PORT, () => logger.info('HTTP API listening', { port: WEBSERVER_PORT }))
 }

@@ -1,6 +1,6 @@
 # Castle Grooves Docker Compose Setup
 
-This project uses Docker Compose v2 to run the bot, Lavalink, and InfluxDB. Compose is split into a shared base file plus environment-specific overrides:
+This project uses Docker Compose v2 to run the bot, Lavalink, InfluxDB, and Grafana. Compose is split into a shared base file plus environment-specific overrides:
 
 - `docker-compose.yml`: shared service configuration, network, volumes, health checks, and environment mapping.
 - `docker-compose.dev.yml`: local development build target, hot reload mounts, debugger port, and dev volume names.
@@ -14,7 +14,7 @@ This project uses Docker Compose v2 to run the bot, Lavalink, and InfluxDB. Comp
 cp .env.example .env.dev
 ```
 
-2. Fill `.env.dev` with your Discord, Spotify, Lavalink, and InfluxDB values.
+2. Fill `.env.dev` with your Discord, Spotify, Lavalink, InfluxDB, and Grafana values. Set `BOT_PUBLIC_URL` to the LAN-accessible bot API URL used by Grafana's Play Song links.
 
 3. Start the stack with hot reload:
 
@@ -64,9 +64,14 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env 
 - Bot API: `http://localhost:${WEBSERVER_PORT}`
 - Lavalink: `http://localhost:2333`
 - InfluxDB UI: `http://localhost:8086`
+- Grafana: `http://<host>:${GRAFANA_PORT:-3000}`
 - Dozzle logs (production only): `http://<host>:8080`
 
 Dozzle reads Docker logs through a read-only Docker socket mount. Its UI is intentionally unauthenticated, so restrict access to port `8080` with your host firewall or network controls.
+
+Grafana listens on all host interfaces so trusted LAN devices can reach it. On first visit, sign in with Grafana's default `admin` / `admin` credentials and set a new password when prompted. Anonymous access and self-service sign-up are disabled. Restrict the Grafana port with your host firewall to trusted devices only.
+
+`BOT_PUBLIC_URL` must point at the bot API from a browser on that LAN, for example `http://192.168.1.100:1337`. Dashboard Play Song links queue music for `ADMIN_USER_ID`; that Discord user must already be in a voice channel. The bot API is network-protected only, so do not expose it to untrusted networks.
 
 ## Logging
 
@@ -92,6 +97,7 @@ docker build --target production -t castle-grooves:prod-test .
 ## Volumes
 
 - `influxdb-data` / `influxdb-config`: persistent production InfluxDB data and config.
+- `grafana-data`: Grafana users, preferences, and local state.
 - `influxdb-data-dev` / `influxdb-config-dev`: isolated local development InfluxDB data and config.
 - `node_modules` / `yarn_cache`: dev-only container dependency volumes.
 - `./recordings`: persisted bot voice recordings.
