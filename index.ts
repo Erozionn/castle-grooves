@@ -34,7 +34,12 @@ import { nowPlayingCanvas, nowPlayingCanvasWithUpNext } from '@utils/nowPlayingC
 import useMockTracks from '@data/dummies/songArray'
 import { refillRadio } from '@utils/radio'
 import { createLogger, installLegacyConsoleBridge } from '@utils/logger'
-import { recordLavalinkState, recordRuntimeHeartbeat } from '@utils/observability'
+import {
+  recordLavalinkState,
+  recordPlaybackSnapshot,
+  recordRuntimeHeartbeat,
+  PlaybackSnapshotStatus,
+} from '@utils/observability'
 
 import { MusicManager, VoiceCommandManager } from './lib'
 import registerCommands from './deploy-commands'
@@ -272,16 +277,44 @@ musicManager.on('playerStart', (queue) => {
   addBotStateChange(queue.guildId, 'playing', queue.tracks.length + (queue.currentTrack ? 1 : 0))
   refillRadio(queue).catch((error) => logger.error('Radio refill failed', error))
 })
+musicManager.on('queueStateChange', (queue, status: PlaybackSnapshotStatus) => {
+  const track = queue.currentTrack
+  const requester = track?.userData?.requestedBy
+  const durationMs = track?.info.length
+  const durationLabel = durationMs
+    ? `${Math.floor(durationMs / 60_000)}:${Math.floor((durationMs % 60_000) / 1_000)
+        .toString()
+        .padStart(2, '0')}`
+    : undefined
+
+  recordPlaybackSnapshot({
+    guildId: queue.guildId,
+    status,
+    title: track?.info.title,
+    artist: track?.info.author,
+    artworkUrl: track?.info.artworkUrl || track?.userData?.thumbnail,
+    requesterName: requester?.user.username,
+    requesterAvatar: requester?.displayAvatarURL(),
+    durationMs,
+    durationLabel,
+    startedAtMs: queue.playbackStartedAt || undefined,
+    queueDepth: queue.tracks.length,
+  })
+})
 musicManager.on('audioTrackAdd', addSongEventHandler)
 musicManager.on('audioTracksAdd', addSongEventHandler) // For playlists
 musicManager.on('disconnect', (queue) => {
   voiceCommandManager.disable(queue.guildId)
   addBotStateChange(queue.guildId, 'stopped', queue.tracks.length)
+  recordPlaybackSnapshot({ guildId: queue.guildId, status: 'stopped', queueDepth: 0 })
 })
 musicManager.on('disconnect', disconnectEventHandler)
 musicManager.on('emptyQueue', emptyEventHandler)
 musicManager.on('emptyQueue', songFinishEventHandler)
-musicManager.on('emptyQueue', (queue) => addBotStateChange(queue.guildId, 'idle', 0))
+musicManager.on('emptyQueue', (queue) => {
+  addBotStateChange(queue.guildId, 'idle', 0)
+  recordPlaybackSnapshot({ guildId: queue.guildId, status: 'idle', queueDepth: 0 })
+})
 musicManager.on('queueCreate', queueCreatedEventHandler)
 
 musicManager.on('nodeReady', (node: string) => recordLavalinkState(node, 'ready'))

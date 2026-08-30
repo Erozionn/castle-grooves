@@ -21,6 +21,8 @@ export interface QueueMetadata {
   [key: string]: any
 }
 
+export type PlaybackSnapshotStatus = 'playing' | 'paused' | 'idle' | 'stopped'
+
 export class MusicQueue {
   public manager: MusicManager
   public guildId: string
@@ -35,6 +37,7 @@ export class MusicQueue {
   public volume: number
   public repeatMode: 'off' | 'track' | 'queue'
   public history: LavalinkTrack[]
+  public playbackStartedAt: number | null
   private emptyChannelTimeout: NodeJS.Timeout | null
   private isTransitioning: boolean // Flag to prevent end event during track transitions
 
@@ -52,6 +55,7 @@ export class MusicQueue {
     this.volume = 100
     this.repeatMode = 'off'
     this.history = []
+    this.playbackStartedAt = null
     this.emptyChannelTimeout = null
     this.isTransitioning = false
   }
@@ -154,10 +158,12 @@ export class MusicQueue {
     this.player.on('start', () => {
       this.isPlaying = true
       this.isPaused = false
+      this.playbackStartedAt = Date.now()
       // Clear transitioning flag when track actually starts
       this.isTransitioning = false
       if (ENV.DEBUG_QUEUE) console.log(`[Queue] Track started, clearing transition flag`)
       this.manager.emit('playerStart', this, this.currentTrack)
+      this.emitSnapshotChange('playing')
     })
 
     this.player.on('end', (reason) => {
@@ -202,6 +208,7 @@ export class MusicQueue {
       } else {
         if (ENV.DEBUG_QUEUE) console.log(`[Queue] No more tracks in queue, emitting emptyQueue`)
         this.isPlaying = false
+        this.playbackStartedAt = null
         this.manager.emit('emptyQueue', this)
       }
     })
@@ -344,6 +351,7 @@ export class MusicQueue {
     }
     // Emit event so handlers can update UI
     this.manager.emit('audioTrackAdd', this, track)
+    this.emitSnapshotChange()
   }
 
   /**
@@ -353,6 +361,7 @@ export class MusicQueue {
     this.tracks.push(...tracks)
     // Emit event so handlers can update UI
     this.manager.emit('audioTracksAdd', this, tracks)
+    this.emitSnapshotChange()
   }
 
   /**
@@ -361,6 +370,7 @@ export class MusicQueue {
   insertTrack(track: LavalinkTrack, position = 0): void {
     const validPosition = Math.max(0, Math.min(position, this.tracks.length))
     this.tracks.splice(validPosition, 0, track)
+    this.emitSnapshotChange()
   }
 
   /**
@@ -441,6 +451,7 @@ export class MusicQueue {
     if (this.player && !this.isPaused) {
       this.player.setPaused(true)
       this.isPaused = true
+      this.emitSnapshotChange('paused')
     }
   }
 
@@ -451,6 +462,7 @@ export class MusicQueue {
     if (this.player && this.isPaused) {
       this.player.setPaused(false)
       this.isPaused = false
+      this.emitSnapshotChange('playing')
     }
   }
 
@@ -460,6 +472,7 @@ export class MusicQueue {
   skip(): void {
     if (this.player) {
       this.player.stopTrack()
+      this.emitSnapshotChange()
     }
   }
 
@@ -471,10 +484,13 @@ export class MusicQueue {
     this.currentTrack = null
     this.isPlaying = false
     this.isPaused = false
+    this.playbackStartedAt = null
 
     if (this.player) {
       this.player.stopTrack()
     }
+
+    this.emitSnapshotChange('stopped')
   }
 
   /**
@@ -521,6 +537,7 @@ export class MusicQueue {
    */
   clear(): void {
     this.tracks = []
+    this.emitSnapshotChange()
   }
 
   /**
@@ -575,6 +592,12 @@ export class MusicQueue {
     }
 
     this.manager.queues.delete(this.guildId)
+  }
+
+  private emitSnapshotChange(status?: PlaybackSnapshotStatus): void {
+    const currentStatus =
+      status || (this.isPaused ? 'paused' : this.isPlaying ? 'playing' : this.currentTrack ? 'idle' : 'idle')
+    this.manager.emit('queueStateChange', this, currentStatus)
   }
 
   /**
