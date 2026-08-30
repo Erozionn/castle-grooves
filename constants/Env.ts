@@ -18,7 +18,6 @@ const {
   LAVALINK_HOST,
   LAVALINK_PORT,
   LAVALINK_PASSWORD,
-  DEBUG_QUEUE,
   VOICE_COMMANDS_ENABLED,
   VOICE_HELLO_RESPONSES_ENABLED,
   VOICE_WAKE_WORD_CONFIRM_SOUND_ENABLED,
@@ -28,7 +27,14 @@ const {
   VOICE_CAPTURE_TIMEOUT_MS,
   VOICE_SILENCE_MS,
   PERF_LOGGING,
+  LOG_LEVEL: LOG_LEVEL_ENV,
 } = process.env
+
+const logLevels = ['debug', 'info', 'warn', 'error'] as const
+const configuredLogLevel = LOG_LEVEL_ENV?.toLowerCase()
+const LOG_LEVEL = logLevels.includes(configuredLogLevel as (typeof logLevels)[number])
+  ? (configuredLogLevel as (typeof logLevels)[number])
+  : 'info'
 
 const ENV = {
   CLIENT_ID,
@@ -50,7 +56,6 @@ const ENV = {
   LAVALINK_HOST: LAVALINK_HOST || 'localhost',
   LAVALINK_PORT: LAVALINK_PORT || '2333',
   LAVALINK_PASSWORD: LAVALINK_PASSWORD || 'youshallnotpass',
-  DEBUG_QUEUE: DEBUG_QUEUE === 'true',
   VOICE_COMMANDS_ENABLED: VOICE_COMMANDS_ENABLED === 'true',
   VOICE_HELLO_RESPONSES_ENABLED: VOICE_HELLO_RESPONSES_ENABLED === 'true',
   VOICE_WAKE_WORD_CONFIRM_SOUND_ENABLED: VOICE_WAKE_WORD_CONFIRM_SOUND_ENABLED === 'true',
@@ -61,6 +66,8 @@ const ENV = {
   VOICE_SILENCE_MS: Number(VOICE_SILENCE_MS || 1200),
   // Disabled by default: timing logs are useful during tuning, but should not add log noise normally.
   PERF_LOGGING: PERF_LOGGING === 'true',
+  LOG_LEVEL,
+  DEBUG_QUEUE: LOG_LEVEL === 'debug',
 }
 
 export default ENV

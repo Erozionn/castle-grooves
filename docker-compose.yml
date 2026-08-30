@@ -30,6 +30,7 @@ services:
       WEBSERVER_PORT: ${WEBSERVER_PORT:-1337}
       NOW_PLAYING_MOCK_DATA: ${NOW_PLAYING_MOCK_DATA:-false}
       PRELOAD_SONG_DATA: ${PRELOAD_SONG_DATA:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
       PERF_LOGGING: ${PERF_LOGGING:-false}
     depends_on:
       lavalink:
@@ -42,6 +43,11 @@ services:
       - ./recordings:/usr/src/app/recordings
       - ./models:/usr/src/app/models:ro
       - hello-responses:/usr/src/app/assets/audio/hello-responses
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
 
   lavalink:
     image: ghcr.io/lavalink-devs/lavalink:4.2-alpine
@@ -71,6 +77,11 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
 
   influxdb:
     image: influxdb:2-alpine
@@ -95,6 +106,11 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
 
 networks:
   castle-grooves:

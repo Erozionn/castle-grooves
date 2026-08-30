@@ -4,8 +4,11 @@ import { Shoukaku, Connectors, Node, Player as ShoukakuPlayer, NodeOption } from
 import { Client, VoiceBasedChannel, GuildMember, Interaction } from 'discord.js'
 
 import { logLatency, startLatencyTimer } from '@utils/latency'
+import { createLogger } from '@utils/logger'
 
 import { MusicQueue } from './MusicQueue'
+
+const logger = createLogger('lavalink')
 
 export interface MusicManagerOptions {
   nodes: NodeOption[]
@@ -77,22 +80,22 @@ export class MusicManager extends EventEmitter {
 
   private setupShoukakuEvents() {
     this.shoukaku.on('ready', (name: string) => {
-      console.log(`[Lavalink] Node ${name} is ready!`)
+      logger.info('Node ready', { node: name })
       this.emit('nodeReady', name)
     })
 
     this.shoukaku.on('error', (name: string, error: Error) => {
-      console.error(`[Lavalink] Node ${name} error:`, error)
+      logger.error('Node error', error, { node: name })
       this.emit('nodeError', name, error)
     })
 
     this.shoukaku.on('close', (name: string, code: number, reason: string) => {
-      console.warn(`[Lavalink] Node ${name} closed: ${code} - ${reason}`)
+      logger.warn('Node closed', { node: name, code, reason })
 
       // Clear all queue connections when node closes to prevent stale sessions
       this.queues.forEach((queue) => {
         if (queue.player) {
-          console.log(`[MusicManager] Clearing stale player for guild ${queue.guildId}`)
+          logger.info('Clearing stale player', { guildId: queue.guildId })
           // eslint-disable-next-line no-param-reassign
           queue.player = null
           // eslint-disable-next-line no-param-reassign
@@ -104,7 +107,7 @@ export class MusicManager extends EventEmitter {
     })
 
     this.shoukaku.on('disconnect', (name: string, count: number) => {
-      console.warn(`[Lavalink] Node ${name} disconnected. Retry count: ${count}`)
+      logger.warn('Node disconnected', { node: name, retryCount: count })
       this.emit('nodeDisconnect', name, count)
 
       // If no nodes remain connected, exit so Docker restarts the container
@@ -112,13 +115,13 @@ export class MusicManager extends EventEmitter {
         (node) => node.state === 2 // NodeState.Connected = 2
       )
       if (connectedNodes.length === 0) {
-        console.error('[Lavalink] All nodes disconnected — exiting for container restart')
+        logger.error('All nodes disconnected; exiting for container restart')
         process.exit(1)
       }
     })
 
     this.shoukaku.on('debug', (name: string, info: string) => {
-      console.log(`[Lavalink Debug] ${name}:`, info)
+      logger.debug('Node debug event', { node: name, details: info })
       this.emit('debug', name, info)
     })
 
@@ -344,7 +347,7 @@ export class MusicManager extends EventEmitter {
         playlistInfo: this.extractPlaylistInfo(result),
       }
     } catch (error) {
-      console.error('[MusicManager] Search error:', error)
+      logger.error('Search failed', error)
       logLatency('lavalink.resolve-error', startedAt, { queryType: isUrl ? 'url' : 'search' })
       return {
         tracks: [],
