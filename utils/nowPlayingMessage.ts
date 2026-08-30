@@ -1,4 +1,5 @@
 import { useComponents } from '@constants/messageComponents'
+import { getRadioStation } from '@constants/radioStations'
 import { logLatency, startLatencyTimer } from '@utils/latency'
 import { sendMessage } from '@utils/mainMessage'
 import { generateNowPlayingCanvas } from '@utils/nowPlayingCanvas'
@@ -55,7 +56,13 @@ const refreshNowPlayingMessage = async (state: UpdateState) => {
     const canvasStartedAt = startLatencyTimer()
     const sendStartedAt = startLatencyTimer()
     try {
-      const buffer = await generateNowPlayingCanvas(tracks)
+      const radioStation = queue.metadata.radio
+        ? getRadioStation(queue.metadata.radio.stationId)
+        : undefined
+      const buffer = await generateNowPlayingCanvas(tracks, {
+        radioStationName: radioStation ? `${radioStation.label} Radio` : undefined,
+        radioStationImage: radioStation?.coverImage,
+      })
       logLatency('dashboard.canvas', canvasStartedAt, {
         guildId: queue.guildId,
         tracks: tracks.length,

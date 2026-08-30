@@ -33,9 +33,14 @@ import { commandInteractionHandler } from '@components/interactions'
 import { nowPlayingCanvas, nowPlayingCanvasWithUpNext } from '@utils/nowPlayingCanvas'
 import useMockTracks from '@data/dummies/songArray'
 import { refillRadio } from '@utils/radio'
+import { createLogger, installLegacyConsoleBridge } from '@utils/logger'
 
 import { MusicManager, VoiceCommandManager } from './lib'
 import registerCommands from './deploy-commands'
+
+const logger = createLogger('bot')
+
+installLegacyConsoleBridge()
 
 const {
   BOT_TOKEN,
@@ -59,9 +64,7 @@ const voiceListenerClient = (() => {
   if (!ENV.VOICE_LISTENER_BOT_TOKEN) return undefined
 
   if (ENV.VOICE_LISTENER_BOT_TOKEN === BOT_TOKEN) {
-    console.warn(
-      '[VoiceListener] VOICE_LISTENER_BOT_TOKEN matches BOT_TOKEN; falling back to experimental same-bot receiver.'
-    )
+    logger.warn('Voice listener token matches primary bot token; using same-bot receiver')
     return undefined
   }
 
@@ -114,7 +117,7 @@ initApi(client)
 registerCommands()
 
 if (NOW_PLAYING_MOCK_DATA) {
-  console.log('[nowPlayingMock] Generating mock now playing data...')
+  logger.debug('Generating mock now-playing data')
   const mockTracks = useMockTracks()
 
   if (mockTracks && mockTracks.length > 0) {
@@ -126,7 +129,7 @@ if (NOW_PLAYING_MOCK_DATA) {
       fs.writeFileSync('mockNowPlaying.png', buffer)
     })
   } else {
-    console.log('[nowPlayingMock] No mock data available, skipping')
+    logger.debug('No mock now-playing data available')
   }
 
   // client.once('ready', async () => {
@@ -203,9 +206,7 @@ client.once('ready', async () => {
     )
 
     if (botMessages.size > 0)
-      console.log(
-        `[housekeeping] Deleting ${botMessages.size} old bot message(s) from ${channel.name}`
-      )
+      logger.info('Deleting old bot messages', { count: botMessages.size, channel: channel.name })
 
     botMessages.forEach((message) => {
       message.delete()
@@ -225,7 +226,7 @@ client.once('ready', async () => {
   }
 
   // eslint-disable-next-line no-console
-  console.log('[CastleGrooves] Ready!')
+  logger.info('Discord client ready', { guildId: mainGuild.id })
 })
 
 client.on('interactionCreate', async (interaction) => {
@@ -249,7 +250,7 @@ client.on('voiceStateUpdate', (oldState, newState) => recordVoiceStateChange(old
 // Music Manager event listeners
 musicManager.on('playerStart', playSongEventHandler)
 musicManager.on('playerStart', (queue) => {
-  refillRadio(queue).catch((error) => console.error('[radio] Refill failed:', error))
+  refillRadio(queue).catch((error) => logger.error('Radio refill failed', error))
 })
 musicManager.on('audioTrackAdd', addSongEventHandler)
 musicManager.on('audioTracksAdd', addSongEventHandler) // For playlists
@@ -263,19 +264,21 @@ musicManager.on('queueCreate', queueCreatedEventHandler)
 
 // Error handlers
 musicManager.on('error', (guildId: string, error: Error) => {
-  console.error('[musicManagerError]', error)
+  logger.error('Music manager error', error, { guildId })
 })
 
 process.on('unhandledRejection', (reason) => {
-  console.error('Unhandled Rejection:', reason)
+  logger.error('Unhandled promise rejection', reason)
 })
 
 process.on('SIGINT', () => {
+  logger.info('Received shutdown signal', { signal: 'SIGINT' })
   voiceCommandManager.destroy()
   process.exit(0)
 })
 
 process.on('SIGTERM', () => {
+  logger.info('Received shutdown signal', { signal: 'SIGTERM' })
   voiceCommandManager.destroy()
   process.exit(0)
 })
@@ -316,11 +319,11 @@ client.on('messageCreate', (msg) => {
 
 if (voiceListenerClient) {
   voiceListenerClient.once('ready', () => {
-    console.log(`[VoiceListener] Ready as ${voiceListenerClient.user?.tag}`)
+    logger.info('Voice listener ready', { user: voiceListenerClient.user?.tag })
   })
 
   voiceListenerClient.login(ENV.VOICE_LISTENER_BOT_TOKEN).catch((error) => {
-    console.error('[VoiceListener] Login failed:', error)
+    logger.error('Voice listener login failed', error)
   })
 }
 

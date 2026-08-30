@@ -64,6 +64,15 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env 
 - Bot API: `http://localhost:${WEBSERVER_PORT}`
 - Lavalink: `http://localhost:2333`
 - InfluxDB UI: `http://localhost:8086`
+- Dozzle logs (production only): `http://<host>:8080`
+
+Dozzle reads Docker logs through a read-only Docker socket mount. Its UI is intentionally unauthenticated, so restrict access to port `8080` with your host firewall or network controls.
+
+## Logging
+
+The bot emits timestamped, human-readable logs to container stdout. Set `LOG_LEVEL=debug` temporarily to include queue, cache, and Lavalink diagnostics; the production default is `info`. `PERF_LOGGING=true` adds opt-in timing events.
+
+Docker retains at most three 10 MB `json-file` log files per service. Dozzle viewers can see logged track titles, requester IDs, and guild IDs, so limit access to the UI accordingly.
 
 ## Building Images
 

@@ -3,8 +3,11 @@ import { sendMessage } from '@utils/mainMessage'
 import { addSong } from '@utils/songHistoryV2'
 import { useDJMode } from '@hooks/useDJMode'
 import { triggerQueueEmpty } from '@utils/djTriggers'
+import { createLogger } from '@utils/logger'
 
 import type { MusicQueue } from '../../lib'
+
+const logger = createLogger('queue')
 
 export default async (queue: MusicQueue) => {
   const { stopDJMode } = useDJMode(queue)
@@ -14,7 +17,7 @@ export default async (queue: MusicQueue) => {
 
   stopDJMode()
 
-  console.log('[songFinish] Queue finished', queue.tracks.length === 0, !queue.currentTrack)
+  logger.info('Queue finished', { guildId: queue.guildId })
 
   const components = await useComponents(queue)
   const { channel } = queue.metadata

@@ -4,6 +4,9 @@ import express from 'express'
 import { BaseGuildTextChannel } from 'discord.js'
 
 import type { ClientType } from '@types'
+import { createLogger } from '@utils/logger'
+
+const logger = createLogger('api')
 
 const { WEBSERVER_PORT, ADMIN_USER_ID, GUILD_ID, DEFAULT_TEXT_CHANNEL } = process.env
 
@@ -13,12 +16,12 @@ app.use('/static', express.static(path.resolve('public')))
 
 function initApi(client?: ClientType) {
   if (!DEFAULT_TEXT_CHANNEL || !ADMIN_USER_ID || !GUILD_ID) {
-    console.error('[api] Missing environment variables.')
+    logger.error('Missing required environment variables')
     return
   }
 
   if (!client) {
-    console.error('[api] Client not provided.')
+    logger.error('Discord client not provided')
     return
   }
 
@@ -71,7 +74,7 @@ function initApi(client?: ClientType) {
         queue.resume()
       }
     } catch (e) {
-      console.warn('[api]', e)
+      logger.error('Playback request failed', e)
       res.status(400).json({ message: 'Error joining your channel.' })
     }
 
@@ -79,7 +82,7 @@ function initApi(client?: ClientType) {
     res.send('<script>window.close();</script>')
   })
 
-  app.listen(WEBSERVER_PORT)
+  app.listen(WEBSERVER_PORT, () => logger.info('HTTP API listening', { port: WEBSERVER_PORT }))
 }
 
 export default initApi

@@ -8,6 +8,21 @@ services:
     labels:
       com.centurylinklabs.watchtower.enable: 'true'
 
+  dozzle:
+    image: amir20/dozzle:latest
+    restart: unless-stopped
+    ports:
+      - '8080:8080'
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - castle-grooves
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
   watchtower:
     image: containrrr/watchtower:latest
     restart: unless-stopped
@@ -22,3 +37,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - castle-grooves
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'

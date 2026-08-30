@@ -97,7 +97,6 @@ const resetToDefaults = () => {
 }
 
 export const useComponents = async (queue?: MusicQueue, voiceCommandsEnabled?: boolean) => {
-  console.log('[useComponents] Starting...')
   const playerButtons = defaultPlayerButtons
 
   // Create fresh instance each time to avoid shared state issues
@@ -116,19 +115,15 @@ export const useComponents = async (queue?: MusicQueue, voiceCommandsEnabled?: b
     .setDisabled(!ENV.VOICE_COMMANDS_ENABLED)
     .setLabel(isVoiceCommandsEnabled ? 'Voice: On' : 'Voice: Off')
 
-  console.log('[useComponents] Calling generateHistoryOptions...')
   const { options } = await generateHistoryOptions()
-  console.log(`[useComponents] Generated ${options.length} history options`)
 
   if (options.length > 0) {
-    console.log('[useComponents] Setting options on history menu')
     playerHistory
       .setOptions(options)
       .setPlaceholder('-- Song History --')
       .setMaxValues(options.length)
       .setDisabled(false)
   } else {
-    console.log('[useComponents] No options, using placeholder')
     playerHistory
       .setOptions([
         {
@@ -141,8 +136,6 @@ export const useComponents = async (queue?: MusicQueue, voiceCommandsEnabled?: b
       .setMaxValues(1)
       .setDisabled(true)
   }
-
-  console.log('[useComponents] History menu configured')
 
   const buttonsActionRow1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     playerButtons.back,

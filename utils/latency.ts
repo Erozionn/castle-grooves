@@ -1,6 +1,9 @@
 import { performance } from 'node:perf_hooks'
 
 import ENV from '@constants/Env'
+import { createLogger } from '@utils/logger'
+
+const logger = createLogger('perf')
 
 /**
  * Low-overhead, opt-in timing helper. It only logs when PERF_LOGGING=true and
@@ -23,5 +26,5 @@ export const logLatency = (
         .join(' ')
     : ''
 
-  console.log(`[perf] ${operation} ${elapsedMs}ms${metadata ? ` ${metadata}` : ''}`)
+  logger.info(operation, { elapsedMs, details: metadata || undefined })
 }

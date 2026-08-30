@@ -19,22 +19,23 @@ export default async (queue: MusicQueue | null) => {
     return
   }
 
-  // Get the last track from history
-  const previousTrack = queue.history[queue.history.length - 1]
+  // History is newest-first, so the previous track is at the front.
+  const previousTrack = queue.history.shift()
 
-  // Remove from history
-  queue.history.pop()
+  if (!previousTrack) {
+    return
+  }
 
   // Put current track at the front of the queue so we can go forward to it later
-  if (queue.currentTrack) {
-    queue.tracks.unshift(queue.currentTrack)
-  }
+  queue.tracks.unshift(queue.currentTrack)
 
   // Put the previous track at the very front
   queue.tracks.unshift(previousTrack)
 
-  // Skip to play the previous track
-  queue.skip()
+  // Start the previous track through the queue transition path. Using skip() would
+  // add the outgoing track back to history, making repeated Back presses alternate
+  // between two tracks instead of continuing backward through the history.
+  await queue.play()
 
   if (mainMessage?.channel.isTextBased() && 'guild' in mainMessage.channel) {
     sendMessage(mainMessage.channel, {
