@@ -8,6 +8,8 @@ export type RadioStation = {
   label: string
   description: string
   emoji: string
+  /** Optional local image path or URL shown on the now-playing card. */
+  coverImage?: string
   /** Artist anchors used to construct the station's Mix rotation. */
   artists: string[]
   sources: RadioStationSeed[]

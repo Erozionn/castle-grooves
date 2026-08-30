@@ -26,6 +26,8 @@ GlobalFonts.registerFromPath(path.resolve('./assets/fonts/Poppins-Bold.ttf'), 'P
 type CanvasOptions = {
   currentTrackDislikes?: number
   playlistTitle?: string
+  radioStationName?: string
+  radioStationImage?: string
 }
 
 type LoadedImage = Awaited<ReturnType<typeof loadImage>>
@@ -52,6 +54,30 @@ const loadCachedImage = (source: string): Promise<LoadedImage> => {
   }
 
   return imagePromise
+}
+
+const renderCircularImage = async (
+  canvas: Canvas,
+  source: string,
+  x: number,
+  y: number,
+  errorLabel: string
+) => {
+  const canv = canvas.getContext('2d')
+  canv.save()
+  canv.beginPath()
+  canv.arc(x + 16, y + 16, 16, 0, Math.PI * 2)
+  canv.closePath()
+  canv.clip()
+
+  try {
+    const image = await loadCachedImage(source)
+    canv.drawImage(image, x, y, 32, 32)
+  } catch (error) {
+    console.warn(`[${errorLabel}]`, error)
+  }
+
+  canv.restore()
 }
 
 const getThumbsDownIcon = () => {
@@ -235,6 +261,8 @@ export const nowPlayingCanvasWithUpNext = async (
 
   const song = songs[0]
   const { requestedBy } = song.userData || {}
+  const attributionName =
+    options?.radioStationName || (requestedBy ? capitalize(requestedBy.user.username) : null)
   const thumbnailUrl = getThumbnailUrl(song)
   const isLocal = false // Local file detection not implemented for Lavalink yet
   let thumbnailX = 25
@@ -317,43 +345,45 @@ export const nowPlayingCanvasWithUpNext = async (
   canv.font = '18px Poppins'
   canv.fillText('UP NEXT:', 345, 40)
 
-  if (requestedBy) {
-    // Render requester profile picture
-    canv.save()
-
-    canv.beginPath()
-    canv.arc(41, 359, 16, 0, Math.PI * 2)
-    canv.closePath()
-    canv.clip()
-
-    try {
-      const avatar = await loadCachedImage(
-        requestedBy.displayAvatarURL({ extension: 'png', size: 64 })
+  if (attributionName) {
+    // Radio playback uses its optional station cover in place of an avatar.
+    if (requestedBy && !options?.radioStationName) {
+      await renderCircularImage(
+        canvas,
+        requestedBy.displayAvatarURL({ extension: 'png', size: 64 }),
+        25,
+        343,
+        'AvatarError'
       )
-      canv.drawImage(avatar, 25, 343, 32, 32)
-    } catch (e) {
-      console.warn('[AvatarError] ', e)
+    } else if (options?.radioStationImage) {
+      await renderCircularImage(
+        canvas,
+        options.radioStationImage,
+        25,
+        343,
+        'RadioStationImageError'
+      )
     }
-
-    canv.restore()
 
     if (isLocal) {
       const isLocalIcon = await loadImage('./assets/icons/downloaded.png')
       canv.drawImage(isLocalIcon, 320 - 32 - 20, 343)
     }
 
-    // Render requester name
+    // Render the requester or active radio station name.
     canv.fillStyle = '#ffffff'
     canv.textAlign = 'left'
     canv.font = '600 18px Poppins'
-    canv.fillText(capitalize(requestedBy.user.username), 70, 364)
+    canv.fillText(attributionName, 70, 364)
     canv.fillStyle = '#ffffff'
 
     try {
       const pics = await Promise.all(
         songs.slice(1, 7).map((s) => {
           return s.userData?.requestedBy
-            ? loadCachedImage(s.userData.requestedBy.displayAvatarURL({ extension: 'png', size: 64 }))
+            ? loadCachedImage(
+                s.userData.requestedBy.displayAvatarURL({ extension: 'png', size: 64 })
+              )
             : null
         })
       )
@@ -431,6 +461,8 @@ export const nowPlayingCanvas = async (
   const canvas = new Canvas(700, 169)
   const canv = canvas.getContext('2d')
   const { requestedBy } = song.userData || {}
+  const attributionName =
+    options?.radioStationName || (requestedBy ? capitalize(requestedBy.user.username) : null)
   const thumbnailUrl = getThumbnailUrl(song)
   const isLocal = false // Local file detection not implemented for Lavalink yet
 
@@ -499,31 +531,31 @@ export const nowPlayingCanvas = async (
     })
   }
 
-  if (requestedBy) {
-    // Render requester profile picture
-    canv.save()
-
-    canv.beginPath()
-    canv.arc(_width + 41, 133, 16, 0, Math.PI * 2)
-    canv.closePath()
-    canv.clip()
-
-    try {
-      const avatar = await loadCachedImage(
-        requestedBy.displayAvatarURL({ extension: 'png', size: 64 })
+  if (attributionName) {
+    // Radio playback uses its optional station cover in place of an avatar.
+    if (requestedBy && !options?.radioStationName) {
+      await renderCircularImage(
+        canvas,
+        requestedBy.displayAvatarURL({ extension: 'png', size: 64 }),
+        _width + 25,
+        117,
+        'AvatarError'
       )
-      canv.drawImage(avatar, _width + 25, 117, 32, 32)
-    } catch (e) {
-      console.warn('[AvatarError]', e)
+    } else if (options?.radioStationImage) {
+      await renderCircularImage(
+        canvas,
+        options.radioStationImage,
+        _width + 25,
+        117,
+        'RadioStationImageError'
+      )
     }
 
-    canv.restore()
-
-    // Render requester name
+    // Render the requester or active radio station name.
     canv.fillStyle = '#ffffff'
     canv.textAlign = 'left'
     canv.font = '600 18px Poppins'
-    canv.fillText(capitalize(requestedBy.user.username), _width + 25 + 32 + 12, 139)
+    canv.fillText(attributionName, _width + 25 + 32 + 12, 139)
 
     if (isLocal) {
       const isLocalIcon = await loadImage('./assets/icons/downloaded.png')
@@ -558,6 +590,8 @@ const processTracks = async (tracks: LavalinkTrack[], options?: CanvasOptions): 
       options?.currentTrackDislikes ?? (await getSongDislikeCount(tracks[0].info.identifier)),
     playlistTitle:
       tracks.length > 1 ? (options?.playlistTitle ?? tracks[0].userData?.playlistTitle) : undefined,
+    radioStationName: options?.radioStationName,
+    radioStationImage: options?.radioStationImage,
   }
 
   if (tracks.length > 1) {
