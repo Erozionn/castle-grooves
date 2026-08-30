@@ -25,7 +25,7 @@
       ],
       "fieldConfig": { "defaults": {}, "overrides": [] },
       "options": {
-        "inlineEditing": true,
+        "inlineEditing": false,
         "showAdvancedTypes": true,
         "panZoom": false,
         "zoomToContent": true,
@@ -38,7 +38,7 @@
               "name": "Artwork",
               "type": "rectangle",
               "placement": { "left": 26, "top": 24, "width": 310, "height": 310 },
-              "background": { "color": { "fixed": "#20142f" }, "image": { "mode": "field", "field": "Artwork" }, "size": "cover" },
+              "background": { "color": { "fixed": "#20142f" }, "image": { "mode": "field", "field": "Artwork" }, "size": "contain" },
               "border": { "color": { "fixed": "#8b5cf6" }, "width": 1, "radius": 12 }
             },
             {
@@ -165,7 +165,7 @@
       "gridPos": { "x": 18, "y": 13, "w": 6, "h": 3 },
       "targets": [],
       "fieldConfig": { "defaults": {}, "overrides": [] },
-      "options": { "inlineEditing": true, "showAdvancedTypes": true, "panZoom": false, "zoomToContent": true, "tooltip": { "mode": "none" }, "root": { "name": "Navigation", "type": "frame", "elements": [{ "name": "Listening Recap", "type": "text", "placement": { "left": 20, "top": 20, "width": 330, "height": 70 }, "config": { "text": { "mode": "fixed", "fixed": "Open Listening Recap  →" }, "align": "center", "valign": "middle", "size": 18, "color": { "fixed": "#c4b5fd" } }, "background": { "color": { "fixed": "#21183a" } }, "border": { "color": { "fixed": "#6d4aff" }, "width": 1, "radius": 10 }, "links": [{ "title": "Open Listening Recap", "url": "/d/castle-grooves-recap/listening-recap", "targetBlank": false }] }] } }
+      "options": { "inlineEditing": false, "showAdvancedTypes": true, "panZoom": false, "zoomToContent": true, "tooltip": { "mode": "none" }, "root": { "name": "Navigation", "type": "frame", "elements": [{ "name": "Listening Recap", "type": "text", "placement": { "left": 20, "top": 20, "width": 330, "height": 70 }, "config": { "text": { "mode": "fixed", "fixed": "Open Listening Recap  →" }, "align": "center", "valign": "middle", "size": 18, "color": { "fixed": "#c4b5fd" } }, "background": { "color": { "fixed": "#21183a" } }, "border": { "color": { "fixed": "#6d4aff" }, "width": 1, "radius": 10 }, "links": [{ "title": "Open Listening Recap", "url": "/d/castle-grooves-recap/listening-recap", "targetBlank": false }] }] } }
     }
   ]
 }
