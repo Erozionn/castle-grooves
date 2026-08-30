@@ -113,7 +113,7 @@ services:
         max-file: '3'
 
   grafana:
-    image: grafana/grafana-oss:13.2.0
+    image: grafana/grafana-oss:13.0.2
     restart: unless-stopped
     environment:
       GF_AUTH_ANONYMOUS_ENABLED: 'false'
