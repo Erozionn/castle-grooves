@@ -1,6 +1,9 @@
 import crypto from 'node:crypto'
 
 import type { SongHistory } from '@types'
+import ENV from '@constants/Env'
+import { queryApi } from '@hooks/InfluxDb'
+import { HistoryUnavailableError } from '@utils/songHistoryV2'
 
 export type HistoryPlay = {
   playId: string
@@ -103,4 +106,41 @@ export const surroundingHistoryPlays = (plays: HistoryPlay[], playId: string, ra
   const index = chronological.findIndex((play) => play.playId === playId)
   if (index < 0) return []
   return chronological.slice(Math.max(0, index - radius), index + radius + 1)
+}
+
+export type HistoryPage = { items: HistoryPlay[]; nextCursor: string | null }
+const historyRangeMs: Record<string, number> = { '24h': 86_400_000, weekly: 7 * 86_400_000, monthly: 30 * 86_400_000, yearly: 365 * 86_400_000 }
+const cursor = (before: string) => Buffer.from(JSON.stringify({ before }), 'utf8').toString('base64url')
+
+export const decodeHistoryCursor = (value: string): string | null => {
+  try {
+    const parsed = JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as { before?: unknown }
+    return typeof parsed.before === 'string' && !Number.isNaN(Date.parse(parsed.before)) ? new Date(parsed.before).toISOString() : null
+  } catch { return null }
+}
+
+/** Reads one bounded page, with an exclusive timestamp cursor for older starts. */
+export const getHistoryPageStrict = async ({ range, from, to, before, limit }: { range: string; from?: string; to?: string; before?: string; limit: number }): Promise<HistoryPage> => {
+  const end = to ? new Date(to) : new Date()
+  const start = from ? new Date(from) : new Date(end.getTime() - historyRangeMs[range])
+  if (!historyRangeMs[range] || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start >= end) throw new Error('Invalid history date bounds.')
+  const cursorBefore = before ? new Date(before) : undefined
+  if (cursorBefore && (Number.isNaN(cursorBefore.getTime()) || cursorBefore <= start || cursorBefore > end)) throw new Error('Invalid history cursor.')
+  const fluxTime = (date: Date) => `time(v: ${JSON.stringify(date.toISOString())})`
+  const cursorFilter = cursorBefore ? `\n    |> filter(fn: (r) => r["_time"] < ${fluxTime(cursorBefore)})` : ''
+  const query = `
+  from(bucket:"${ENV.INFLUX_BUCKET}")
+    |> range(start: ${fluxTime(start)}, stop: ${fluxTime(end)})
+    |> filter(fn: (r) => r["_measurement"] == "song_play")
+    |> filter(fn: (r) => r["_field"] == "songTitle" or r["_field"] == "artist" or r["_field"] == "title" or r["_field"] == "songUrl" or r["_field"] == "songIdentifier" or r["_field"] == "songThumbnail" or r["_field"] == "requestedByUsername" or r["_field"] == "requestedByAvatar")
+    |> group(columns: ["_time", "songHash", "requestedById"])
+    |> pivot(rowKey:["_time", "songHash", "requestedById"], columnKey: ["_field"], valueColumn: "_value")
+    |> group()
+    |> sort(columns: ["_time"], desc: true)${cursorFilter}
+    |> limit(n: ${limit + 1})`
+  try {
+    const rows = await queryApi().collectRows<SongHistory>(query)
+    const page = rows.slice(0, limit).map(normalizeHistoryPlay)
+    return { items: page, nextCursor: rows.length > limit && page.length ? cursor(page.at(-1)!.playedAt) : null }
+  } catch (error) { throw new HistoryUnavailableError(error) }
 }

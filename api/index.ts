@@ -18,7 +18,7 @@ import {
   originIsAllowed,
 } from '@dashboard/auth'
 import { getDashboardConfig } from '@dashboard/config'
-import { filterHistoryPlays, normalizeHistoryPlay, surroundingHistoryPlays } from '@dashboard/history'
+import { decodeHistoryCursor, filterHistoryPlays, getHistoryPageStrict, normalizeHistoryPlay, surroundingHistoryPlays } from '@dashboard/history'
 import { getHistoryInsightsStrict, type HistoryRange } from '@dashboard/insights'
 import { getDashboardRole, canControlPlayer } from '@dashboard/permissions'
 import { clearSession, consumeOauthState, createOauthState, createSession } from '@dashboard/session'
@@ -264,8 +264,16 @@ function initApi(client: ClientType): Server {
     if (q.length > 200) throw new PlayerControllerError('INVALID_HISTORY_FILTER', 'Search text must be at most 200 characters.')
     const requesterId = typeof request.query.requesterId === 'string' && request.query.requesterId.trim() ? request.query.requesterId.trim() : undefined
     const limit = integer(request.query.limit, 1, 100) || 50
-    const history = await getSongsPlayedStrict(range, 100)
-    const items = filterHistoryPlays(history.map(normalizeHistoryPlay), {
+    const from = typeof request.query.from === 'string' ? request.query.from : undefined
+    const to = typeof request.query.to === 'string' ? request.query.to : undefined
+    const cursor = typeof request.query.cursor === 'string' ? decodeHistoryCursor(request.query.cursor) : undefined
+    if (typeof request.query.cursor === 'string' && !cursor) throw new PlayerControllerError('INVALID_HISTORY_CURSOR', 'History cursor is invalid.')
+    let page
+    try { page = await getHistoryPageStrict({ range, from, to, before: cursor || undefined, limit: 100 }) } catch (error) {
+      if (error instanceof HistoryUnavailableError) throw error
+      throw new PlayerControllerError('INVALID_HISTORY_RANGE', error instanceof Error ? error.message : 'Invalid history range.')
+    }
+    const items = filterHistoryPlays(page.items, {
       q, requesterId, timezone,
       weekday: integer(request.query.weekday, 0, 6),
       hourFrom: integer(request.query.hourFrom, 0, 23),
@@ -273,7 +281,7 @@ function initApi(client: ClientType): Server {
       hourTo: integer(request.query.hourTo, 0, 24),
     }).slice(0, limit)
     response.setHeader('Cache-Control', 'private, no-store')
-    response.json({ timezone, range, items })
+    response.json({ timezone, range, items, nextCursor: page.nextCursor })
   }))
   app.get('/api/v1/history/insights', protectedRoute(false, async (request, response) => {
     const range = typeof request.query.range === 'string' ? request.query.range : 'monthly'

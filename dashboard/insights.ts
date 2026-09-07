@@ -1,6 +1,5 @@
 import ENV from '@constants/Env'
-import { queryApi } from '@hooks/InfluxDb'
-import { HistoryUnavailableError } from '@utils/songHistoryV2'
+import { getHistoryPageStrict } from './history'
 
 export type HistoryRange = '24h' | 'weekly' | 'monthly' | 'yearly'
 export type HistoryInsights = {
@@ -28,11 +27,11 @@ plays = from(bucket: "${bucket}")
 total = plays
   |> group()
   |> count(column: "_value")
-  |> map(fn: (r) => ({ kind: "total", starts: r._value }))
+  |> set(key: "kind", value: "total")
 
 daily = plays
   |> aggregateWindow(every: 1d, fn: count, createEmpty: false)
-  |> map(fn: (r) => ({ kind: "daily", date: string(v: r._time), starts: r._value }))
+  |> set(key: "kind", value: "daily")
 
 weekdayHours = plays
   |> map(fn: (r) => ({ r with weekday: date.weekDay(t: r._time), hour: date.hour(t: r._time) }))
@@ -63,26 +62,26 @@ topRequesters = from(bucket: "${bucket}")
 union(tables: [total, daily, weekdayHours, topArtists, topRequesters])
 `
 
-type InsightRow = { kind?: unknown; starts?: unknown; date?: unknown; weekday?: unknown; hour?: unknown; artist?: unknown; username?: unknown }
+type InsightRow = { kind?: unknown; starts?: unknown; _value?: unknown; _time?: unknown; weekday?: unknown; hour?: unknown; artist?: unknown; username?: unknown }
 const number = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? value : 0
 
 export const getHistoryInsightsStrict = async (range: HistoryRange, timezone: string): Promise<HistoryInsights> => {
-  try {
-    const rows = await queryApi().collectRows<InsightRow>(buildHistoryInsightsQuery(range, timezone))
-    const insights: HistoryInsights = { timezone, range, totalStarts: 0, daily: [], weekdayHours: [], topArtists: [], topRequesters: [] }
-    for (const row of rows) {
-      if (row.kind === 'total') insights.totalStarts = number(row.starts)
-      if (row.kind === 'daily' && typeof row.date === 'string') insights.daily.push({ date: row.date, starts: number(row.starts) })
-      if (row.kind === 'weekday_hour') {
-        const weekday = number(row.weekday)
-        const hour = number(row.hour)
-        if (weekday >= 0 && weekday <= 6 && hour >= 0 && hour <= 23) insights.weekdayHours.push({ weekday, hour, starts: number(row.starts) })
-      }
-      if (row.kind === 'top_artist' && typeof row.artist === 'string' && row.artist.trim()) insights.topArtists.push({ artist: row.artist, starts: number(row.starts) })
-      if (row.kind === 'top_requester' && typeof row.username === 'string' && row.username.trim()) insights.topRequesters.push({ username: row.username, starts: number(row.starts) })
-    }
-    return insights
-  } catch (error) {
-    throw new HistoryUnavailableError(error)
+  const page = await getHistoryPageStrict({ range, limit: 1000 })
+  const daily = new Map<string, number>()
+  const weekdayHours = new Map<string, number>()
+  const artists = new Map<string, number>()
+  const requesters = new Map<string, number>()
+  for (const play of page.items) {
+    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short', hour: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(play.playedAt))
+    const value = (type: string) => parts.find((part) => part.type === type)?.value || ''
+    const day = `${value('year')}-${value('month')}-${value('day')}`
+    const weekday = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(value('weekday'))
+    const hour = Number(value('hour'))
+    daily.set(day, (daily.get(day) || 0) + 1)
+    if (weekday >= 0 && hour >= 0) weekdayHours.set(`${weekday}-${hour}`, (weekdayHours.get(`${weekday}-${hour}`) || 0) + 1)
+    if (play.track.artist) artists.set(play.track.artist, (artists.get(play.track.artist) || 0) + 1)
+    if (play.requester?.usernameAtPlay) requesters.set(play.requester.usernameAtPlay, (requesters.get(play.requester.usernameAtPlay) || 0) + 1)
   }
+  const ranked = (values: Map<string, number>, label: 'artist' | 'username') => [...values.entries()].sort((left, right) => right[1] - left[1]).slice(0, 5).map(([name, starts]) => label === 'artist' ? { artist: name, starts } : { username: name, starts })
+  return { timezone, range, totalStarts: page.items.length, daily: [...daily.entries()].map(([date, starts]) => ({ date: `${date}T00:00:00.000Z`, starts })), weekdayHours: [...weekdayHours.entries()].map(([key, starts]) => { const [weekday, hour] = key.split('-').map(Number); return { weekday, hour, starts } }), topArtists: ranked(artists, 'artist') as HistoryInsights['topArtists'], topRequesters: ranked(requesters, 'username') as HistoryInsights['topRequesters'] }
 }
