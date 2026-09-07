@@ -9,5 +9,6 @@ test('builds a timezone-aware, full-range insight query without a history page l
   assert.match(query, /timezone\.location\(name: "America\/Toronto"\)/)
   assert.match(query, /aggregateWindow\(every: 1d/)
   assert.match(query, /weekday_hour/)
-  assert.doesNotMatch(query, /limit\(n:/)
+  assert.match(query, /top_artist/)
+  assert.match(query, /topArtists[\s\S]*?limit\(n: 5\)/)
 })
