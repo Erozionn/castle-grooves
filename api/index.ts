@@ -18,6 +18,7 @@ import {
   originIsAllowed,
 } from '@dashboard/auth'
 import { getDashboardConfig } from '@dashboard/config'
+import { filterHistoryPlays, normalizeHistoryPlay } from '@dashboard/history'
 import { getDashboardRole, canControlPlayer } from '@dashboard/permissions'
 import { clearSession, consumeOauthState, createOauthState, createSession } from '@dashboard/session'
 import { DASHBOARD_CONTRACT_VERSION, type PlayerAction } from '@dashboard/types'
@@ -229,6 +230,31 @@ function initApi(client: ClientType): Server {
     const limit = Number.isInteger(parsedLimit) ? Math.max(1, Math.min(parsedLimit, 100)) : 25
     const history = await getSongsPlayedStrict(range, limit)
     response.json({ items: history.map((item) => ({ playedAt: item._time, title: item.songTitle, uri: item.songUrl, artworkUrl: item.songThumbnail, requester: { id: item.requestedById, username: item.requestedByUsername, avatarUrl: item.requestedByAvatar }, source: item.source })) })
+  }))
+  app.get('/api/v1/history/plays', protectedRoute(false, async (request, response) => {
+    const range = typeof request.query.range === 'string' ? request.query.range : 'monthly'
+    if (!['24h', 'weekly', 'monthly', 'yearly'].includes(range)) throw new PlayerControllerError('INVALID_HISTORY_RANGE', 'Invalid history range.')
+    const timezone = typeof request.query.timezone === 'string' ? request.query.timezone : 'America/Toronto'
+    try { new Intl.DateTimeFormat('en-CA', { timeZone: timezone }) } catch { throw new PlayerControllerError('INVALID_TIMEZONE', 'timezone must be a valid IANA timezone.') }
+    const integer = (value: unknown, min: number, max: number) => {
+      if (value === undefined) return undefined
+      const parsed = Number(value)
+      if (!Number.isInteger(parsed) || parsed < min || parsed > max) throw new PlayerControllerError('INVALID_HISTORY_FILTER', 'History filter is invalid.')
+      return parsed
+    }
+    const q = typeof request.query.q === 'string' ? request.query.q.trim() : ''
+    if (q.length > 200) throw new PlayerControllerError('INVALID_HISTORY_FILTER', 'Search text must be at most 200 characters.')
+    const requesterId = typeof request.query.requesterId === 'string' && request.query.requesterId.trim() ? request.query.requesterId.trim() : undefined
+    const limit = integer(request.query.limit, 1, 100) || 50
+    const history = await getSongsPlayedStrict(range, 100)
+    const items = filterHistoryPlays(history.map(normalizeHistoryPlay), {
+      q, requesterId, timezone,
+      weekday: integer(request.query.weekday, 0, 6),
+      hourFrom: integer(request.query.hourFrom, 0, 23),
+      hourTo: integer(request.query.hourTo, 0, 23),
+    }).slice(0, limit)
+    response.setHeader('Cache-Control', 'private, no-store')
+    response.json({ timezone, range, items })
   }))
 
   const playFromRequest = async (request: ApiRequest, response: Response) => {

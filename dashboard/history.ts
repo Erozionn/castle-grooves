@@ -18,6 +18,15 @@ export type HistoryPlay = {
   requester: { id: string; usernameAtPlay: string | null; avatarUrlAtPlay: string | null } | null
 }
 
+export type HistoryPlayFilters = {
+  q?: string
+  requesterId?: string
+  weekday?: number
+  hourFrom?: number
+  hourTo?: number
+  timezone: string
+}
+
 const nonEmpty = (value: unknown): string | null =>
   typeof value === 'string' && value.trim() ? value.trim() : null
 
@@ -58,4 +67,32 @@ export const normalizeHistoryPlay = (row: SongHistory): HistoryPlay => {
       ? { id: requestedById, usernameAtPlay: nonEmpty(row.requestedByUsername), avatarUrlAtPlay: nonEmpty(row.requestedByAvatar) }
       : null,
   }
+}
+
+const localParts = (playedAt: string, timezone: string) => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    hour: '2-digit',
+    hourCycle: 'h23',
+    weekday: 'short',
+  }).formatToParts(new Date(playedAt))
+  const value = (type: string) => parts.find((part) => part.type === type)?.value || ''
+  return { hour: Number(value('hour')), weekday: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(value('weekday')) }
+}
+
+export const filterHistoryPlays = (plays: HistoryPlay[], filters: HistoryPlayFilters): HistoryPlay[] => {
+  const terms = (filters.q || '').trim().toLocaleLowerCase().split(/\s+/).filter(Boolean)
+  return plays.filter((play) => {
+    const text = `${play.track.title || ''} ${play.track.artist || ''}`.toLocaleLowerCase()
+    if (!terms.every((term) => text.includes(term))) return false
+    if (filters.requesterId && play.requester?.id !== filters.requesterId) return false
+    const local = localParts(play.playedAt, filters.timezone)
+    if (Number.isInteger(filters.weekday) && local.weekday !== filters.weekday) return false
+    if (Number.isInteger(filters.hourFrom) && Number.isInteger(filters.hourTo)) {
+      const start = filters.hourFrom!
+      const end = filters.hourTo!
+      if (start !== end && (start < end ? local.hour < start || local.hour >= end : local.hour < start && local.hour >= end)) return false
+    }
+    return true
+  })
 }

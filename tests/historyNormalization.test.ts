@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { normalizeHistoryPlay } from '@dashboard/history'
+import { filterHistoryPlays, normalizeHistoryPlay } from '@dashboard/history'
 
 test('normalizes a recorded track start without inventing missing metadata', () => {
   const play = normalizeHistoryPlay({
@@ -12,4 +12,9 @@ test('normalizes a recorded track start without inventing missing metadata', () 
   assert.equal(play.track.uri, null)
   assert.equal(play.requester, null)
   assert.equal(play.eventKind, 'track_start')
+})
+
+test('filters normalized plays with Toronto weekday and overnight time clues', () => {
+  const play = normalizeHistoryPlay({ songTitle: 'Artist - Night song', songUrl: '', songThumbnail: '', requestedById: 'u1', requestedByUsername: 'Mira', requestedByAvatar: '', serializedTrack: '', source: 'youtube', _time: '2026-08-29T01:30:00.000Z', playing: true })
+  assert.equal(filterHistoryPlays([play], { q: 'night', requesterId: 'u1', weekday: 5, hourFrom: 20, hourTo: 2, timezone: 'America/Toronto' }).length, 1)
 })
