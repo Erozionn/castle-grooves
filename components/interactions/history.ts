@@ -7,7 +7,7 @@ import { MusicQueue } from '../../lib'
 
 export default async (queue: MusicQueue | null, interaction: StringSelectMenuInteraction) => {
   const client = interaction.client as ClientType
-  const musicManager = client.musicManager
+  const controller = client.playerController
   const { member, message, values } = interaction
   const {
     voice: { channel: voiceChannel },
@@ -35,25 +35,13 @@ export default async (queue: MusicQueue | null, interaction: StringSelectMenuInt
     }
 
     try {
-      // Get or create queue
-      let existingQueue = queue || musicManager.getQueue(voiceChannel.guild.id)
-
-      if (!existingQueue) {
-        existingQueue = new MusicQueue(musicManager, voiceChannel, {
-          channel: interaction.channel,
-          interaction,
-        })
-        musicManager.queues.set(voiceChannel.guild.id, existingQueue)
-        musicManager.emit('queueCreate', existingQueue)
-      }
-
       // Re-search the track to get a valid encoded string
       // History tracks from DB don't have the encoded field needed for playback
       const searchQuery =
         historyTrack.info.uri || `${historyTrack.info.author} - ${historyTrack.info.title}`
       console.log(`[history] Re-searching track: "${searchQuery}"`)
 
-      const searchResult = await musicManager.search(searchQuery, {
+      const searchResult = await client.musicManager.search(searchQuery, {
         requester: member as GuildMember,
       })
 
@@ -66,17 +54,7 @@ export default async (queue: MusicQueue | null, interaction: StringSelectMenuInt
       // Use the first search result (should be the same song)
       const track = searchResult.tracks[0]
 
-      // Preserve original requester info
-      if (!track.userData) track.userData = {}
-      track.userData.requestedBy = member as GuildMember
-
-      // Add track to queue
-      await existingQueue.addTrack(track)
-
-      // Auto-play if nothing is playing
-      if (!existingQueue.isPlaying && !existingQueue.currentTrack) {
-        await existingQueue.play()
-      }
+      await controller.enqueueTrack({ member: member as GuildMember, textChannel: interaction.channel }, track)
     } catch (e: any) {
       // Handle Lavalink connection errors specifically
       if (e?.status === 400 || e?.message?.includes('Bad Request')) {
@@ -102,12 +80,4 @@ export default async (queue: MusicQueue | null, interaction: StringSelectMenuInt
     console.warn('[history]', e)
   }
 
-  // Resume if paused
-  const existingQueue = queue || musicManager.getQueue(voiceChannel.guild.id)
-  if (existingQueue && existingQueue.isPaused) {
-    if (existingQueue.tracks.length > 0 || existingQueue.currentTrack) {
-      await existingQueue.skip()
-    }
-    existingQueue.resume()
-  }
 }

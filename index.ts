@@ -41,7 +41,7 @@ import {
   PlaybackSnapshotStatus,
 } from '@utils/observability'
 
-import { MusicManager, VoiceCommandManager } from './lib'
+import { MusicManager, PlayerController, VoiceCommandManager } from './lib'
 import registerCommands from './deploy-commands'
 
 const logger = createLogger('bot')
@@ -56,6 +56,9 @@ const {
   TS_NODE_DEV,
   PRELOAD_SONG_DATA,
 } = ENV
+
+if (!GUILD_ID) throw new Error('GUILD_ID is not set!')
+const primaryGuildId = GUILD_ID
 
 const client = new Client({
   intents: [
@@ -107,9 +110,13 @@ const voiceCommandManager = new VoiceCommandManager(
   voiceListenerClient
 )
 
+const playerController = new PlayerController(client, musicManager, primaryGuildId)
+
 // Attach manager instances to the Discord client.
 client.musicManager = musicManager
 client.voiceCommandManager = voiceCommandManager
+client.playerController = playerController
+musicManager.playerController = playerController
 musicManager.isVoiceCommandsEnabled = (guildId) => Boolean(voiceCommandManager.getStatus(guildId))
 musicManager.disableVoiceCommands = (guildId) => {
   voiceCommandManager.disable(guildId)
@@ -269,7 +276,12 @@ client.on('interactionCreate', async (interaction) => {
 })
 
 // On user join voice channel event
-client.on('voiceStateUpdate', (oldState, newState) => recordVoiceStateChange(oldState, newState))
+client.on('voiceStateUpdate', (oldState, newState) => {
+  recordVoiceStateChange(oldState, newState)
+
+  if (newState.guild.id !== primaryGuildId || newState.id !== client.user?.id) return
+  playerController.handleBotVoiceChannelChange(newState.channel)
+})
 
 // Music Manager event listeners
 musicManager.on('playerStart', playSongEventHandler)

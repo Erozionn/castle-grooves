@@ -38,6 +38,33 @@ DOCKER_HUB_USERNAME=your-dockerhub-username
 WEBSERVER_PORT=1337
 ```
 
+## React dashboard and Discord login
+
+The bot remains the backend. Deploy `castle-grooves-ui` behind the same HTTPS
+LAN reverse-proxy origin and route `/` to the UI, while routing `/api/v1/`,
+`/ws`, `/auth/`, and `/healthz` to this bot. A starting Nginx configuration is
+available in `deploy/reverse-proxy.nginx.conf.example`.
+
+Set all dashboard variables in `.env`: `DASHBOARD_PUBLIC_URL`, Discord OAuth
+client ID/secret/redirect URI, `DASHBOARD_SESSION_SECRET`, and at least one
+dashboard role allowlist. `ADMIN_USER_ID` remains the legacy `/play` playback
+identity; it does not grant dashboard access.
+
+In the Discord Developer Portal, open the application's **OAuth2** settings
+and add the exact redirect URI:
+
+```text
+https://castle-grooves.lan/auth/discord/callback
+```
+
+Use the exact value configured as `DISCORD_OAUTH_REDIRECT_URI`; Discord rejects
+near-matches. The OAuth scope required by this backend is `identify` only.
+
+The dashboard uses secure HTTP-only session cookies. Do not expose the bot,
+Lavalink, InfluxDB, OAuth secret, or session secret directly to the browser.
+Production is same-origin and has no CORS policy. `DASHBOARD_DEV_ORIGIN` is
+allowed only in non-production local React development.
+
 Start production:
 
 ```bash

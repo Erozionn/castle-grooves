@@ -20,7 +20,8 @@ export default async (queue: MusicQueue | null) => {
   // If there's music playing or tracks in queue, just stop playback (stay in channel)
   if (queue.isPlaying || queue.currentTrack || queue.tracks.length > 0) {
     try {
-      queue.stop()
+      if (!queue.manager.playerController) return
+      await queue.manager.playerController.stopWithoutDisconnect()
     } catch (error) {
       console.error('[stopButton] Error stopping playback:', error)
     }
@@ -35,7 +36,8 @@ export default async (queue: MusicQueue | null) => {
     })
   } else {
     // If nothing is playing, disconnect from voice channel
-    queue.destroy()
+    if (!queue.manager.playerController) return
+    await queue.manager.playerController.performAction({ type: 'stop', disconnect: true })
 
     if (!channel || !channel.isTextBased() || !('guild' in channel)) return
 

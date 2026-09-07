@@ -32,7 +32,6 @@ import {
   parseVoiceCommand,
   VoiceCommandAction,
 } from '@utils/voiceCommandParser'
-import { isNoTracksFoundError, queueSongQuery } from '@utils/queueSongQuery'
 import { useDJMode } from '@hooks/useDJMode'
 
 import type { MusicManager } from './MusicManager'
@@ -454,15 +453,14 @@ export class VoiceCommandManager {
         if (queue.isPaused) {
           return
         }
-
-        queue.pause()
+        await this.musicManager.playerController?.performAction({ type: 'pause' })
         return
       case 'skip':
-        queue.skip()
+        await this.musicManager.playerController?.performAction({ type: 'skip' })
         return
       case 'stop':
         useDJMode(queue).stopDJMode()
-        queue.stop()
+        await this.musicManager.playerController?.stopWithoutDisconnect()
         return
     }
   }
@@ -547,20 +545,16 @@ export class VoiceCommandManager {
     query: string
   ): Promise<void> {
     try {
-      const result = await queueSongQuery({
-        musicManager: this.musicManager,
-        voiceChannel: session.voiceChannel,
-        query,
-        requestedBy: member,
-        textChannel: session.textChannel,
-      })
-
-      const title = result.firstTrack?.info?.title || query
+      const queue = await this.musicManager.playerController?.enqueueQuery(
+        { member, textChannel: session.textChannel },
+        query
+      )
+      const title = queue?.currentTrack?.info?.title || query
       console.log(
         `[VoiceCommandManager:${this.receiverMode}] queued voice command result: ${title}`
       )
     } catch (error: any) {
-      if (isNoTracksFoundError(error)) {
+      if (error instanceof Error && error.message.includes('No tracks were found')) {
         return
       }
 

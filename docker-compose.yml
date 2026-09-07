@@ -32,7 +32,18 @@ services:
       PRELOAD_SONG_DATA: ${PRELOAD_SONG_DATA:-true}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       PERF_LOGGING: ${PERF_LOGGING:-false}
-      GRAFANA_PUBLIC_URL: ${GRAFANA_PUBLIC_URL:?Set GRAFANA_PUBLIC_URL to the LAN-accessible Grafana URL.}
+      # Development defaults allow the existing bot stack to start before the
+      # dashboard is configured. Production validation rejects these values.
+      DASHBOARD_PUBLIC_URL: ${DASHBOARD_PUBLIC_URL:-http://localhost:5173}
+      DASHBOARD_DEV_ORIGIN: ${DASHBOARD_DEV_ORIGIN:-http://localhost:5173}
+      DISCORD_OAUTH_CLIENT_ID: ${DISCORD_OAUTH_CLIENT_ID:-local-development-client-id}
+      DISCORD_OAUTH_CLIENT_SECRET: ${DISCORD_OAUTH_CLIENT_SECRET:-local-development-client-secret}
+      DISCORD_OAUTH_REDIRECT_URI: ${DISCORD_OAUTH_REDIRECT_URI:-http://localhost:5173/auth/discord/callback}
+      DASHBOARD_SESSION_SECRET: ${DASHBOARD_SESSION_SECRET:-local-development-session-secret-change-me-123456789}
+      DASHBOARD_ADMIN_DISCORD_USER_IDS: ${DASHBOARD_ADMIN_DISCORD_USER_IDS:-00000000000000000}
+      DASHBOARD_DJ_DISCORD_USER_IDS: ${DASHBOARD_DJ_DISCORD_USER_IDS:-}
+      DASHBOARD_VIEWER_DISCORD_USER_IDS: ${DASHBOARD_VIEWER_DISCORD_USER_IDS:-}
+      GRAFANA_PUBLIC_URL: ${GRAFANA_PUBLIC_URL:-http://localhost:3000}
     depends_on:
       lavalink:
         condition: service_healthy
@@ -122,8 +133,8 @@ services:
       INFLUX_ORG: ${INFLUX_ORG}
       INFLUX_BUCKET: ${INFLUX_BUCKET}
       INFLUX_TOKEN: ${INFLUX_TOKEN}
-      BOT_PUBLIC_URL: ${BOT_PUBLIC_URL:?Set BOT_PUBLIC_URL to the LAN-accessible bot API URL.}
-      GRAFANA_PUBLIC_URL: ${GRAFANA_PUBLIC_URL:?Set GRAFANA_PUBLIC_URL to the LAN-accessible Grafana URL.}
+      BOT_PUBLIC_URL: ${BOT_PUBLIC_URL:-http://localhost:1338}
+      GRAFANA_PUBLIC_URL: ${GRAFANA_PUBLIC_URL:-http://localhost:3000}
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/dj-console.json
     entrypoint:
       - /bin/sh

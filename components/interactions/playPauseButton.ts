@@ -16,11 +16,8 @@ export default async (queue: MusicQueue | null) => {
 
   if (!channel) return
 
-  if (!queue.isPaused) {
-    queue.pause()
-  } else {
-    queue.resume()
-  }
+  if (!queue.manager.playerController) return
+  await queue.manager.playerController.performAction({ type: queue.isPaused ? 'resume' : 'pause' })
 
   const components = await useComponents(queue)
 

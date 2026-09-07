@@ -3,10 +3,27 @@ name: castle-grooves
 services:
   bot:
     image: ${DOCKER_HUB_USERNAME}/castle-grooves:latest
-    ports:
-      - '${WEBSERVER_PORT:-1337}:${WEBSERVER_PORT:-1337}'
+    environment:
+      DASHBOARD_PUBLIC_URL: ${DASHBOARD_PUBLIC_URL:?Set DASHBOARD_PUBLIC_URL to the HTTPS dashboard origin.}
+      DASHBOARD_DEV_ORIGIN: ${DASHBOARD_DEV_ORIGIN:-}
+      DISCORD_OAUTH_CLIENT_ID: ${DISCORD_OAUTH_CLIENT_ID:?Set DISCORD_OAUTH_CLIENT_ID.}
+      DISCORD_OAUTH_CLIENT_SECRET: ${DISCORD_OAUTH_CLIENT_SECRET:?Set DISCORD_OAUTH_CLIENT_SECRET.}
+      DISCORD_OAUTH_REDIRECT_URI: ${DISCORD_OAUTH_REDIRECT_URI:?Set DISCORD_OAUTH_REDIRECT_URI.}
+      DASHBOARD_SESSION_SECRET: ${DASHBOARD_SESSION_SECRET:?Set DASHBOARD_SESSION_SECRET.}
+      DASHBOARD_ADMIN_DISCORD_USER_IDS: ${DASHBOARD_ADMIN_DISCORD_USER_IDS:-}
+      DASHBOARD_DJ_DISCORD_USER_IDS: ${DASHBOARD_DJ_DISCORD_USER_IDS:-}
+      DASHBOARD_VIEWER_DISCORD_USER_IDS: ${DASHBOARD_VIEWER_DISCORD_USER_IDS:-}
+      GRAFANA_PUBLIC_URL: ${GRAFANA_PUBLIC_URL:?Set GRAFANA_PUBLIC_URL to the LAN-accessible Grafana URL.}
+    # The HTTPS reverse proxy is the only public entry point for the bot API.
+    expose:
+      - '${WEBSERVER_PORT:-1337}'
     labels:
       com.centurylinklabs.watchtower.enable: 'true'
+
+  grafana:
+    environment:
+      BOT_PUBLIC_URL: ${BOT_PUBLIC_URL:?Set BOT_PUBLIC_URL to the LAN-accessible bot API URL.}
+      GRAFANA_PUBLIC_URL: ${GRAFANA_PUBLIC_URL:?Set GRAFANA_PUBLIC_URL to the LAN-accessible Grafana URL.}
 
   dozzle:
     image: amir20/dozzle:latest

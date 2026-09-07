@@ -14,9 +14,19 @@ This project uses Docker Compose v2 to run the bot, Lavalink, InfluxDB, and Graf
 cp .env.example .env.dev
 ```
 
-2. Fill `.env.dev` with your Discord, Spotify, Lavalink, InfluxDB, and Grafana values. Set `BOT_PUBLIC_URL` to the LAN-accessible bot API URL and `GRAFANA_PUBLIC_URL` to the exact LAN URL used to open Grafana.
+2. Fill `.env.dev` with your Discord, Spotify, Lavalink, InfluxDB, Grafana, and dashboard values. For local React development set `DASHBOARD_PUBLIC_URL` and `DISCORD_OAUTH_REDIRECT_URI` to the local HTTPS-capable origin you use, and set `DASHBOARD_DEV_ORIGIN=http://localhost:5173`.
 
-3. Start the stack with hot reload:
+3. For normal TypeScript development, run the bot on the host:
+
+```bash
+yarn start:dev
+```
+
+This starts or reuses the Lavalink and InfluxDB development containers, then
+runs the bot through `ts-node-dev`. Stop the bot with `Ctrl+C`; the supporting
+containers remain running.
+
+Use the full Docker bot workflow only when testing the image/container:
 
 ```bash
 yarn docker:dev
@@ -71,7 +81,7 @@ Dozzle reads Docker logs through a read-only Docker socket mount. Its UI is inte
 
 Grafana listens on all host interfaces so trusted LAN devices can reach it. On first visit, sign in with Grafana's default `admin` / `admin` credentials and set a new password when prompted. Anonymous access and self-service sign-up are disabled. Restrict the Grafana port with your host firewall to trusted devices only.
 
-`BOT_PUBLIC_URL` must point at the bot API from a browser on that LAN, for example `http://192.168.1.100:1337`. `GRAFANA_PUBLIC_URL` must be the exact Grafana browser origin, for example `http://192.168.1.100:3000`; it is the only browser origin granted CORS access to DJ Console controls. Dashboard Play Song links queue music for `ADMIN_USER_ID`; that Discord user must already be in a voice channel. The bot API is network-protected only, so do not expose it to untrusted networks.
+`BOT_PUBLIC_URL` continues to support Grafana replay links such as `/play`. The authenticated React dashboard uses `/api/v1`, `/auth`, and `/ws` behind one HTTPS origin; it no longer grants Grafana browser CORS access to player controls. Dashboard queue requests require the logged-in DJ to be in the bot's voice channel. Keep the bot API network-private behind the reverse proxy.
 
 The DJ Console needs a bot image built from this revision: it writes the `playback_snapshot`, `bot_runtime`, `bot_state`, and `lavalink_state` measurements. Deploy the updated bot image before expecting live playback and health data; Listening Recap uses existing history immediately.
 

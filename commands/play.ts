@@ -6,7 +6,6 @@ import {
 } from 'discord.js'
 
 import { isUrl, parseSongName } from '@utils/utilities'
-import { isNoTracksFoundError, queueSongQuery } from '@utils/queueSongQuery'
 import { logLatency, startLatencyTimer } from '@utils/latency'
 import type { ClientType } from '@types'
 
@@ -190,22 +189,19 @@ export default {
 
     try {
       const queueStartedAt = startLatencyTimer()
-      const result = await queueSongQuery({
-        musicManager,
-        voiceChannel,
-        query: songName,
-        requestedBy: member as GuildMember,
+      const hadQueue = Boolean(musicManager.getQueue(interaction.guildId || ''))
+      const result = await (interaction.client as ClientType).playerController.enqueueQuery({
+        member: member as GuildMember,
         textChannel: interaction.channel,
-      })
+      }, songName)
       logLatency('play.queue-song', queueStartedAt, {
-        createdQueue: result.createdQueue,
-        playlist: result.playlist,
+        createdQueue: !hadQueue,
       })
 
-      if (result.firstTrack?.info) {
-        const action = result.createdQueue ? 'Now playing' : 'Added to queue'
+      if (result.currentTrack?.info) {
+        const action = result.isPlaying ? 'Now playing' : 'Added to queue'
         console.log(
-          `[playCommand] ${action}: "${result.firstTrack.info.title}" by "${result.firstTrack.info.author}"`
+          `[playCommand] ${action}: "${result.currentTrack.info.title}" by "${result.currentTrack.info.author}"`
         )
       }
 
@@ -236,7 +232,7 @@ export default {
         return
       }
 
-      if (isNoTracksFoundError(e)) {
+      if (e instanceof Error && e.message.includes('No tracks were found')) {
         await interaction.editReply({ content: 'No results found!' })
         deleteReplySoon(interaction)
         return
