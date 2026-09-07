@@ -10,6 +10,7 @@ export type HistoryInsights = {
   daily: Array<{ date: string; starts: number }>
   weekdayHours: Array<{ weekday: number; hour: number; starts: number }>
   topArtists: Array<{ artist: string; starts: number }>
+  topRequesters: Array<{ username: string; starts: number }>
 }
 
 const rangeStart: Record<HistoryRange, string> = { '24h': '-1d', weekly: '-7d', monthly: '-30d', yearly: '-365d' }
@@ -49,16 +50,26 @@ topArtists = from(bucket: "${bucket}")
   |> sort(columns: ["starts"], desc: true)
   |> limit(n: 5)
 
-union(tables: [total, daily, weekdayHours, topArtists])
+topRequesters = from(bucket: "${bucket}")
+  |> range(start: ${rangeStart[range]})
+  |> filter(fn: (r) => r["_measurement"] == "song_play" and r["_field"] == "requestedByUsername")
+  |> group(columns: ["_value"])
+  |> count(column: "_value")
+  |> map(fn: (r) => ({ kind: "top_requester", username: string(v: r._value), starts: r._value }))
+  |> group()
+  |> sort(columns: ["starts"], desc: true)
+  |> limit(n: 5)
+
+union(tables: [total, daily, weekdayHours, topArtists, topRequesters])
 `
 
-type InsightRow = { kind?: unknown; starts?: unknown; date?: unknown; weekday?: unknown; hour?: unknown; artist?: unknown }
+type InsightRow = { kind?: unknown; starts?: unknown; date?: unknown; weekday?: unknown; hour?: unknown; artist?: unknown; username?: unknown }
 const number = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? value : 0
 
 export const getHistoryInsightsStrict = async (range: HistoryRange, timezone: string): Promise<HistoryInsights> => {
   try {
     const rows = await queryApi().collectRows<InsightRow>(buildHistoryInsightsQuery(range, timezone))
-    const insights: HistoryInsights = { timezone, range, totalStarts: 0, daily: [], weekdayHours: [], topArtists: [] }
+    const insights: HistoryInsights = { timezone, range, totalStarts: 0, daily: [], weekdayHours: [], topArtists: [], topRequesters: [] }
     for (const row of rows) {
       if (row.kind === 'total') insights.totalStarts = number(row.starts)
       if (row.kind === 'daily' && typeof row.date === 'string') insights.daily.push({ date: row.date, starts: number(row.starts) })
@@ -68,6 +79,7 @@ export const getHistoryInsightsStrict = async (range: HistoryRange, timezone: st
         if (weekday >= 0 && weekday <= 6 && hour >= 0 && hour <= 23) insights.weekdayHours.push({ weekday, hour, starts: number(row.starts) })
       }
       if (row.kind === 'top_artist' && typeof row.artist === 'string' && row.artist.trim()) insights.topArtists.push({ artist: row.artist, starts: number(row.starts) })
+      if (row.kind === 'top_requester' && typeof row.username === 'string' && row.username.trim()) insights.topRequesters.push({ username: row.username, starts: number(row.starts) })
     }
     return insights
   } catch (error) {
