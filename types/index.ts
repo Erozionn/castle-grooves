@@ -15,8 +15,13 @@ export type { LavalinkTrack }
 // Song history and recommendation types
 export type SongHistory = {
   songTitle: string
+  title?: string
+  artist?: string
   songUrl: string
+  songIdentifier?: string
   songThumbnail: string
+  duration?: number
+  songHash?: string
   requestedById: string
   requestedByUsername: string
   requestedByAvatar: string
