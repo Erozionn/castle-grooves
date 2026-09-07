@@ -19,6 +19,7 @@ import {
 } from '@dashboard/auth'
 import { getDashboardConfig } from '@dashboard/config'
 import { filterHistoryPlays, normalizeHistoryPlay } from '@dashboard/history'
+import { getHistoryInsightsStrict, type HistoryRange } from '@dashboard/insights'
 import { getDashboardRole, canControlPlayer } from '@dashboard/permissions'
 import { clearSession, consumeOauthState, createOauthState, createSession } from '@dashboard/session'
 import { DASHBOARD_CONTRACT_VERSION, type PlayerAction } from '@dashboard/types'
@@ -273,6 +274,15 @@ function initApi(client: ClientType): Server {
     }).slice(0, limit)
     response.setHeader('Cache-Control', 'private, no-store')
     response.json({ timezone, range, items })
+  }))
+  app.get('/api/v1/history/insights', protectedRoute(false, async (request, response) => {
+    const range = typeof request.query.range === 'string' ? request.query.range : 'monthly'
+    if (!['24h', 'weekly', 'monthly', 'yearly'].includes(range)) throw new PlayerControllerError('INVALID_HISTORY_RANGE', 'Invalid history range.')
+    const timezone = typeof request.query.timezone === 'string' ? request.query.timezone : 'America/Toronto'
+    try { new Intl.DateTimeFormat('en-CA', { timeZone: timezone }) } catch { throw new PlayerControllerError('INVALID_TIMEZONE', 'timezone must be a valid IANA timezone.') }
+    const insights = await getHistoryInsightsStrict(range as HistoryRange, timezone)
+    response.setHeader('Cache-Control', 'private, no-store')
+    response.json(insights)
   }))
 
   const playFromRequest = async (request: ApiRequest, response: Response) => {

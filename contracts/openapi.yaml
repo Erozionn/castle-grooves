@@ -86,6 +86,13 @@ paths:
         - { name: hourTo, in: query, schema: { type: integer, minimum: 0, maximum: 24 }, description: Exclusive local end hour; 24 means midnight. }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
       responses: { '200': { description: Filtered recorded track starts in the requested recent range, content: { application/json: { schema: { type: object, required: [timezone, range, items], properties: { timezone: { type: string }, range: { type: string }, items: { type: array, items: { $ref: '#/components/schemas/HistoryPlay' } } } } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '503': { $ref: '#/components/responses/Error' } }
+  /api/v1/history/insights:
+    get:
+      operationId: historyInsights
+      parameters:
+        - { name: range, in: query, schema: { enum: [24h, weekly, monthly, yearly], default: monthly } }
+        - { name: timezone, in: query, schema: { type: string, default: America/Toronto } }
+      responses: { '200': { description: Exact range-wide track-start counts for trends and weekday-hour activity, content: { application/json: { schema: { $ref: '#/components/schemas/HistoryInsights' } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '503': { $ref: '#/components/responses/Error' } }
 components:
   responses:
     Error: { description: Stable error envelope, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' }, example: { error: { code: FORBIDDEN, message: DJ permission is required., requestId: 018fc4d4-9348-7a09-ae12-4c858fd8a2b9 } } } } }
@@ -112,3 +119,4 @@ components:
         - { type: object, required: [type], properties: { type: { const: clear } } }
     HistoryItem: { type: object, required: [playedAt, title, uri, artworkUrl, requester, source], properties: { playedAt: { type: string, format: date-time }, title: { type: string }, uri: { type: string }, artworkUrl: { type: string }, requester: { $ref: '#/components/schemas/Requester' }, source: { type: string } } }
     HistoryPlay: { type: object, required: [playId, playedAt, eventKind, track, requester], properties: { playId: { type: string }, playedAt: { type: string, format: date-time }, eventKind: { const: track_start }, track: { type: object, required: [title, artist, durationMs, uri, artworkUrl, source, sourceIdentifier], properties: { title: { type: [string, 'null'] }, artist: { type: [string, 'null'] }, durationMs: { type: [integer, 'null'], minimum: 0 }, uri: { type: [string, 'null'], format: uri }, artworkUrl: { type: [string, 'null'], format: uri }, source: { type: string }, sourceIdentifier: { type: [string, 'null'] } } }, requester: { anyOf: [ { type: object, required: [id, usernameAtPlay, avatarUrlAtPlay], properties: { id: { type: string }, usernameAtPlay: { type: [string, 'null'] }, avatarUrlAtPlay: { type: [string, 'null'], format: uri } } }, { type: 'null' } ] } } }
+    HistoryInsights: { type: object, required: [timezone, range, totalStarts, daily, weekdayHours], properties: { timezone: { type: string }, range: { enum: [24h, weekly, monthly, yearly] }, totalStarts: { type: integer, minimum: 0 }, daily: { type: array, items: { type: object, required: [date, starts], properties: { date: { type: string, format: date-time }, starts: { type: integer, minimum: 0 } } } }, weekdayHours: { type: array, items: { type: object, required: [weekday, hour, starts], properties: { weekday: { type: integer, minimum: 0, maximum: 6 }, hour: { type: integer, minimum: 0, maximum: 23 }, starts: { type: integer, minimum: 0 } } } } } }
