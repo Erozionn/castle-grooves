@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { filterHistoryPlays, normalizeHistoryPlay } from '@dashboard/history'
+import { filterHistoryPlays, normalizeHistoryPlay, surroundingHistoryPlays } from '@dashboard/history'
 
 test('normalizes a recorded track start without inventing missing metadata', () => {
   const play = normalizeHistoryPlay({
@@ -22,4 +22,10 @@ test('filters normalized plays with Toronto weekday and overnight time clues', (
 test('treats midnight as a valid exclusive end for an evening filter', () => {
   const play = normalizeHistoryPlay({ songTitle: 'Artist - Evening song', songUrl: '', songThumbnail: '', requestedById: '', requestedByUsername: '', requestedByAvatar: '', serializedTrack: '', source: 'youtube', _time: '2026-08-29T23:30:00.000Z', playing: true })
   assert.equal(filterHistoryPlays([play], { hourFrom: 18, hourTo: 24, timezone: 'America/Toronto' }).length, 1)
+})
+
+test('returns surrounding recorded starts chronologically around an anchor', () => {
+  const rows = ['2026-08-29T03:00:00.000Z', '2026-08-29T01:00:00.000Z', '2026-08-29T02:00:00.000Z'].map((time, index) => normalizeHistoryPlay({ songTitle: `Artist - Song ${index}`, songUrl: '', songThumbnail: '', requestedById: '', requestedByUsername: '', requestedByAvatar: '', serializedTrack: '', source: 'youtube', _time: time, playing: true }))
+  const anchor = rows[2]
+  assert.deepEqual(surroundingHistoryPlays(rows, anchor.playId, 1).map((play) => play.playedAt), ['2026-08-29T01:00:00.000Z', '2026-08-29T02:00:00.000Z', '2026-08-29T03:00:00.000Z'])
 })

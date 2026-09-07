@@ -96,3 +96,11 @@ export const filterHistoryPlays = (plays: HistoryPlay[], filters: HistoryPlayFil
     return true
   })
 }
+
+/** Returns a chronological local window, including the requested recorded start. */
+export const surroundingHistoryPlays = (plays: HistoryPlay[], playId: string, radius: number): HistoryPlay[] => {
+  const chronological = [...plays].sort((left, right) => new Date(left.playedAt).getTime() - new Date(right.playedAt).getTime())
+  const index = chronological.findIndex((play) => play.playId === playId)
+  if (index < 0) return []
+  return chronological.slice(Math.max(0, index - radius), index + radius + 1)
+}

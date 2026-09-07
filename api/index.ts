@@ -18,7 +18,7 @@ import {
   originIsAllowed,
 } from '@dashboard/auth'
 import { getDashboardConfig } from '@dashboard/config'
-import { filterHistoryPlays, normalizeHistoryPlay } from '@dashboard/history'
+import { filterHistoryPlays, normalizeHistoryPlay, surroundingHistoryPlays } from '@dashboard/history'
 import { getHistoryInsightsStrict, type HistoryRange } from '@dashboard/insights'
 import { getDashboardRole, canControlPlayer } from '@dashboard/permissions'
 import { clearSession, consumeOauthState, createOauthState, createSession } from '@dashboard/session'
@@ -79,7 +79,7 @@ const statusFor = (error: unknown): number => {
   if (error instanceof DashboardAuthError) return error.code === 'UNAUTHENTICATED' ? 401 : 403
   if (error instanceof HistoryUnavailableError) return 503
   if (error instanceof PlayerControllerError) {
-    if (error.code === 'QUEUE_ITEM_NOT_FOUND') return 404
+    if (['QUEUE_ITEM_NOT_FOUND', 'HISTORY_PLAY_NOT_FOUND'].includes(error.code)) return 404
     if (['NO_ACTIVE_QUEUE', 'INVALID_PLAYER_STATE', 'VOICE_CHANNEL_MISMATCH'].includes(error.code)) return 409
     return 400
   }
@@ -283,6 +283,19 @@ function initApi(client: ClientType): Server {
     const insights = await getHistoryInsightsStrict(range as HistoryRange, timezone)
     response.setHeader('Cache-Control', 'private, no-store')
     response.json(insights)
+  }))
+  app.get('/api/v1/history/plays/:playId/context', protectedRoute(false, async (request, response) => {
+    const range = typeof request.query.range === 'string' ? request.query.range : 'monthly'
+    if (!['24h', 'weekly', 'monthly', 'yearly'].includes(range)) throw new PlayerControllerError('INVALID_HISTORY_RANGE', 'Invalid history range.')
+    const timezone = typeof request.query.timezone === 'string' ? request.query.timezone : 'America/Toronto'
+    try { new Intl.DateTimeFormat('en-CA', { timeZone: timezone }) } catch { throw new PlayerControllerError('INVALID_TIMEZONE', 'timezone must be a valid IANA timezone.') }
+    const parsedRadius = Number(request.query.radius || 2)
+    if (!Number.isInteger(parsedRadius) || parsedRadius < 1 || parsedRadius > 5) throw new PlayerControllerError('INVALID_HISTORY_CONTEXT', 'radius must be between 1 and 5.')
+    const plays = (await getSongsPlayedStrict(range, 100)).map(normalizeHistoryPlay)
+    const items = surroundingHistoryPlays(plays, request.params.playId, parsedRadius)
+    if (!items.length) throw new PlayerControllerError('HISTORY_PLAY_NOT_FOUND', 'This recorded start is outside the loaded history window.')
+    response.setHeader('Cache-Control', 'private, no-store')
+    response.json({ timezone, range, anchorPlayId: request.params.playId, items })
   }))
 
   const playFromRequest = async (request: ApiRequest, response: Response) => {
