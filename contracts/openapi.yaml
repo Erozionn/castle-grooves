@@ -78,7 +78,7 @@ paths:
         - { name: requesterId, in: query, schema: { type: string } }
         - { name: weekday, in: query, schema: { type: integer, minimum: 0, maximum: 6 } }
         - { name: hourFrom, in: query, schema: { type: integer, minimum: 0, maximum: 23 } }
-        - { name: hourTo, in: query, schema: { type: integer, minimum: 0, maximum: 23 } }
+        - { name: hourTo, in: query, schema: { type: integer, minimum: 0, maximum: 24 }, description: Exclusive local end hour; 24 means midnight. }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
       responses: { '200': { description: Filtered recorded track starts in the requested recent range, content: { application/json: { schema: { type: object, required: [timezone, range, items], properties: { timezone: { type: string }, range: { type: string }, items: { type: array, items: { $ref: '#/components/schemas/HistoryPlay' } } } } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '503': { $ref: '#/components/responses/Error' } }
 components:

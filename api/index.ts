@@ -251,7 +251,8 @@ function initApi(client: ClientType): Server {
       q, requesterId, timezone,
       weekday: integer(request.query.weekday, 0, 6),
       hourFrom: integer(request.query.hourFrom, 0, 23),
-      hourTo: integer(request.query.hourTo, 0, 23),
+      // An end at 24:00 makes a natural, exclusive end for evening filters.
+      hourTo: integer(request.query.hourTo, 0, 24),
     }).slice(0, limit)
     response.setHeader('Cache-Control', 'private, no-store')
     response.json({ timezone, range, items })

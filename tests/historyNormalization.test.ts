@@ -18,3 +18,8 @@ test('filters normalized plays with Toronto weekday and overnight time clues', (
   const play = normalizeHistoryPlay({ songTitle: 'Artist - Night song', songUrl: '', songThumbnail: '', requestedById: 'u1', requestedByUsername: 'Mira', requestedByAvatar: '', serializedTrack: '', source: 'youtube', _time: '2026-08-29T01:30:00.000Z', playing: true })
   assert.equal(filterHistoryPlays([play], { q: 'night', requesterId: 'u1', weekday: 5, hourFrom: 20, hourTo: 2, timezone: 'America/Toronto' }).length, 1)
 })
+
+test('treats midnight as a valid exclusive end for an evening filter', () => {
+  const play = normalizeHistoryPlay({ songTitle: 'Artist - Evening song', songUrl: '', songThumbnail: '', requestedById: '', requestedByUsername: '', requestedByAvatar: '', serializedTrack: '', source: 'youtube', _time: '2026-08-29T23:30:00.000Z', playing: true })
+  assert.equal(filterHistoryPlays([play], { hourFrom: 18, hourTo: 24, timezone: 'America/Toronto' }).length, 1)
+})
