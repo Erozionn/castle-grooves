@@ -37,3 +37,22 @@ test('adding a track leaves an already paused queue paused and on its current tr
   assert.equal(calls.skip, 0)
   assert.equal(calls.resume, 0)
 })
+
+test('adds selected history tracks in their displayed order without resuming a paused queue', async () => {
+  const queue = {
+    guildId: 'guild', voiceChannel: { id: 'voice' }, metadata: { channel: null }, isPlaying: true, isPaused: true,
+    currentTrack: { info: { title: 'Current song' } }, tracks: [] as Array<{ info: { title: string } }>,
+    addTracks: async (tracks: Array<{ info: { title: string } }>) => { queue.tracks.push(...tracks) },
+  }
+  const manager = Object.assign(new EventEmitter(), {
+    getQueue: () => queue,
+    search: async (query: string) => ({ loadType: 'search', tracks: [{ info: { title: query, author: 'Artist' } }] }),
+  })
+  const controller = new PlayerController({} as ClientType, manager as never, 'guild')
+  const actor = { member: { voice: { channel: { id: 'voice' } } } } as never
+
+  await controller.enqueueQueries(actor, ['First remembered track', 'Second remembered track', 'Third remembered track'])
+
+  assert.deepEqual(queue.tracks.map((track) => track.info.title), ['First remembered track', 'Second remembered track', 'Third remembered track'])
+  assert.equal(queue.isPaused, true)
+})

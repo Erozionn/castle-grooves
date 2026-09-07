@@ -64,29 +64,13 @@ export class PlayerController extends EventEmitter {
   }
 
   async enqueueQuery(actor: PlaybackActor, query: string): Promise<MusicQueue> {
-    return this.runMutation(async () => {
-      const voiceChannel = this.requireVoiceChannel(actor.member)
-      const queue = this.musicManager.getQueue(this.guildId)
-      if (queue && queue.voiceChannel.id !== voiceChannel.id) {
-        throw new PlayerControllerError('VOICE_CHANNEL_MISMATCH', 'Join the bot voice channel to add music.')
-      }
+    return this.runMutation(async () => this.enqueueQueriesWithinMutation(actor, [query], true))
+  }
 
-      if (!queue) {
-        const result = await this.musicManager.play(voiceChannel, query, {
-          requestedBy: actor.member,
-          metadata: { channel: actor.textChannel },
-        })
-        return result.queue
-      }
-
-      if (actor.textChannel && !queue.metadata.channel) queue.metadata.channel = actor.textChannel
-      const result = await this.musicManager.search(query, { requester: actor.member })
-      if (!result.tracks.length) throw new PlayerControllerError('NO_SEARCH_RESULTS', 'No tracks were found.')
-      const tracks = result.loadType === 'playlist' ? result.tracks : [result.tracks[0]]
-      await queue.addTracks(tracks)
-      if (!queue.isPlaying && !queue.currentTrack) await queue.play()
-      return queue
-    })
+  /** Queues one resolved result per query, in input order, as one controller mutation. */
+  async enqueueQueries(actor: PlaybackActor, queries: string[]): Promise<MusicQueue> {
+    if (!queries.length) throw new PlayerControllerError('INVALID_QUEUE_ITEM', 'At least one track is required.')
+    return this.runMutation(async () => this.enqueueQueriesWithinMutation(actor, queries, false))
   }
 
   async enqueueTrack(actor: PlaybackActor, track: LavalinkTrack): Promise<MusicQueue> {
@@ -233,6 +217,35 @@ export class PlayerController extends EventEmitter {
   private requireQueue(): MusicQueue {
     const queue = this.musicManager.getQueue(this.guildId)
     if (!queue) throw new PlayerControllerError('NO_ACTIVE_QUEUE', 'There is no active queue.')
+    return queue
+  }
+
+  private async enqueueQueriesWithinMutation(actor: PlaybackActor, queries: string[], expandSinglePlaylist: boolean): Promise<MusicQueue> {
+    const voiceChannel = this.requireVoiceChannel(actor.member)
+    let queue = this.musicManager.getQueue(this.guildId)
+    const hadQueue = Boolean(queue)
+    if (queue && queue.voiceChannel.id !== voiceChannel.id) {
+      throw new PlayerControllerError('VOICE_CHANNEL_MISMATCH', 'Join the bot voice channel to add music.')
+    }
+
+    const [firstQuery, ...remainingQueries] = queries
+    if (!queue) {
+      const result = await this.musicManager.play(voiceChannel, firstQuery, {
+        requestedBy: actor.member,
+        metadata: { channel: actor.textChannel },
+      })
+      queue = result.queue
+    }
+
+    if (actor.textChannel && !queue.metadata.channel) queue.metadata.channel = actor.textChannel
+    const tracks: LavalinkTrack[] = []
+    for (const query of hadQueue ? queries : remainingQueries) {
+      const result = await this.musicManager.search(query, { requester: actor.member })
+      if (!result.tracks.length) throw new PlayerControllerError('NO_SEARCH_RESULTS', 'No tracks were found.')
+      tracks.push(...(expandSinglePlaylist && result.loadType === 'playlist' ? result.tracks : [result.tracks[0]]))
+    }
+    if (tracks.length) await queue.addTracks(tracks)
+    if (!queue.isPlaying && !queue.currentTrack) await queue.play()
     return queue
   }
 

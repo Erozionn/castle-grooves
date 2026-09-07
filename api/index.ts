@@ -213,6 +213,23 @@ function initApi(client: ClientType): Server {
     logger.info('Dashboard queue item added', { userId: user.id, requestId: getRequestId(request) })
     response.status(201).json({ state: controller.getState(user.role) })
   }))
+  app.post('/api/v1/history/queue', protectedRoute(true, async (request, response, user) => {
+    if (!canControlPlayer(user.role)) throw new DashboardAuthError('FORBIDDEN', 'DJ permission is required.')
+    const body = asRecord(request.body)
+    const queries = body?.queries
+    if (!Array.isArray(queries) || !queries.length || queries.length > 25 || !queries.every((query) => typeof query === 'string' && query.trim() && query.length <= 500)) {
+      throw new PlayerControllerError('INVALID_QUEUE_ITEM', 'queries must contain between 1 and 25 non-empty track references.')
+    }
+    const guild = client.guilds.cache.get(guildId)
+    const textChannel = guild
+      ? ((await guild.channels.fetch(defaultTextChannelId)) as BaseGuildTextChannel | null)
+      : null
+    if (!textChannel) throw new PlayerControllerError('TEXT_CHANNEL_NOT_FOUND', 'The configured text channel is unavailable.')
+    const member = await getGuildMemberForUser(user.id, client, guildId)
+    await controller.enqueueQueries({ member, textChannel }, queries.map((query) => query.trim()))
+    logger.info('Dashboard history queue batch added', { userId: user.id, count: queries.length, requestId: getRequestId(request) })
+    response.status(201).json({ state: controller.getState(user.role) })
+  }))
   app.delete('/api/v1/queue/items/:queueItemId', protectedRoute(true, async (request, response, user) => {
     if (!canControlPlayer(user.role)) throw new DashboardAuthError('FORBIDDEN', 'DJ permission is required.')
     await controller.removeQueueItem(request.params.queueItemId)

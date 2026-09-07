@@ -56,6 +56,11 @@ paths:
       operationId: removeQueueItem
       parameters: [ { name: queueItemId, in: path, required: true, schema: { type: string, format: uuid } } ]
       responses: { '200': { $ref: '#/components/responses/State' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' } }
+  /api/v1/history/queue:
+    post:
+      operationId: addHistoryQueueBatch
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [queries], properties: { queries: { type: array, minItems: 1, maxItems: 25, items: { type: string, minLength: 1, maxLength: 500 } } } } } } }
+      responses: { '201': { $ref: '#/components/responses/State' }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } }
   /api/v1/queue:
     patch:
       operationId: patchQueue
