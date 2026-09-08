@@ -11,7 +11,7 @@ export type HistoryInsights = {
   topArtists: Array<{ artist: string; starts: number }>
   topTracks: Array<{ title: string; artist: string | null; uri: string | null; lastPlayedAt: string; starts: number }>
   risingTracks: Array<{ title: string; artist: string | null; uri: string | null; recentStarts: number; previousStarts: number }>
-  topRequesters: Array<{ username: string; starts: number }>
+  topRequesters: Array<{ id: string; username: string; starts: number }>
 }
 
 /** A bounded read keeps dashboard data reliable when the history database is under load. */
@@ -23,7 +23,7 @@ export const getHistoryInsightsStrict = async (range: HistoryRange, timezone: st
   const weekdayHours = new Map<string, number>()
   const artists = new Map<string, number>()
   const tracks = new Map<string, { title: string; artist: string | null; uri: string | null; lastPlayedAt: string; starts: number; recentStarts: number; previousStarts: number }>()
-  const requesters = new Map<string, number>()
+  const requesters = new Map<string, { id: string; username: string; starts: number }>()
   const splitAt = Date.now() - ({ '24h': 86_400_000, weekly: 7 * 86_400_000, monthly: 30 * 86_400_000, yearly: 365 * 86_400_000 }[range] / 2)
   for (const play of page.items) {
     const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short', hour: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(play.playedAt))
@@ -41,9 +41,12 @@ export const getHistoryInsightsStrict = async (range: HistoryRange, timezone: st
       const isRecent = new Date(play.playedAt).getTime() >= splitAt
       tracks.set(key, { title, artist: play.track.artist, uri: play.track.uri, lastPlayedAt: !known || new Date(play.playedAt) > new Date(known.lastPlayedAt) ? play.playedAt : known.lastPlayedAt, starts: (known?.starts || 0) + 1, recentStarts: (known?.recentStarts || 0) + Number(isRecent), previousStarts: (known?.previousStarts || 0) + Number(!isRecent) })
     }
-    if (play.requester?.usernameAtPlay) requesters.set(play.requester.usernameAtPlay, (requesters.get(play.requester.usernameAtPlay) || 0) + 1)
+    if (play.requester?.id && play.requester.usernameAtPlay) {
+      const known = requesters.get(play.requester.id)
+      requesters.set(play.requester.id, { id: play.requester.id, username: play.requester.usernameAtPlay, starts: (known?.starts || 0) + 1 })
+    }
   }
-  const ranked = (values: Map<string, number>, label: 'artist' | 'username') => [...values.entries()].sort((left, right) => right[1] - left[1]).slice(0, 5).map(([name, starts]) => label === 'artist' ? { artist: name, starts } : { username: name, starts })
+  const ranked = (values: Map<string, number>, label: 'artist') => [...values.entries()].sort((left, right) => right[1] - left[1]).slice(0, 5).map(([name, starts]) => ({ artist: name, starts }))
   return {
     timezone,
     range,
@@ -51,9 +54,9 @@ export const getHistoryInsightsStrict = async (range: HistoryRange, timezone: st
     isTruncated: Boolean(page.nextCursor),
     daily: [...daily.entries()].map(([date, starts]) => ({ date, starts })),
     weekdayHours: [...weekdayHours.entries()].map(([key, starts]) => { const [weekday, hour] = key.split('-').map(Number); return { weekday, hour, starts } }),
-    topArtists: ranked(artists, 'artist') as HistoryInsights['topArtists'],
+    topArtists: ranked(artists, 'artist'),
     topTracks: [...tracks.values()].sort((left, right) => right.starts - left.starts).slice(0, 5),
     risingTracks: [...tracks.values()].filter((track) => track.recentStarts > track.previousStarts).sort((left, right) => (right.recentStarts - right.previousStarts) - (left.recentStarts - left.previousStarts) || right.recentStarts - left.recentStarts).slice(0, 5).map(({ title, artist, uri, recentStarts, previousStarts }) => ({ title, artist, uri, recentStarts, previousStarts })),
-    topRequesters: ranked(requesters, 'username') as HistoryInsights['topRequesters'],
+    topRequesters: [...requesters.values()].sort((left, right) => right.starts - left.starts).slice(0, 5),
   }
 }
