@@ -20,6 +20,25 @@ services:
     labels:
       com.centurylinklabs.watchtower.enable: 'true'
 
+  dashboard:
+    image: ${DOCKER_HUB_USERNAME}/castle-grooves-ui:latest
+    restart: unless-stopped
+    environment:
+      BACKEND_UPSTREAM: http://bot:${WEBSERVER_PORT:-1337}
+    depends_on:
+      - bot
+    ports:
+      - '${DASHBOARD_PORT:-5173}:80'
+    networks:
+      - castle-grooves
+    labels:
+      com.centurylinklabs.watchtower.enable: 'true'
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
   grafana:
     environment:
       BOT_PUBLIC_URL: ${BOT_PUBLIC_URL:?Set BOT_PUBLIC_URL to the LAN-accessible bot API URL.}
