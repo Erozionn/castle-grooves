@@ -29,6 +29,7 @@
     "lint": "eslint --ext .ts,.js,.cts,.cjs .",
     "lint:fix": "eslint --fix --ext .ts,.js,.cts,.cjs .",
     "test": "yarn build && node --test build/tests/**/*.test.js",
+    "smoke:dashboard": "node scripts/smokeDashboard.mjs",
     "p": "prettier . --write",
     "test:voice": "ts-node -r tsconfig-paths/register scripts/testVoiceCommandParser.ts",
     "download:hello-sounds": "ts-node -r tsconfig-paths/register scripts/downloadHelloSounds.ts"

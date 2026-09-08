@@ -4,10 +4,10 @@ Production deployment uses GitHub Actions to build and publish Docker images to 
 
 ## How It Works
 
-1. Push to `main`.
-2. GitHub Actions builds `Dockerfile` target `production` and publishes `${DOCKER_HUB_USERNAME}/castle-grooves:latest`.
+1. Push to `main` or `master` for production, or `develop` for the development image.
+2. GitHub Actions runs the backend test suite before publishing `${DOCKER_HUB_USERNAME}/castle-grooves:latest` and the matching UI image.
 3. Watchtower checks Docker Hub every 5 minutes.
-4. Watchtower replaces the bot container when a newer image is available.
+4. Watchtower replaces the bot and dashboard containers when newer images are available.
 
 ## GitHub Setup
 
@@ -16,7 +16,7 @@ Add these repository secrets under Settings > Secrets and variables > Actions:
 - `DOCKER_HUB_USERNAME`
 - `DOCKER_HUB_ACCESS_TOKEN`
 
-The workflow in `.github/workflows/docker-image.yml` publishes:
+The backend and UI workflows publish:
 
 - `latest` for `main`
 - `dev` for `develop`
@@ -40,10 +40,7 @@ WEBSERVER_PORT=1337
 
 ## React dashboard and Discord login
 
-The bot remains the backend. Deploy `castle-grooves-ui` behind the same HTTPS
-LAN reverse-proxy origin and route `/` to the UI, while routing `/api/v1/`,
-`/ws`, `/auth/`, and `/healthz` to this bot. A starting Nginx configuration is
-available in `deploy/reverse-proxy.nginx.conf.example`.
+The production Compose overlay pulls `${DOCKER_HUB_USERNAME}/castle-grooves-ui:latest` as the `dashboard` service. It serves the React application and proxies `/api/v1/`, `/ws`, `/auth/`, and `/healthz` to the internal bot service. Point the external HTTPS reverse proxy at the dashboard service on `DASHBOARD_PORT`; it is the single public origin.
 
 Set all dashboard variables in `.env`: `DASHBOARD_PUBLIC_URL`, Discord OAuth
 client ID/secret/redirect URI, `DASHBOARD_SESSION_SECRET`, and at least one
@@ -77,6 +74,14 @@ Check status and logs:
 docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env ps
 yarn docker:prod:logs
 ```
+
+Run the post-deploy smoke test from any machine that can reach the public dashboard URL:
+
+```bash
+yarn smoke:dashboard https://castle-grooves.lan
+```
+
+It checks the React entry point, the proxied health response, and the unauthenticated API boundary. Then sign in with Discord and verify the live connection indicator, a queue action as a DJ, and a view-only account’s disabled controls.
 
 ## Manual Update
 

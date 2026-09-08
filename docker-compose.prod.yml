@@ -29,6 +29,12 @@ services:
       - bot
     ports:
       - '${DASHBOARD_PORT:-5173}:80'
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost/healthz | grep -q status']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     networks:
       - castle-grooves
     labels:
