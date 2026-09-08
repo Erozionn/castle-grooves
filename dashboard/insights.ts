@@ -10,6 +10,7 @@ export type HistoryInsights = {
   weekdayHours: Array<{ weekday: number; hour: number; starts: number }>
   topArtists: Array<{ artist: string; starts: number }>
   topTracks: Array<{ title: string; artist: string | null; uri: string | null; starts: number }>
+  risingTracks: Array<{ title: string; artist: string | null; uri: string | null; recentStarts: number; previousStarts: number }>
   topRequesters: Array<{ username: string; starts: number }>
 }
 
@@ -21,8 +22,9 @@ export const getHistoryInsightsStrict = async (range: HistoryRange, timezone: st
   const daily = new Map<string, number>()
   const weekdayHours = new Map<string, number>()
   const artists = new Map<string, number>()
-  const tracks = new Map<string, { title: string; artist: string | null; uri: string | null; starts: number }>()
+  const tracks = new Map<string, { title: string; artist: string | null; uri: string | null; starts: number; recentStarts: number; previousStarts: number }>()
   const requesters = new Map<string, number>()
+  const splitAt = Date.now() - ({ '24h': 86_400_000, weekly: 7 * 86_400_000, monthly: 30 * 86_400_000, yearly: 365 * 86_400_000 }[range] / 2)
   for (const play of page.items) {
     const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short', hour: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(play.playedAt))
     const value = (type: string) => parts.find((part) => part.type === type)?.value || ''
@@ -36,7 +38,8 @@ export const getHistoryInsightsStrict = async (range: HistoryRange, timezone: st
     if (title) {
       const key = play.track.sourceIdentifier || play.track.uri || `${play.track.artist || ''}|${title}`
       const known = tracks.get(key)
-      tracks.set(key, { title, artist: play.track.artist, uri: play.track.uri, starts: (known?.starts || 0) + 1 })
+      const isRecent = new Date(play.playedAt).getTime() >= splitAt
+      tracks.set(key, { title, artist: play.track.artist, uri: play.track.uri, starts: (known?.starts || 0) + 1, recentStarts: (known?.recentStarts || 0) + Number(isRecent), previousStarts: (known?.previousStarts || 0) + Number(!isRecent) })
     }
     if (play.requester?.usernameAtPlay) requesters.set(play.requester.usernameAtPlay, (requesters.get(play.requester.usernameAtPlay) || 0) + 1)
   }
@@ -50,6 +53,7 @@ export const getHistoryInsightsStrict = async (range: HistoryRange, timezone: st
     weekdayHours: [...weekdayHours.entries()].map(([key, starts]) => { const [weekday, hour] = key.split('-').map(Number); return { weekday, hour, starts } }),
     topArtists: ranked(artists, 'artist') as HistoryInsights['topArtists'],
     topTracks: [...tracks.values()].sort((left, right) => right.starts - left.starts).slice(0, 5),
+    risingTracks: [...tracks.values()].filter((track) => track.recentStarts > track.previousStarts).sort((left, right) => (right.recentStarts - right.previousStarts) - (left.recentStarts - left.previousStarts) || right.recentStarts - left.recentStarts).slice(0, 5).map(({ title, artist, uri, recentStarts, previousStarts }) => ({ title, artist, uri, recentStarts, previousStarts })),
     topRequesters: ranked(requesters, 'username') as HistoryInsights['topRequesters'],
   }
 }
