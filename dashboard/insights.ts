@@ -1,4 +1,4 @@
-import { getHistoryPageStrict } from './history'
+import { getHistoryPageStrict, type HistoryPlay } from './history'
 
 export type HistoryRange = '24h' | 'weekly' | 'monthly' | 'yearly'
 export type HistoryInsights = {
@@ -16,6 +16,51 @@ export type HistoryInsights = {
 
 /** A bounded read keeps dashboard data reliable when the history database is under load. */
 export const HISTORY_INSIGHTS_MAX_PLAYS = 1000
+export const ROOM_PICK_LIMIT = 3
+
+type RoomMember = { id: string; username: string; avatarUrl: string }
+type RoomPick = { play: HistoryPlay; playCount: number; lastPlayedAt: string }
+
+/**
+ * Finds each active listener's most reliable remembered songs. Repeats rank
+ * first, then the most recently played version breaks ties.
+ */
+export const rankRoomPicks = (members: RoomMember[], plays: HistoryPlay[]) => {
+  const memberIds = new Set(members.map((member) => member.id))
+  const picksByMember = new Map<string, Map<string, RoomPick>>()
+
+  for (const play of plays) {
+    const requesterId = play.requester?.id
+    const title = play.track.title || play.track.uri
+    if (!requesterId || !memberIds.has(requesterId) || !title) continue
+
+    const key = play.track.sourceIdentifier || play.track.uri || `${play.track.artist || ''}|${title}`
+    const picks = picksByMember.get(requesterId) || new Map<string, RoomPick>()
+    const known = picks.get(key)
+    const isNewer = !known || new Date(play.playedAt) > new Date(known.lastPlayedAt)
+    picks.set(key, {
+      play: isNewer ? play : known.play,
+      playCount: (known?.playCount || 0) + 1,
+      lastPlayedAt: isNewer ? play.playedAt : known.lastPlayedAt,
+    })
+    picksByMember.set(requesterId, picks)
+  }
+
+  return members.map((member) => ({
+    member,
+    picks: [...(picksByMember.get(member.id)?.values() || [])]
+      .sort((left, right) => right.playCount - left.playCount || new Date(right.lastPlayedAt).getTime() - new Date(left.lastPlayedAt).getTime())
+      .slice(0, ROOM_PICK_LIMIT),
+  }))
+}
+
+export const getHistoryRoomPicksStrict = async (range: HistoryRange, members: RoomMember[]) => {
+  const page = await getHistoryPageStrict({ range, limit: HISTORY_INSIGHTS_MAX_PLAYS })
+  return {
+    isTruncated: Boolean(page.nextCursor),
+    members: rankRoomPicks(members, page.items),
+  }
+}
 
 export const getHistoryInsightsStrict = async (range: HistoryRange, timezone: string): Promise<HistoryInsights> => {
   const page = await getHistoryPageStrict({ range, limit: HISTORY_INSIGHTS_MAX_PLAYS })
