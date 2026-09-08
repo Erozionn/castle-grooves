@@ -144,3 +144,21 @@ export const getHistoryPageStrict = async ({ range, from, to, before, limit }: {
     return { items: page, nextCursor: rows.length > limit && page.length ? cursor(page.at(-1)!.playedAt) : null }
   } catch (error) { throw new HistoryUnavailableError(error) }
 }
+
+/**
+ * Reads a bounded time window around an anchor. This avoids treating the latest
+ * history page as the context for an older recorded start.
+ */
+export const getHistoryContextStrict = async ({ range, playedAt, playId, radius }: { range: string; playedAt: string; playId: string; radius: number }): Promise<HistoryPlay[]> => {
+  const anchor = new Date(playedAt)
+  const now = new Date()
+  const rangeDuration = historyRangeMs[range]
+  if (!rangeDuration || Number.isNaN(anchor.getTime())) throw new Error('Invalid history context anchor.')
+  const rangeStart = new Date(now.getTime() - rangeDuration)
+  if (anchor < rangeStart || anchor > now) return []
+  const windowMs = 12 * 60 * 60 * 1000
+  const from = new Date(Math.max(rangeStart.getTime(), anchor.getTime() - windowMs)).toISOString()
+  const to = new Date(Math.min(now.getTime(), anchor.getTime() + windowMs + 1)).toISOString()
+  const page = await getHistoryPageStrict({ range, from, to, limit: 1000 })
+  return surroundingHistoryPlays(page.items, playId, radius)
+}

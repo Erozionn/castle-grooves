@@ -18,7 +18,7 @@ import {
   originIsAllowed,
 } from '@dashboard/auth'
 import { getDashboardConfig } from '@dashboard/config'
-import { decodeHistoryCursor, filterHistoryPlays, getHistoryPageStrict, normalizeHistoryPlay, surroundingHistoryPlays } from '@dashboard/history'
+import { decodeHistoryCursor, filterHistoryPlays, getHistoryContextStrict, getHistoryPageStrict } from '@dashboard/history'
 import { getHistoryInsightsStrict, type HistoryRange } from '@dashboard/insights'
 import { getDashboardRole, canControlPlayer } from '@dashboard/permissions'
 import { clearSession, consumeOauthState, createOauthState, createSession } from '@dashboard/session'
@@ -299,9 +299,10 @@ function initApi(client: ClientType): Server {
     try { new Intl.DateTimeFormat('en-CA', { timeZone: timezone }) } catch { throw new PlayerControllerError('INVALID_TIMEZONE', 'timezone must be a valid IANA timezone.') }
     const parsedRadius = Number(request.query.radius || 2)
     if (!Number.isInteger(parsedRadius) || parsedRadius < 1 || parsedRadius > 5) throw new PlayerControllerError('INVALID_HISTORY_CONTEXT', 'radius must be between 1 and 5.')
-    const plays = (await getSongsPlayedStrict(range, 100)).map(normalizeHistoryPlay)
-    const items = surroundingHistoryPlays(plays, request.params.playId, parsedRadius)
-    if (!items.length) throw new PlayerControllerError('HISTORY_PLAY_NOT_FOUND', 'This recorded start is outside the loaded history window.')
+    const playedAt = typeof request.query.playedAt === 'string' ? request.query.playedAt : ''
+    if (!playedAt || Number.isNaN(Date.parse(playedAt))) throw new PlayerControllerError('INVALID_HISTORY_CONTEXT', 'playedAt must be a valid recorded-start timestamp.')
+    const items = await getHistoryContextStrict({ range, playedAt, playId: request.params.playId, radius: parsedRadius })
+    if (!items.length) throw new PlayerControllerError('HISTORY_PLAY_NOT_FOUND', 'This recorded start is outside the selected history range.')
     response.setHeader('Cache-Control', 'private, no-store')
     response.json({ timezone, range, anchorPlayId: request.params.playId, items })
   }))

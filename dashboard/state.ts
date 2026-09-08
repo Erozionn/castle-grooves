@@ -72,7 +72,7 @@ export const serializeDashboardState = (
     voiceChannel: voiceChannel ? { id: voiceChannel.id, name: voiceChannel.name } : null,
     queueItems: queue?.tracks.map(trackSummary) || [],
     voiceMembers: voiceChannel
-      ? [...voiceChannel.members.values()].map(memberSummary)
+      ? [...voiceChannel.members.values()].filter((member) => !member.user.bot).map(memberSummary)
       : [],
     services: {
       botConnected: Boolean(client.user),

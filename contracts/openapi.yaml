@@ -103,6 +103,7 @@ paths:
         - { name: playId, in: path, required: true, schema: { type: string } }
         - { name: range, in: query, schema: { enum: [24h, weekly, monthly, yearly], default: monthly } }
         - { name: timezone, in: query, schema: { type: string, default: America/Toronto } }
+        - { name: playedAt, in: query, required: true, schema: { type: string, format: date-time } }
         - { name: radius, in: query, schema: { type: integer, minimum: 1, maximum: 5, default: 2 } }
       responses: { '200': { description: "Recorded starts around an anchor, in chronological order", content: { application/json: { schema: { $ref: '#/components/schemas/HistoryPlayContext' } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' }, '503': { $ref: '#/components/responses/Error' } }
 components:
