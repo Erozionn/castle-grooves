@@ -9,7 +9,7 @@ export type HistoryInsights = {
   daily: Array<{ date: string; starts: number }>
   weekdayHours: Array<{ weekday: number; hour: number; starts: number }>
   topArtists: Array<{ artist: string; starts: number }>
-  topTracks: Array<{ title: string; artist: string | null; uri: string | null; starts: number }>
+  topTracks: Array<{ title: string; artist: string | null; uri: string | null; lastPlayedAt: string; starts: number }>
   risingTracks: Array<{ title: string; artist: string | null; uri: string | null; recentStarts: number; previousStarts: number }>
   topRequesters: Array<{ username: string; starts: number }>
 }
@@ -22,7 +22,7 @@ export const getHistoryInsightsStrict = async (range: HistoryRange, timezone: st
   const daily = new Map<string, number>()
   const weekdayHours = new Map<string, number>()
   const artists = new Map<string, number>()
-  const tracks = new Map<string, { title: string; artist: string | null; uri: string | null; starts: number; recentStarts: number; previousStarts: number }>()
+  const tracks = new Map<string, { title: string; artist: string | null; uri: string | null; lastPlayedAt: string; starts: number; recentStarts: number; previousStarts: number }>()
   const requesters = new Map<string, number>()
   const splitAt = Date.now() - ({ '24h': 86_400_000, weekly: 7 * 86_400_000, monthly: 30 * 86_400_000, yearly: 365 * 86_400_000 }[range] / 2)
   for (const play of page.items) {
@@ -39,7 +39,7 @@ export const getHistoryInsightsStrict = async (range: HistoryRange, timezone: st
       const key = play.track.sourceIdentifier || play.track.uri || `${play.track.artist || ''}|${title}`
       const known = tracks.get(key)
       const isRecent = new Date(play.playedAt).getTime() >= splitAt
-      tracks.set(key, { title, artist: play.track.artist, uri: play.track.uri, starts: (known?.starts || 0) + 1, recentStarts: (known?.recentStarts || 0) + Number(isRecent), previousStarts: (known?.previousStarts || 0) + Number(!isRecent) })
+      tracks.set(key, { title, artist: play.track.artist, uri: play.track.uri, lastPlayedAt: !known || new Date(play.playedAt) > new Date(known.lastPlayedAt) ? play.playedAt : known.lastPlayedAt, starts: (known?.starts || 0) + 1, recentStarts: (known?.recentStarts || 0) + Number(isRecent), previousStarts: (known?.previousStarts || 0) + Number(!isRecent) })
     }
     if (play.requester?.usernameAtPlay) requesters.set(play.requester.usernameAtPlay, (requesters.get(play.requester.usernameAtPlay) || 0) + 1)
   }
