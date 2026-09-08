@@ -280,6 +280,7 @@ const getTimeRangeDescription = (timeRange: string): string => {
 const getTimeRangeParams = (timeRange: string) => {
   const timeRanges: Record<string, { start: string; end?: string }> = {
     '1h': { start: '-1h' },
+    '24h': { start: '-1d' },
     daily: { start: '-1d' },
     weekly: { start: '-7d' },
     'bi-weekly': { start: '-14d' },
@@ -525,7 +526,19 @@ const getSongsPlayedAtHour = async (
   }
 }
 
-const getSongsPlayed = async (timeRange = 'monthly', limitResults = 34, bypassCache = false) => {
+export class HistoryUnavailableError extends Error {
+  constructor(public readonly originalCause?: unknown) {
+    super('Listening history is unavailable. Try again shortly.')
+    this.name = 'HistoryUnavailableError'
+  }
+}
+
+const getSongsPlayed = async (
+  timeRange = 'monthly',
+  limitResults = 34,
+  bypassCache = false,
+  throwOnError = false
+) => {
   const cacheKey = `history-v2-${timeRange}-${limitResults}`
 
   if (!bypassCache) {
@@ -552,9 +565,17 @@ const getSongsPlayed = async (timeRange = 'monthly', limitResults = 34, bypassCa
     return results
   } catch (e) {
     console.warn('[getSongsPlayedV2]', e)
+    if (throwOnError) throw new HistoryUnavailableError(e)
     return []
   }
 }
+
+/**
+ * Dashboard callers need to distinguish unavailable history from a genuine
+ * empty period. Legacy Discord menus retain the forgiving helper above.
+ */
+const getSongsPlayedStrict = async (timeRange = 'monthly', limitResults = 34) =>
+  getSongsPlayed(timeRange, limitResults, false, true)
 
 const getTopSongs = async (timeRange = 'monthly', limit = 20) => {
   const cacheKey = `topSongs-v2-${timeRange}-${limit}`
@@ -730,8 +751,9 @@ const addSong = (playing: boolean, track?: LavalinkTrack, requestedBy?: GuildMem
     .stringField('serializedTrack', serializeLavalinkTrack(track))
     .intField('duration', track.info.length || 0)
 
-  writeApi().writePoint(point)
-  writeApi()
+  const api = writeApi()
+  api.writePoint(point)
+  api
     .close()
     .then(() => {
       console.log('[addSongV2] ✅ Write successful')
@@ -762,8 +784,9 @@ const addBotStateChange = (
     .intField('queueLength', queueLength)
     .stringField('playbackState', state)
 
-  writeApi().writePoint(point)
-  writeApi()
+  const api = writeApi()
+  api.writePoint(point)
+  api
     .close()
     .catch((e) => {
       console.error('[addBotStateChange]', e)
@@ -1088,6 +1111,7 @@ const preloadSongData = async () => {
 export {
   // Main functions
   getSongsPlayed,
+  getSongsPlayedStrict,
   getSongsPlayedAtHour,
   getTopSongs,
   getUserTopSongs,

@@ -12,9 +12,7 @@ export default async (queue: MusicQueue | null) => {
     return
   }
 
-  if (queue.tracks.length > 0) {
-    queue.skip()
-  } else {
-    queue.stop()
-  }
+  if (!queue.manager.playerController) return
+  if (queue.tracks.length > 0) await queue.manager.playerController.performAction({ type: 'skip' })
+  else await queue.manager.playerController.stopWithoutDisconnect()
 }

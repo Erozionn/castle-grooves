@@ -47,6 +47,8 @@ export default async (queue: MusicQueue | null, interaction: ButtonInteraction) 
       return
     }
 
+    const controller = musicManager.playerController
+    if (!controller) return
     let activeQueue = queue || musicManager.getQueue(guildId) || null
     let addedCount = 0
 
@@ -61,17 +63,10 @@ export default async (queue: MusicQueue | null, interaction: ButtonInteraction) 
         const track = searchResult.tracks[0]
         if (!track) continue
 
-        if (!activeQueue) {
-          activeQueue = new MusicQueue(musicManager, voiceChannel, {
-            channel: interaction.channel,
-            interaction,
-          })
-          musicManager.queues.set(guildId, activeQueue)
-          musicManager.emit('queueCreate', activeQueue)
-        }
-
-        track.userData = { ...track.userData, requestedBy: member, playlistTitle }
-        await activeQueue.addTrack(track)
+        activeQueue = await controller.enqueueTrack(
+          { member, textChannel: interaction.channel },
+          { ...track, userData: { ...track.userData, requestedBy: member, playlistTitle } }
+        )
         addedCount += 1
       } catch (error) {
         console.warn(`[topSongsButton] Could not queue "${historyTrack.info.title}":`, error)
@@ -86,12 +81,6 @@ export default async (queue: MusicQueue | null, interaction: ButtonInteraction) 
         })
       }
       return
-    }
-
-    if (!activeQueue.isPlaying && !activeQueue.currentTrack) {
-      await activeQueue.play()
-    } else if (activeQueue.isPaused) {
-      activeQueue.resume()
     }
 
     if (channel && channel.isTextBased() && 'guild' in channel) {

@@ -6,110 +6,28 @@ export default {
   data: new SlashCommandBuilder()
     .setName('play-next')
     .setDescription('Plays a song next in queue.')
-    .addStringOption((option) =>
-      option.setName('song').setDescription('The song to play.').setRequired(true)
-    ),
+    .addStringOption((option) => option.setName('song').setDescription('The song to play.').setRequired(true)),
   async execute(interaction: ChatInputCommandInteraction) {
     if (!interaction.isChatInputCommand()) return
-
-    // Defer immediately to prevent timeout
     await interaction.deferReply()
-
-    const musicManager = (interaction.client as ClientType).musicManager
-    const queue = interaction.guild ? musicManager.getQueue(interaction.guild.id) || null : null
-    const { member } = interaction
-
-    const {
-      voice: { channel: voiceChannel },
-    } = member as GuildMember
-
-    if (!voiceChannel) {
-      await interaction.editReply({
-        content: '❌ | You need to be in a voice channel!',
-      })
+    const member = interaction.member as GuildMember
+    if (!member.voice.channel) {
+      await interaction.editReply({ content: 'âŒ | You need to be in a voice channel!' })
       setTimeout(() => interaction.deleteReply().catch(() => {}), 3000)
       return
     }
-
-    await interaction.editReply({ content: '⏱ | Loading...' })
-
-    const songName = interaction.options.get('song')?.value as string
-
     try {
-      if (queue?.isPlaying || queue?.currentTrack) {
-        // Ensure channel metadata is set
-        if (!queue.metadata.channel) {
-          queue.metadata.channel = interaction.channel
-        }
-
-        // Search for the track
-        const results = await musicManager.search(songName, { source: 'spsearch' })
-
-        if (!results || !results.tracks || results.tracks.length === 0) {
-          await interaction.editReply({ content: '❌ | No results found!' })
-          setTimeout(() => interaction.deleteReply().catch(() => {}), 3000)
-          return
-        }
-
-        // Insert at the front of the queue
-        queue.insertTrack(results.tracks[0], 0)
-        await interaction.editReply({
-          content: `✅ | Added **${results.tracks[0].info.title}** to play next!`,
-        })
-        setTimeout(() => interaction.deleteReply().catch(() => {}), 3000)
-      } else {
-        // No queue exists or nothing playing, just play the song
-        await musicManager.play(voiceChannel, songName, {
-          metadata: { channel: interaction.channel },
-        })
-        setTimeout(() => interaction.deleteReply().catch(() => {}), 1500)
-      }
-
-      // If queue is paused, skip to the next track and resume
-      if (queue && queue.isPaused) {
-        if (queue.tracks.length + (queue.currentTrack ? 1 : 0) >= 1) {
-          queue.skip()
-        }
-        queue.resume()
-      }
-    } catch (e: any) {
-      // Handle AbortError specifically
-      if (e instanceof Error && e.name === 'AbortError') {
-        console.warn(
-          '[playNextCommand] Operation was aborted - likely due to timeout or cancellation'
-        )
-        try {
-          await interaction.editReply({
-            content: '⚠️ | Operation was cancelled. Please try again.',
-          })
-          setTimeout(() => interaction.deleteReply().catch(() => {}), 3000)
-        } catch {
-          // Ignore if interaction is invalid
-        }
-        return
-      }
-
-      // Handle Lavalink connection errors
-      if (e?.status === 400 || e?.message?.includes('Bad Request')) {
-        console.warn('[playNextCommand] Lavalink connection error (possibly reconnecting)')
-        try {
-          await interaction.editReply({
-            content: '⚠️ | Music server reconnecting. Please try again in a moment.',
-          })
-          setTimeout(() => interaction.deleteReply().catch(() => {}), 5000)
-        } catch {
-          // Ignore if interaction is invalid
-        }
-        return
-      }
-
-      console.warn('[playNextCommand]', e)
-      try {
-        await interaction.editReply({ content: '❌ | Error playing the song.' })
-        setTimeout(() => interaction.deleteReply().catch(() => {}), 3000)
-      } catch {
-        // Ignore if interaction is invalid
-      }
+      const songName = interaction.options.get('song')?.value as string
+      const queue = await (interaction.client as ClientType).playerController.enqueueNextQuery({
+        member,
+        textChannel: interaction.channel,
+      }, songName)
+      await interaction.editReply({ content: `âœ… | Added **${queue.tracks[0]?.info.title || songName}** to play next!` })
+      setTimeout(() => interaction.deleteReply().catch(() => {}), 3000)
+    } catch (error) {
+      console.warn('[playNextCommand]', error)
+      await interaction.editReply({ content: 'âŒ | Error playing the song.' }).catch(() => {})
+      setTimeout(() => interaction.deleteReply().catch(() => {}), 3000)
     }
   },
 }

@@ -1,0 +1,37 @@
+asyncapi: 3.0.0
+info:
+  title: Castle Grooves Dashboard WebSocket API
+  version: 1.0.0
+servers:
+  production:
+    host: example.lan
+    protocol: wss
+    pathname: /ws
+channels:
+  dashboardEvents:
+    address: /ws
+    messages:
+      sessionReady: { $ref: '#/components/messages/sessionReady' }
+      stateSnapshot: { $ref: '#/components/messages/stateSnapshot' }
+      systemNotice: { $ref: '#/components/messages/systemNotice' }
+      systemHeartbeat: { $ref: '#/components/messages/systemHeartbeat' }
+operations:
+  receiveDashboardEvents:
+    action: receive
+    channel: { $ref: '#/channels/dashboardEvents' }
+    messages:
+      - { $ref: '#/channels/dashboardEvents/messages/sessionReady' }
+      - { $ref: '#/channels/dashboardEvents/messages/stateSnapshot' }
+      - { $ref: '#/channels/dashboardEvents/messages/systemNotice' }
+      - { $ref: '#/channels/dashboardEvents/messages/systemHeartbeat' }
+components:
+  messages:
+    sessionReady: { payload: { $ref: '#/components/schemas/SessionReady' } }
+    stateSnapshot: { payload: { $ref: '#/components/schemas/StateSnapshot' } }
+    systemNotice: { payload: { $ref: '#/components/schemas/SystemNotice' } }
+    systemHeartbeat: { payload: { $ref: '#/components/schemas/Heartbeat' } }
+  schemas:
+    SessionReady: { type: object, required: [type, contractVersion, user], properties: { type: { const: session.ready }, contractVersion: { const: 1.0.0 }, user: { type: object } } }
+    StateSnapshot: { type: object, required: [type, contractVersion, state], properties: { type: { const: state.snapshot }, contractVersion: { const: 1.0.0 }, state: { type: object, required: [revision, serverTime] } } }
+    SystemNotice: { type: object, required: [type, contractVersion, code, message], properties: { type: { const: system.notice }, contractVersion: { const: 1.0.0 }, code: { type: string }, message: { type: string } } }
+    Heartbeat: { type: object, required: [type, contractVersion, serverTime, revision], properties: { type: { const: system.heartbeat }, contractVersion: { const: 1.0.0 }, serverTime: { type: string, format: date-time }, revision: { type: integer } } }

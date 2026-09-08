@@ -7,6 +7,7 @@ import { logLatency, startLatencyTimer } from '@utils/latency'
 import { createLogger } from '@utils/logger'
 
 import { MusicQueue } from './MusicQueue'
+import type { PlayerController } from './PlayerController'
 
 const logger = createLogger('lavalink')
 
@@ -54,6 +55,7 @@ export interface LavalinkTrack {
     thumbnail?: string
     playlistTitle?: string
     radioStationId?: string
+    queueItemId?: string
   }
 }
 
@@ -62,6 +64,7 @@ export class MusicManager extends EventEmitter {
   public queues: Map<string, MusicQueue>
   public isVoiceCommandsEnabled: (guildId: string) => boolean
   public disableVoiceCommands: (guildId: string) => void
+  public playerController?: PlayerController
   private options: MusicManagerOptions
 
   constructor(client: Client, options: MusicManagerOptions) {

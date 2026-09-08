@@ -6,7 +6,7 @@ import {
   SlashCommandBuilder,
 } from 'discord.js'
 
-import type { MusicManager, LavalinkTrack, VoiceCommandManager } from '../lib'
+import type { MusicManager, LavalinkTrack, VoiceCommandManager, PlayerController } from '../lib'
 
 // Re-export for convenience
 export type Track = LavalinkTrack
@@ -15,8 +15,13 @@ export type { LavalinkTrack }
 // Song history and recommendation types
 export type SongHistory = {
   songTitle: string
+  title?: string
+  artist?: string
   songUrl: string
+  songIdentifier?: string
   songThumbnail: string
+  duration?: number
+  songHash?: string
   requestedById: string
   requestedByUsername: string
   requestedByAvatar: string
@@ -39,6 +44,7 @@ export type ClientType = Client & {
   commands: Collection<string, any>
   musicManager: MusicManager
   voiceCommandManager: VoiceCommandManager
+  playerController: PlayerController
 }
 
 // Command types

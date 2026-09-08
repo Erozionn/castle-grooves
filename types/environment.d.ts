@@ -20,6 +20,15 @@ declare global {
       LAVALINK_PORT?: string
       LAVALINK_PASSWORD?: string
       TS_NODE_DEV?: string
+      DASHBOARD_PUBLIC_URL?: string
+      DASHBOARD_DEV_ORIGIN?: string
+      DISCORD_OAUTH_CLIENT_ID?: string
+      DISCORD_OAUTH_CLIENT_SECRET?: string
+      DISCORD_OAUTH_REDIRECT_URI?: string
+      DASHBOARD_SESSION_SECRET?: string
+      DASHBOARD_ADMIN_DISCORD_USER_IDS?: string
+      DASHBOARD_DJ_DISCORD_USER_IDS?: string
+      DASHBOARD_VIEWER_DISCORD_USER_IDS?: string
     }
   }
 }

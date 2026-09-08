@@ -89,6 +89,10 @@ Vosk model files are not committed to this repository. Download an English small
 - `INFLUX_ORG` is your InfluxDB Organization name
 - `INFLUX_TOKEN` is your InfluxDB Access Token
 - `WEBSERVER_PORT` is the port for the integrated API
+- `DASHBOARD_PUBLIC_URL` is the HTTPS same-origin URL for the React dashboard
+- `DISCORD_OAUTH_CLIENT_ID`, `DISCORD_OAUTH_CLIENT_SECRET`, and `DISCORD_OAUTH_REDIRECT_URI` configure Discord `identify` login
+- `DASHBOARD_SESSION_SECRET` signs encrypted HTTP-only dashboard sessions
+- `DASHBOARD_ADMIN_DISCORD_USER_IDS`, `DASHBOARD_DJ_DISCORD_USER_IDS`, and `DASHBOARD_VIEWER_DISCORD_USER_IDS` are comma-separated dashboard allowlists (admin > DJ > viewer)
 - `DOCKER_HUB_USERNAME` is required for production Docker Compose pulls
 - `VOICE_COMMANDS_ENABLED` enables the experimental voice toggle when set to `true`
 - `VOICE_HELLO_RESPONSES_ENABLED` enables the opt-in standalone `hello` sound replies (defaults to `false`)
@@ -98,3 +102,13 @@ Vosk model files are not committed to this repository. Download an English small
 - `VOICE_WAKE_PHRASE` defaults to `castle grooves`
 - `VOICE_CAPTURE_TIMEOUT_MS` limits each speech capture window
 - `VOICE_SILENCE_MS` controls how long silence ends a speech capture
+
+## Dashboard backend API
+
+The React dashboard is a separate repository. This bot serves its authenticated
+backend at `/api/v1`, Discord login routes at `/auth`, and a standard WebSocket
+at `/ws`, behind the same HTTPS reverse-proxy origin as the UI. Versioned REST
+and WebSocket contracts live in `contracts/openapi.yaml` and
+`contracts/asyncapi.yaml`. Legacy `/play` links remain supported for existing
+Influx/Grafana replay links and use `ADMIN_USER_ID` only as the playback
+identity.

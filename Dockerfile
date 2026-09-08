@@ -1,4 +1,4 @@
-ARG NODE_VERSION=lts-slim
+ARG NODE_VERSION=20-slim
 ARG YARN_VERSION=4.9.1
 ARG PORT=1337
 
@@ -21,7 +21,7 @@ RUN corepack enable && corepack prepare yarn@${YARN_VERSION} --activate
 
 WORKDIR /usr/src/app
 COPY package.json yarn.lock .yarnrc.yml ./
-COPY patches ./patches
+# COPY patches ./patches
 
 RUN yarn install --immutable && node -e "require('vosk'); require('@discordjs/opus'); require('@discordjs/voice'); require('@snazzah/davey')"
 

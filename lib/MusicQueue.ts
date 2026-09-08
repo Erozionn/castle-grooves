@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto'
+
 import { VoiceBasedChannel, GuildMember, Message } from 'discord.js'
 import { Player as ShoukakuPlayer } from 'shoukaku'
 
@@ -343,7 +345,8 @@ export class MusicQueue {
    * Add a track to the queue
    */
   async addTrack(track: LavalinkTrack): Promise<void> {
-    this.tracks.push(track)
+    const queuedTrack = this.withQueueItemId(track)
+    this.tracks.push(queuedTrack)
     if (ENV.DEBUG_QUEUE) {
       console.log(
         `[Queue] Added track to queue: "${track.info.title}" - Queue size: ${this.tracks.length}`
@@ -358,7 +361,8 @@ export class MusicQueue {
    * Add multiple tracks to the queue
    */
   async addTracks(tracks: LavalinkTrack[]): Promise<void> {
-    this.tracks.push(...tracks)
+    const queuedTracks = tracks.map((track) => this.withQueueItemId(track))
+    this.tracks.push(...queuedTracks)
     // Emit event so handlers can update UI
     this.manager.emit('audioTracksAdd', this, tracks)
     this.emitSnapshotChange()
@@ -368,8 +372,9 @@ export class MusicQueue {
    * Insert a track at a specific position in the queue
    */
   insertTrack(track: LavalinkTrack, position = 0): void {
+    const queuedTrack = this.withQueueItemId(track)
     const validPosition = Math.max(0, Math.min(position, this.tracks.length))
-    this.tracks.splice(validPosition, 0, track)
+    this.tracks.splice(validPosition, 0, queuedTrack)
     this.emitSnapshotChange()
   }
 
@@ -502,6 +507,7 @@ export class MusicQueue {
     if (this.player) {
       await this.player.setGlobalVolume(this.volume)
     }
+    this.emitSnapshotChange()
   }
 
   /**
@@ -513,6 +519,7 @@ export class MusicQueue {
     }
 
     await this.player.seekTo(position)
+    this.emitSnapshotChange()
   }
 
   /**
@@ -520,6 +527,7 @@ export class MusicQueue {
    */
   setRepeatMode(mode: 'off' | 'track' | 'queue'): void {
     this.repeatMode = mode
+    this.emitSnapshotChange()
   }
 
   /**
@@ -530,6 +538,46 @@ export class MusicQueue {
       const j = Math.floor(Math.random() * (i + 1))
       ;[this.tracks[i], this.tracks[j]] = [this.tracks[j], this.tracks[i]]
     }
+    this.emitSnapshotChange()
+  }
+
+  /** Removes a queued item. The currently playing item cannot be removed through this method. */
+  removeQueueItem(queueItemId: string): boolean {
+    const index = this.tracks.findIndex((track) => track.userData?.queueItemId === queueItemId)
+    if (index < 0) return false
+    this.tracks.splice(index, 1)
+    this.emitSnapshotChange()
+    return true
+  }
+
+  /** Reorders queued tracks by their stable IDs. The full current ordering must be supplied. */
+  reorderQueueItems(queueItemIds: string[]): boolean {
+    if (queueItemIds.length !== this.tracks.length) return false
+    const byId = new Map(this.tracks.map((track) => [track.userData?.queueItemId, track]))
+    if (byId.size !== this.tracks.length || queueItemIds.some((id) => !byId.has(id))) return false
+    this.tracks = queueItemIds.map((id) => byId.get(id)!)
+    this.emitSnapshotChange()
+    return true
+  }
+
+  /**
+   * Keeps queue metadata in sync when a Discord moderator drags the bot to a
+   * different voice channel. Shoukaku receives the gateway voice update and
+   * retains the Lavalink player; this method intentionally does not reconnect
+   * or restart the current track.
+   */
+  updateVoiceChannel(voiceChannel: VoiceBasedChannel): void {
+    if (this.voiceChannel.id === voiceChannel.id) return
+    this.voiceChannel = voiceChannel
+
+    // A pending "alone" timeout belongs to the previous channel and must not
+    // disconnect the bot after it has been manually moved.
+    if (this.emptyChannelTimeout) {
+      clearTimeout(this.emptyChannelTimeout)
+      this.emptyChannelTimeout = null
+    }
+
+    this.emitSnapshotChange()
   }
 
   /**
@@ -598,6 +646,13 @@ export class MusicQueue {
     const currentStatus =
       status || (this.isPaused ? 'paused' : this.isPlaying ? 'playing' : this.currentTrack ? 'idle' : 'idle')
     this.manager.emit('queueStateChange', this, currentStatus)
+  }
+
+  private withQueueItemId(track: LavalinkTrack): LavalinkTrack {
+    return {
+      ...track,
+      userData: { ...track.userData, queueItemId: track.userData?.queueItemId || randomUUID() },
+    }
   }
 
   /**

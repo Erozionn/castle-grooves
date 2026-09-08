@@ -1,0 +1,144 @@
+openapi: 3.1.0
+info:
+  title: Castle Grooves Dashboard API
+  version: 1.0.0
+  description: Same-origin API for the Castle Grooves React dashboard.
+servers:
+  - url: /
+paths:
+  /healthz:
+    get:
+      operationId: healthz
+      responses:
+        '200': { description: Service health, content: { application/json: { schema: { type: object, required: [status, contractVersion], properties: { status: { const: ok }, contractVersion: { const: 1.0.0 } } } } } }
+  /auth/discord:
+    get:
+      operationId: startDiscordLogin
+      responses: { '302': { description: Redirect to Discord OAuth } }
+  /auth/discord/callback:
+    get:
+      operationId: finishDiscordLogin
+      parameters:
+        - { name: code, in: query, required: true, schema: { type: string } }
+        - { name: state, in: query, required: true, schema: { type: string } }
+      responses: { '302': { description: Session created and redirected to dashboard }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' } }
+  /auth/logout:
+    post:
+      operationId: logout
+      responses: { '204': { description: Session cleared }, '403': { $ref: '#/components/responses/Error' } }
+  /api/v1/me:
+    get:
+      operationId: getMe
+      responses: { '200': { description: Session user, content: { application/json: { schema: { type: object, required: [user, contractVersion], properties: { user: { $ref: '#/components/schemas/SessionUser' }, contractVersion: { const: 1.0.0 } } } } } }, '401': { $ref: '#/components/responses/Error' } }
+  /api/v1/state:
+    get:
+      operationId: getState
+      responses: { '200': { $ref: '#/components/responses/State' }, '401': { $ref: '#/components/responses/Error' } }
+  /api/v1/player/actions:
+    post:
+      operationId: playerAction
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/PlayerAction' } } } }
+      responses: { '200': { $ref: '#/components/responses/State' }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } }
+  /api/v1/search:
+    get:
+      operationId: search
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, minLength: 1, maxLength: 200 }, example: daft punk harder better }
+        - { name: source, in: query, schema: { enum: [ytsearch, ytmsearch, scsearch] } }
+      responses: { '200': { description: Search results, content: { application/json: { schema: { type: object, required: [results], properties: { results: { type: array, items: { $ref: '#/components/schemas/SearchTrack' } } } } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' } }
+  /api/v1/queue/items:
+    post:
+      operationId: addQueueItem
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [query], properties: { query: { type: string, minLength: 1, maxLength: 500 } } }, example: { query: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" } } } }
+      responses: { '201': { $ref: '#/components/responses/State' }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } }
+  /api/v1/queue/items/{queueItemId}:
+    delete:
+      operationId: removeQueueItem
+      parameters: [ { name: queueItemId, in: path, required: true, schema: { type: string, format: uuid } } ]
+      responses: { '200': { $ref: '#/components/responses/State' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' } }
+  /api/v1/history/queue:
+    post:
+      operationId: addHistoryQueueBatch
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [queries], properties: { queries: { type: array, minItems: 1, maxItems: 25, items: { type: string, minLength: 1, maxLength: 500 } } } } } } }
+      responses: { '201': { $ref: '#/components/responses/State' }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } }
+  /api/v1/queue:
+    patch:
+      operationId: patchQueue
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/QueuePatch' } } } }
+      responses: { '200': { $ref: '#/components/responses/State' }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } }
+  /api/v1/history:
+    get:
+      operationId: history
+      parameters:
+        - { name: range, in: query, schema: { enum: [24h, weekly, monthly, yearly], default: monthly } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 25 } }
+      responses: { '200': { description: Listening history, content: { application/json: { schema: { type: object, required: [items], properties: { items: { type: array, items: { $ref: '#/components/schemas/HistoryItem' } } } } } } }, '401': { $ref: '#/components/responses/Error' }, '503': { $ref: '#/components/responses/Error' } }
+  /api/v1/history/plays:
+    get:
+      operationId: historyPlays
+      parameters:
+        - { name: range, in: query, schema: { enum: [24h, weekly, monthly, yearly], default: monthly } }
+        - { name: timezone, in: query, schema: { type: string, default: America/Toronto } }
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: q, in: query, schema: { type: string, maxLength: 200 } }
+        - { name: requesterId, in: query, schema: { type: string } }
+        - { name: weekday, in: query, schema: { type: integer, minimum: 0, maximum: 6 } }
+        - { name: hourFrom, in: query, schema: { type: integer, minimum: 0, maximum: 23 } }
+        - { name: hourTo, in: query, schema: { type: integer, minimum: 0, maximum: 24 }, description: Exclusive local end hour; 24 means midnight. }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses: { '200': { description: Filtered recorded track starts in a bounded page, content: { application/json: { schema: { type: object, required: [timezone, range, items, nextCursor], properties: { timezone: { type: string }, range: { type: string }, nextCursor: { type: [string, 'null'] }, items: { type: array, items: { $ref: '#/components/schemas/HistoryPlay' } } } } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '503': { $ref: '#/components/responses/Error' } }
+  /api/v1/history/insights:
+    get:
+      operationId: historyInsights
+      parameters:
+        - { name: range, in: query, schema: { enum: [24h, weekly, monthly, yearly], default: monthly } }
+        - { name: timezone, in: query, schema: { type: string, default: America/Toronto } }
+      responses: { '200': { description: "Range-wide history signals from up to the 1,000 most recent recorded starts", content: { application/json: { schema: { $ref: '#/components/schemas/HistoryInsights' } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '503': { $ref: '#/components/responses/Error' } }
+  /api/v1/history/room-picks:
+    get:
+      operationId: historyRoomPicks
+      parameters:
+        - { name: range, in: query, schema: { enum: [24h, weekly, monthly, yearly], default: monthly } }
+        - { name: timezone, in: query, schema: { type: string, default: America/Toronto } }
+      responses: { '200': { description: "Up to three repeated, tailored song picks for every human currently in the active room", content: { application/json: { schema: { $ref: '#/components/schemas/HistoryRoomPicks' } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '503': { $ref: '#/components/responses/Error' } }
+  /api/v1/history/plays/{playId}/context:
+    get:
+      operationId: historyPlayContext
+      parameters:
+        - { name: playId, in: path, required: true, schema: { type: string } }
+        - { name: range, in: query, schema: { enum: [24h, weekly, monthly, yearly], default: monthly } }
+        - { name: timezone, in: query, schema: { type: string, default: America/Toronto } }
+        - { name: playedAt, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: radius, in: query, schema: { type: integer, minimum: 1, maximum: 5, default: 2 } }
+      responses: { '200': { description: "Recorded starts around an anchor, in chronological order", content: { application/json: { schema: { $ref: '#/components/schemas/HistoryPlayContext' } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' }, '503': { $ref: '#/components/responses/Error' } }
+components:
+  responses:
+    Error: { description: Stable error envelope, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' }, example: { error: { code: FORBIDDEN, message: DJ permission is required., requestId: 018fc4d4-9348-7a09-ae12-4c858fd8a2b9 } } } } }
+    State: { description: Latest authoritative dashboard state, content: { application/json: { schema: { type: object, required: [state], properties: { state: { $ref: '#/components/schemas/DashboardState' } } } } } }
+  schemas:
+    ErrorEnvelope: { type: object, required: [error], properties: { error: { type: object, required: [code, message, requestId], properties: { code: { type: string }, message: { type: string }, requestId: { type: string, format: uuid } } } } }
+    SessionUser: { type: object, required: [id, username, avatarUrl, role], properties: { id: { type: string }, username: { type: string }, avatarUrl: { type: [string, 'null'], format: uri }, role: { enum: [admin, dj, viewer] } } }
+    Requester: { type: object, required: [id, username, avatarUrl], properties: { id: { type: string }, username: { type: string }, avatarUrl: { type: string, format: uri } } }
+    Track: { type: object, required: [queueItemId, title, artist, durationMs, uri, artworkUrl, source], properties: { queueItemId: { type: string, format: uuid }, title: { type: string }, artist: { type: string }, durationMs: { type: integer, minimum: 0 }, uri: { type: [string, 'null'], format: uri }, artworkUrl: { type: [string, 'null'], format: uri }, source: { type: string }, requester: { $ref: '#/components/schemas/Requester' } } }
+    SearchTrack: { type: object, required: [title, artist, durationMs, uri, artworkUrl, source], properties: { title: { type: string }, artist: { type: string }, durationMs: { type: integer }, uri: { type: [string, 'null'] }, artworkUrl: { type: [string, 'null'] }, source: { type: string } } }
+    DashboardState: { type: object, required: [contractVersion, revision, serverTime, guild, player, currentTrack, voiceChannel, queueItems, voiceMembers, services, capabilities], properties: { contractVersion: { const: 1.0.0 }, revision: { type: integer, minimum: 0 }, serverTime: { type: string, format: date-time }, guild: { type: object, required: [id, name, iconUrl], properties: { id: { type: string }, name: { type: string }, iconUrl: { type: [string, 'null'], format: uri } } }, player: { type: object, required: [status, positionMs, durationMs, volume, repeatMode], properties: { status: { enum: [idle, playing, paused] }, positionMs: { type: integer }, durationMs: { type: integer }, volume: { type: integer }, repeatMode: { enum: [off, track, queue] } } }, currentTrack: { anyOf: [ { $ref: '#/components/schemas/Track' }, { type: 'null' } ] }, voiceChannel: { anyOf: [ { type: object, required: [id, name], properties: { id: { type: string }, name: { type: string } } }, { type: 'null' } ] }, queueItems: { type: array, items: { $ref: '#/components/schemas/Track' } }, voiceMembers: { type: array, items: { $ref: '#/components/schemas/Requester' } }, services: { type: object, required: [botConnected, lavalinkConnected], properties: { botConnected: { type: boolean }, lavalinkConnected: { type: boolean } } }, capabilities: { type: object, required: [canControl, canManageQueue], properties: { canControl: { type: boolean }, canManageQueue: { type: boolean } } } } }
+    PlayerAction:
+      oneOf:
+        - { type: object, required: [type], properties: { type: { const: pause } } }
+        - { type: object, required: [type], properties: { type: { const: resume } } }
+        - { type: object, required: [type], properties: { type: { const: skip } } }
+        - { type: object, required: [type, disconnect], properties: { type: { const: stop }, disconnect: { const: true } } }
+        - { type: object, required: [type, positionMs], properties: { type: { const: seek }, positionMs: { type: integer, minimum: 0 } } }
+        - { type: object, required: [type, volume], properties: { type: { const: setVolume }, volume: { type: integer, minimum: 0, maximum: 200 } } }
+        - { type: object, required: [type, repeatMode], properties: { type: { const: setRepeatMode }, repeatMode: { enum: [off, track, queue] } } }
+    QueuePatch:
+      oneOf:
+        - { type: object, required: [type, queueItemIds], properties: { type: { const: reorder }, queueItemIds: { type: array, items: { type: string, format: uuid } } } }
+        - { type: object, required: [type], properties: { type: { const: clear } } }
+    HistoryItem: { type: object, required: [playedAt, title, uri, artworkUrl, requester, source], properties: { playedAt: { type: string, format: date-time }, title: { type: string }, uri: { type: string }, artworkUrl: { type: string }, requester: { $ref: '#/components/schemas/Requester' }, source: { type: string } } }
+    HistoryPlay: { type: object, required: [playId, playedAt, eventKind, track, requester], properties: { playId: { type: string }, playedAt: { type: string, format: date-time }, eventKind: { const: track_start }, track: { type: object, required: [title, artist, durationMs, uri, artworkUrl, source, sourceIdentifier], properties: { title: { type: [string, 'null'] }, artist: { type: [string, 'null'] }, durationMs: { type: [integer, 'null'], minimum: 0 }, uri: { type: [string, 'null'], format: uri }, artworkUrl: { type: [string, 'null'], format: uri }, source: { type: string }, sourceIdentifier: { type: [string, 'null'] } } }, requester: { anyOf: [ { type: object, required: [id, usernameAtPlay, avatarUrlAtPlay], properties: { id: { type: string }, usernameAtPlay: { type: [string, 'null'] }, avatarUrlAtPlay: { type: [string, 'null'], format: uri } } }, { type: 'null' } ] } } }
+    HistoryPlayContext: { type: object, required: [timezone, range, anchorPlayId, items], properties: { timezone: { type: string }, range: { enum: [24h, weekly, monthly, yearly] }, anchorPlayId: { type: string }, items: { type: array, items: { $ref: '#/components/schemas/HistoryPlay' } } } }
+    HistoryRoomPicks: { type: object, required: [timezone, range, isTruncated, members], properties: { timezone: { type: string }, range: { enum: [24h, weekly, monthly, yearly] }, isTruncated: { type: boolean, description: "True when more than 1,000 plays matched the selected range." }, members: { type: array, items: { type: object, required: [member, picks], properties: { member: { $ref: '#/components/schemas/Requester' }, picks: { type: array, maxItems: 3, items: { type: object, required: [play, playCount, lastPlayedAt], properties: { play: { $ref: '#/components/schemas/HistoryPlay' }, playCount: { type: integer, minimum: 1 }, lastPlayedAt: { type: string, format: date-time } } } } } } } } }
+    HistoryInsights: { type: object, required: [timezone, range, totalStarts, isTruncated, daily, weekdayHours, topArtists, topTracks, risingTracks, topRequesters], properties: { timezone: { type: string }, range: { enum: [24h, weekly, monthly, yearly] }, totalStarts: { type: integer, minimum: 0 }, isTruncated: { type: boolean, description: "True when more than 1,000 records matched the range." }, daily: { type: array, items: { type: object, required: [date, starts], properties: { date: { type: string, pattern: '^\\d{4}-\\d{2}-\\d{2}$' }, starts: { type: integer, minimum: 0 } } } }, weekdayHours: { type: array, items: { type: object, required: [weekday, hour, starts], properties: { weekday: { type: integer, minimum: 0, maximum: 6 }, hour: { type: integer, minimum: 0, maximum: 23 }, starts: { type: integer, minimum: 0 } } } }, topArtists: { type: array, items: { type: object, required: [artist, starts], properties: { artist: { type: string }, starts: { type: integer, minimum: 0 } } } }, topTracks: { type: array, items: { type: object, required: [title, artist, uri, lastPlayedAt, starts], properties: { title: { type: string }, artist: { type: [string, 'null'] }, uri: { type: [string, 'null'], format: uri }, lastPlayedAt: { type: string, format: date-time }, starts: { type: integer, minimum: 0 } } } }, risingTracks: { type: array, items: { type: object, required: [title, artist, uri, recentStarts, previousStarts], properties: { title: { type: string }, artist: { type: [string, 'null'] }, uri: { type: [string, 'null'], format: uri }, recentStarts: { type: integer, minimum: 0 }, previousStarts: { type: integer, minimum: 0 } } } }, topRequesters: { type: array, items: { type: object, required: [id, username, starts], properties: { id: { type: string }, username: { type: string }, starts: { type: integer, minimum: 0 } } } } } }
