@@ -292,6 +292,21 @@ function initApi(client: ClientType): Server {
     response.setHeader('Cache-Control', 'private, no-store')
     response.json(insights)
   }))
+  app.get('/api/v1/history/room-picks', protectedRoute(false, async (request, response, user) => {
+    const range = typeof request.query.range === 'string' ? request.query.range : 'monthly'
+    if (!['24h', 'weekly', 'monthly', 'yearly'].includes(range)) throw new PlayerControllerError('INVALID_HISTORY_RANGE', 'Invalid history range.')
+    const timezone = typeof request.query.timezone === 'string' ? request.query.timezone : 'America/Toronto'
+    try { new Intl.DateTimeFormat('en-CA', { timeZone: timezone }) } catch { throw new PlayerControllerError('INVALID_TIMEZONE', 'timezone must be a valid IANA timezone.') }
+    const members = controller.getState(user.role).voiceMembers
+    if (!members.length) return response.json({ timezone, range, isTruncated: false, items: [] })
+    const page = await getHistoryPageStrict({ range, limit: 1000 })
+    const items = members.flatMap((member) => {
+      const play = page.items.find((item) => item.requester?.id === member.id && (item.track.uri || item.track.title))
+      return play ? [{ member, play }] : []
+    })
+    response.setHeader('Cache-Control', 'private, no-store')
+    response.json({ timezone, range, isTruncated: Boolean(page.nextCursor), items })
+  }))
   app.get('/api/v1/history/plays/:playId/context', protectedRoute(false, async (request, response) => {
     const range = typeof request.query.range === 'string' ? request.query.range : 'monthly'
     if (!['24h', 'weekly', 'monthly', 'yearly'].includes(range)) throw new PlayerControllerError('INVALID_HISTORY_RANGE', 'Invalid history range.')
