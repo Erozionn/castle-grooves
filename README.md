@@ -86,6 +86,7 @@ Vosk model files are not committed to this repository. Download an English small
 - `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` are your Spotify API credentials
 - `INFLUX_URL` is the URL to your InfluxDB
 - `INFLUX_BUCKET` is your InfluxDB bucket name
+- `HISTORY_LEGACY_GUILD_ID` enables dashboard history only after you verify that the legacy `INFLUX_BUCKET` data belongs to that `GUILD_ID`; set it to the same guild ID
 - `INFLUX_ORG` is your InfluxDB Organization name
 - `INFLUX_TOKEN` is your InfluxDB Access Token
 - `WEBSERVER_PORT` is the port for the integrated API
