@@ -1,5 +1,5 @@
-ARG NODE_VERSION=20-slim
-ARG YARN_VERSION=4.9.1
+ARG NODE_VERSION=22.23.3-slim
+ARG YARN_VERSION=4.18.1
 ARG PORT=1337
 
 FROM node:${NODE_VERSION} AS base
@@ -23,7 +23,7 @@ WORKDIR /usr/src/app
 COPY package.json yarn.lock .yarnrc.yml ./
 # COPY patches ./patches
 
-RUN yarn install --immutable && node -e "require('vosk'); require('@discordjs/opus'); require('@discordjs/voice'); require('@snazzah/davey')"
+RUN YARN_ENABLE_SCRIPTS=true yarn install --immutable --inline-builds && node -e "require('vosk'); require('@discordjs/opus'); require('@discordjs/voice'); require('@snazzah/davey')"
 
 FROM base AS dev
 ARG PORT

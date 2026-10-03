@@ -5,7 +5,6 @@ import { Canvas, GlobalFonts, loadImage } from '@napi-rs/canvas'
 import {
   capitalize,
   getYoutubeVideoId,
-  parseSongName,
   splitAtClosestSpace,
   truncateString,
 } from '@utils/utilities'
@@ -311,13 +310,8 @@ export const nowPlayingCanvasWithUpNext = async (
     playlistBannerHeight
   )
 
-  // Split artist and title
-  let { author: artist, title } = song.info
-  if (song.info.sourceName === 'youtube') {
-    const titleObj = parseSongName(song.info.title)
-    artist = titleObj.artist
-    if (titleObj.title) title = titleObj.title
-  }
+  // Use the same track metadata as the web dashboard, without parsing the title.
+  const { author: artist, title } = song.info
 
   // Render title
   const songTitleHeight = renderMultiLineTitle(canvas, truncateString(title || artist, 42), {
@@ -411,12 +405,7 @@ export const nowPlayingCanvasWithUpNext = async (
     canv.fillStyle = `#ffffff`
     canv.font = '300 22px Poppins'
     canv.textAlign = 'left'
-    let { author: artist, title } = songObj.info
-    if (songObj.info.sourceName === 'youtube') {
-      const titleObj = parseSongName(songObj.info.title)
-      artist = titleObj.artist
-      if (titleObj.title) title = titleObj.title
-    }
+    const { author: artist, title } = songObj.info
 
     canv.fillText(`${i}`, 345, 36 + 65 * i)
 
@@ -501,13 +490,8 @@ export const nowPlayingCanvas = async (
     playlistBannerHeight
   )
 
-  // Split artist and title
-  let { author: artist, title } = song.info
-  if (song.info.sourceName === 'youtube') {
-    const titleObj = parseSongName(song.info.title)
-    artist = titleObj.artist
-    if (titleObj.title) title = titleObj.title
-  }
+  // Use the same track metadata as the web dashboard, without parsing the title.
+  const { author: artist, title } = song.info
 
   // Render title
   const songTitleHeight = renderMultiLineTitle(canvas, truncateString(title || artist, 42), {

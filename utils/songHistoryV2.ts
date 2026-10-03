@@ -7,6 +7,7 @@ import { GuildMember } from 'discord.js'
 import ENV from '@constants/Env'
 import { parseSongName } from '@utils/utilities'
 import { queryApi, writeApi } from '@hooks/InfluxDb'
+import { databaseWritesEnabled, writeAcknowledged } from './databaseWrites'
 import { SongHistory, SongRecommendation } from '@types'
 
 import type { LavalinkTrack, MusicQueue } from '../lib'
@@ -361,7 +362,7 @@ const buildSongQuery = (
   switch (queryType) {
     case 'history':
       // Get recent song plays with all fields
-      // V2: No pivot needed! All data is in fields
+      // Preserve the complete original series identity through the pivot.
       return `${baseQuery}
     |> filter(fn: (r) => 
         r["_field"] == "songTitle" or 
@@ -372,8 +373,7 @@ const buildSongQuery = (
         r["_field"] == "serializedTrack" or 
         r["_field"] == "requestedByUsername" or 
         r["_field"] == "requestedByAvatar")
-    |> group(columns: ["_time", "songHash", "requestedById"])
-    |> pivot(rowKey:["_time", "songHash", "requestedById"], columnKey: ["_field"], valueColumn: "_value")
+    |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
     |> group()
     |> sort(columns: ["_time"], desc: true)
     |> limit(n: ${limit})`
@@ -445,6 +445,7 @@ const buildSongQuery = (
     case 'totalCount':
       return `${baseQuery}
     |> filter(fn: (r) => r["_field"] == "title")
+    |> group()
     |> count()`
 
     default:
@@ -504,8 +505,7 @@ const getSongsPlayedAtHour = async (
         r["_field"] == "requestedByAvatar")
     |> hourSelection(start: ${startHour}, stop: ${endHour === 0 ? 24 : endHour})
     |> filter(fn: (r) => ${dowFilter})
-    |> group(columns: ["_time", "songHash", "requestedById"])
-    |> pivot(rowKey:["_time", "songHash", "requestedById"], columnKey: ["_field"], valueColumn: "_value")
+    |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
     |> group()
     |> sort(columns: ["_time"], desc: true)
     |> limit(n: ${limitResults})`
@@ -704,7 +704,7 @@ const getTotalSongsPlayedCount = async (timeRange = 'yearly') => {
  * - Uses song_play measurement
  */
 const addSong = (playing: boolean, track?: LavalinkTrack, requestedBy?: GuildMember) => {
-  if (ENV.TS_NODE_DEV && !process.env.ENABLE_DB_WRITES_IN_DEV) {
+  if (!databaseWritesEnabled(Boolean(ENV.TS_NODE_DEV))) {
     console.log(
       '[addSongV2] Skipping DB write in dev mode (set ENABLE_DB_WRITES_IN_DEV=true to enable)'
     )
@@ -738,6 +738,7 @@ const addSong = (playing: boolean, track?: LavalinkTrack, requestedBy?: GuildMem
     .tag('songHash', songHash)
     .tag('requestedById', requestedBy.id)
     .tag('source', track.info.sourceName)
+    .tag('guildId', requestedBy.guild.id)
 
     // FIELDS - High cardinality data
     .stringField('artist', track.info.author)
@@ -751,14 +752,11 @@ const addSong = (playing: boolean, track?: LavalinkTrack, requestedBy?: GuildMem
     .stringField('serializedTrack', serializeLavalinkTrack(track))
     .intField('duration', track.info.length || 0)
 
-  const api = writeApi()
-  api.writePoint(point)
-  api
-    .close()
+  return writeAcknowledged(writeApi, point)
     .then(() => {
       console.log('[addSongV2] ✅ Write successful')
       // Invalidate the history menu cache so the dropdown reflects the new song
-      queryCache.delete('history-v2-monthly-34')
+      queryCache.clear()
     })
     .catch((e) => {
       console.warn('[addSongV2] ❌ Write failed:', e)
@@ -774,7 +772,7 @@ const addBotStateChange = (
   state: 'playing' | 'idle' | 'stopped',
   queueLength: number
 ) => {
-  if (ENV.TS_NODE_DEV && !process.env.ENABLE_DB_WRITES_IN_DEV) {
+  if (!databaseWritesEnabled(Boolean(ENV.TS_NODE_DEV))) {
     return
   }
 
@@ -837,7 +835,7 @@ const addSongDislike = async (
   const cacheKey = `song-dislikes-v2-${songIdentifier}`
   const dislikeUserKey = getDislikeUserKey(songIdentifier, userId)
 
-  if (ENV.TS_NODE_DEV && !process.env.ENABLE_DB_WRITES_IN_DEV) {
+  if (!databaseWritesEnabled(Boolean(ENV.TS_NODE_DEV))) {
     const previousDevCount = devDislikeCounts.get(songIdentifier) ?? 0
     if (devDislikeUsers.has(dislikeUserKey)) return previousDevCount
 

@@ -56,3 +56,41 @@ test('adds selected history tracks in their displayed order without resuming a p
   assert.deepEqual(queue.tracks.map((track) => track.info.title), ['First remembered track', 'Second remembered track', 'Third remembered track'])
   assert.equal(queue.isPaused, true)
 })
+
+test('manual dashboard selection moves the active queue before adding music', async () => {
+  const client = Object.assign(new EventEmitter(), { user: { id: 'bot' } })
+  const current = { id: '111', guild: { id: 'guild', shardId: 0 } }
+  const selected = { id: '222', guild: { id: 'guild', shardId: 0 } }
+  const queue = {
+    guildId: 'guild', voiceChannel: current, metadata: { channel: null, keepAliveWhenEmpty: false },
+    isPlaying: true, isPaused: false, currentTrack: { info: { title: 'Current song' } },
+    tracks: [] as Array<{ info: { title: string } }>,
+    updateVoiceChannel: (channel: typeof selected) => { queue.voiceChannel = channel },
+    addTracks: async (tracks: Array<{ info: { title: string } }>) => { queue.tracks.push(...tracks) },
+  }
+  let moved = false
+  let voiceCommandsDisabled = false
+  const manager = Object.assign(new EventEmitter(), {
+    getQueue: () => queue,
+    search: async () => ({ loadType: 'search', tracks: [{ info: { title: 'New song', author: 'Artist' } }] }),
+    disableVoiceCommands: () => { voiceCommandsDisabled = true },
+    shoukaku: {
+      connections: new Map([['guild', { muted: false, deafened: true }]]),
+      connector: { sendPacket: (_shard: number, packet: { d: { channel_id: string } }) => {
+        assert.equal(packet.d.channel_id, selected.id)
+        moved = true
+        queueMicrotask(() => client.emit('voiceStateUpdate', {}, { id: 'bot', guild: { id: 'guild' }, channelId: selected.id }))
+      } },
+    },
+  })
+  const controller = new PlayerController(client as never, manager as never, 'guild')
+  const actor = { member: { voice: { channel: null } }, voiceChannel: selected, channelOverride: true } as never
+
+  await controller.enqueueQuery(actor, 'New song')
+
+  assert.equal(moved, true)
+  assert.equal(queue.voiceChannel.id, selected.id)
+  assert.equal(queue.metadata.keepAliveWhenEmpty, true)
+  assert.equal(voiceCommandsDisabled, true)
+  assert.deepEqual(queue.tracks.map((track) => track.info.title), ['New song'])
+})
