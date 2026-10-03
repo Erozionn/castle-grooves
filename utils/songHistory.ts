@@ -5,6 +5,7 @@ import { GuildMember } from 'discord.js'
 import ENV from '@constants/Env'
 import { parseSongName } from '@utils/utilities'
 import { queryApi, writeApi } from '@hooks/InfluxDb'
+import { databaseWritesEnabled, writeAcknowledged } from './databaseWrites'
 import { SongHistory, SongRecommendation } from '@types'
 
 import type { LavalinkTrack, MusicQueue } from '../lib'
@@ -457,7 +458,7 @@ const getTotalSongsPlayedCount = async (timeRange = 'yearly') => {
  * Now uses LavalinkTrack with translation layer
  */
 const addSong = (playing: boolean, track?: LavalinkTrack, requestedBy?: GuildMember) => {
-  if (ENV.TS_NODE_DEV && !process.env.ENABLE_DB_WRITES_IN_DEV) {
+  if (!databaseWritesEnabled(Boolean(ENV.TS_NODE_DEV))) {
     console.log(
       '[addSong] Skipping DB write in dev mode (set ENABLE_DB_WRITES_IN_DEV=true to enable)'
     )
@@ -493,9 +494,7 @@ const addSong = (playing: boolean, track?: LavalinkTrack, requestedBy?: GuildMem
     return
   }
 
-  writeApi().writePoint(point)
-  writeApi()
-    .close()
+  return writeAcknowledged(writeApi, point, () => queryCache.clear())
     .catch((e) => {
       console.warn('[addSong]', e)
     })

@@ -33,7 +33,7 @@ export const getAuthorizedDashboardUser = async (
   if (!guild) throw new DashboardAuthError('FORBIDDEN', 'The configured Discord guild is unavailable.')
 
   try {
-    const member = await guild.members.fetch(session.userId)
+    const member = await guild.members.fetch({ user: session.userId, force: true })
     return {
       id: member.id,
       username: member.user.username,
@@ -53,7 +53,7 @@ export const getGuildMemberForUser = async (
 ) => {
   const guild = client.guilds.cache.get(guildId)
   if (!guild) throw new DashboardAuthError('FORBIDDEN', 'The configured Discord guild is unavailable.')
-  return guild.members.fetch(userId)
+  return guild.members.fetch({ user: userId, force: true })
 }
 
 export const originIsAllowed = (origin: string | undefined, config: DashboardConfig): boolean =>

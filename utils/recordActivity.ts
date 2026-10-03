@@ -2,8 +2,11 @@ import { Point } from '@influxdata/influxdb-client'
 import { VoiceState } from 'discord.js'
 
 import { writeApi } from '@hooks/InfluxDb'
+import ENV from '@constants/Env'
+import { databaseWritesEnabled, writeAcknowledged } from './databaseWrites'
 
 const recordVoiceStateChange = (oldState: VoiceState, newState: VoiceState) => {
+  if (!databaseWritesEnabled(Boolean(ENV.TS_NODE_DEV))) return
   const state = newState?.channel?.id !== undefined ? newState : oldState
 
   const member = newState?.member || oldState?.member
@@ -32,9 +35,7 @@ const recordVoiceStateChange = (oldState: VoiceState, newState: VoiceState) => {
     .booleanField('voiceStateConnected', newState.channel?.id !== undefined)
     .stringField('userAvatar', member.displayAvatarURL())
 
-  writeApi().writePoint(point)
-  writeApi()
-    .close()
+  return writeAcknowledged(writeApi, point)
     .catch((e) => {
       console.warn(e)
     })

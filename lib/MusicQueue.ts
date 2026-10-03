@@ -26,12 +26,28 @@ export interface QueueMetadata {
 export type PlaybackSnapshotStatus = 'playing' | 'paused' | 'idle' | 'stopped'
 
 export class MusicQueue {
+  public readonly queueId = randomUUID()
+  public queueRevision = 0
+  private queuedTracks: LavalinkTrack[] = []
+  private activeTrack: LavalinkTrack | null = null
+  private startPromise?: Promise<void>
+  public get tracks(): LavalinkTrack[] { return this.queuedTracks }
+  public set tracks(value: LavalinkTrack[]) {
+    this.queuedTracks = new Proxy(value, {
+      set: (target, key, entry) => { if (Reflect.get(target, key) !== entry) this.queueRevision += 1; return Reflect.set(target, key, entry) },
+      deleteProperty: (target, key) => { this.queueRevision += 1; return Reflect.deleteProperty(target, key) },
+    })
+    this.queueRevision += 1
+  }
+  public get currentTrack(): LavalinkTrack | null { return this.activeTrack }
+  public set currentTrack(value: LavalinkTrack | null) {
+    if (this.activeTrack !== value) this.queueRevision += 1
+    this.activeTrack = value
+  }
   public manager: MusicManager
   public guildId: string
   public voiceChannel: VoiceBasedChannel
   public metadata: QueueMetadata
-  public tracks: LavalinkTrack[]
-  public currentTrack: LavalinkTrack | null
   public player: ShoukakuPlayer | null
   public connection: ShoukakuPlayer | null // Store player as connection reference
   public isPlaying: boolean
@@ -189,7 +205,7 @@ export class MusicQueue {
       }
 
       if (this.repeatMode === 'queue' && this.currentTrack) {
-        this.tracks.push(this.currentTrack)
+        this.tracks.push(this.withQueueItemId(this.currentTrack))
       }
 
       // Move to history
@@ -255,7 +271,7 @@ export class MusicQueue {
       cause: data.exception?.cause,
     })
 
-    if (failedTrack && error.includes('No mirror found for track')) {
+    if (failedTrack && !failedTrack.userData?.exactHistoryReplay && error.includes('No mirror found for track')) {
       try {
         const fallback = await this.manager.findYoutubeMirror(failedTrack)
         if (fallback) {
@@ -382,6 +398,12 @@ export class MusicQueue {
    * Play the next track in queue
    */
   async play(): Promise<void> {
+    if (this.startPromise) return this.startPromise
+    this.startPromise = this.playNext().finally(() => { this.startPromise = undefined })
+    return this.startPromise
+  }
+
+  private async playNext(): Promise<void> {
     // Only reconnect if there's no player at all
     // Trust the existing connection - only clean up if we actually get an error
     if (!this.player) {
@@ -399,6 +421,7 @@ export class MusicQueue {
 
     // Get next track
     this.currentTrack = this.tracks.shift()!
+    const startingTrack = this.currentTrack
 
     if (!this.currentTrack || !this.currentTrack.info) {
       this.isTransitioning = false
@@ -444,6 +467,12 @@ export class MusicQueue {
           await this.player!.setGlobalVolume(this.volume)
         }
       } else {
+        // Admission survives a transport failure. Keep the same occurrence for retry.
+        if (startingTrack.userData?.exactHistoryReplay && this.currentTrack === startingTrack && !this.isPlaying) {
+          this.tracks.unshift(startingTrack)
+          this.currentTrack = null
+          this.isTransitioning = false
+        }
         throw error
       }
     }
@@ -552,7 +581,7 @@ export class MusicQueue {
 
   /** Reorders queued tracks by their stable IDs. The full current ordering must be supplied. */
   reorderQueueItems(queueItemIds: string[]): boolean {
-    if (queueItemIds.length !== this.tracks.length) return false
+    if (queueItemIds.length !== this.tracks.length || new Set(queueItemIds).size !== queueItemIds.length) return false
     const byId = new Map(this.tracks.map((track) => [track.userData?.queueItemId, track]))
     if (byId.size !== this.tracks.length || queueItemIds.some((id) => !byId.has(id))) return false
     this.tracks = queueItemIds.map((id) => byId.get(id)!)
@@ -651,7 +680,7 @@ export class MusicQueue {
   private withQueueItemId(track: LavalinkTrack): LavalinkTrack {
     return {
       ...track,
-      userData: { ...track.userData, queueItemId: track.userData?.queueItemId || randomUUID() },
+      userData: { ...track.userData, queueItemId: randomUUID() },
     }
   }
 

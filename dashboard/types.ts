@@ -1,6 +1,8 @@
 import type { DashboardRole } from './permissions'
+import { randomUUID } from 'node:crypto'
 
 export const DASHBOARD_CONTRACT_VERSION = '1.0.0'
+export const DASHBOARD_INSTANCE_ID = randomUUID()
 
 export type DashboardTrack = {
   queueItemId: string
@@ -14,6 +16,9 @@ export type DashboardTrack = {
 }
 
 export type DashboardState = {
+  instanceId: string
+  queueId: string | null
+  queueRevision: number
   contractVersion: string
   revision: number
   serverTime: string

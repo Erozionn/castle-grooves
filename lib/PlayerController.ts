@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events'
+import { randomUUID } from 'node:crypto'
 
 import type { BaseGuildTextChannel, GuildMember, TextBasedChannel, VoiceBasedChannel } from 'discord.js'
 
@@ -6,10 +7,13 @@ import type { ClientType } from '@types'
 import { serializeDashboardState } from '@dashboard/state'
 import type { DashboardRole } from '@dashboard/permissions'
 import type { DashboardState, PlayerAction } from '@dashboard/types'
+import { DASHBOARD_INSTANCE_ID } from '@dashboard/types'
+import { HistoryError, trackIdentity, type RecallPlay } from '@dashboard/historyIdentity'
+import { withDeadline, type EnqueueRequest, type QueueVersion, type ResolvedItem } from '@dashboard/enqueues'
 import { scheduleNowPlayingMessage } from '@utils/nowPlayingMessage'
 
 import { MusicManager, type LavalinkTrack, type SearchResult } from './MusicManager'
-import type { MusicQueue } from './MusicQueue'
+import { MusicQueue } from './MusicQueue'
 
 export type PlaybackActor = {
   member: GuildMember
@@ -17,8 +21,8 @@ export type PlaybackActor = {
 }
 
 export type QueuePatch =
-  | { type: 'reorder'; queueItemIds: string[] }
-  | { type: 'clear' }
+  | { type: 'reorder'; queueItemIds: string[]; expectedQueueRevision?: number; expectedQueueId?: string }
+  | { type: 'clear'; expectedQueueRevision?: number; expectedQueueId?: string }
 
 /**
  * The only application-level entry point for queue/player mutations. Queue
@@ -57,6 +61,71 @@ export class PlayerController extends EventEmitter {
 
   getState(role: DashboardRole): DashboardState {
     return serializeDashboardState(this.client, this.guildId, this.revision, role)
+  }
+
+  getQueueVersion(): QueueVersion {
+    const queue = this.musicManager.getQueue(this.guildId)
+    return { instanceId: DASHBOARD_INSTANCE_ID, queueId: queue?.queueId || null, queueRevision: queue?.queueRevision || 0, revision: this.revision }
+  }
+
+  validateHistoryActor(actor: PlaybackActor): void {
+    const channel = actor.member.voice.channel
+    if (!channel) throw new HistoryError('VOICE_CHANNEL_REQUIRED', 'Join a voice channel first.', 409)
+    const queue = this.musicManager.getQueue(this.guildId)
+    if (queue && queue.voiceChannel.id !== channel.id) throw new HistoryError('VOICE_CHANNEL_MISMATCH', 'Join the bot voice channel to add music.', 409)
+  }
+
+  async resolveHistoricalTrack(play: RecallPlay): Promise<LavalinkTrack> {
+    if (play.track.replay.status !== 'unchecked' || !play.track.uri) throw new HistoryError(play.track.replay.reason || 'TRACK_UNSUPPORTED', 'This recording cannot be replayed exactly.', 422)
+    const node = this.musicManager.getNode()
+    if (!node) throw new HistoryError('TRACK_PROVIDER_UNAVAILABLE', 'The recording provider is unavailable.', 503)
+    // Bypass MusicManager.search: it deliberately offers mirrors/general search.
+    const result = await node.rest.resolve(play.track.uri)
+    if (!result || result.loadType === 'empty') throw new HistoryError('TRACK_UNAVAILABLE', 'This recording is no longer available.', 422)
+    if (result.loadType === 'error') throw new HistoryError('TRACK_PROVIDER_UNAVAILABLE', 'The recording provider could not resolve this track.', 503)
+    if (result.loadType !== 'track') throw new HistoryError('TRACK_IDENTITY_MISMATCH', 'The provider returned a different recording.', 422)
+    const track = result.data as LavalinkTrack
+    const identity = trackIdentity({ songIdentifier: track.info.identifier, songUrl: track.info.uri }, track.info.sourceName, '')
+    if (identity.track.trackId !== play.track.trackId) throw new HistoryError('TRACK_IDENTITY_MISMATCH', 'The provider returned a different recording.', 422)
+    return { ...track, userData: { exactHistoryReplay: true } }
+  }
+
+  async commitHistoryEnqueue(
+    request: EnqueueRequest,
+    initialVoiceChannelId: string | null,
+    resolved: ResolvedItem[],
+    freshActor: () => Promise<PlaybackActor>,
+    committed: (ids: string[], version: QueueVersion, idle: boolean) => void
+  ): Promise<{ start?: () => Promise<void> }> {
+    return this.runMutation(async () => {
+      const actor = await withDeadline(freshActor(), 5000)
+      this.validateHistoryActor(actor)
+      const voiceChannel = actor.member.voice.channel!
+      if (voiceChannel.id !== initialVoiceChannelId) throw new HistoryError('VOICE_CHANNEL_MISMATCH', 'Your voice channel changed while resolving the recordings.', 409)
+      let queue = this.musicManager.getQueue(this.guildId)
+      const version = this.getQueueVersion()
+      if (version.instanceId !== request.instanceId) throw new HistoryError('INSTANCE_CHANGED', 'Refresh player state after a restart.', 409)
+      if (version.queueId !== request.expectedQueueId) throw new HistoryError('QUEUE_CHANGED', 'The queue was replaced. Refresh player state.', 409)
+      if (request.expectedQueueRevision !== undefined && request.expectedQueueRevision !== version.queueRevision) throw new HistoryError('QUEUE_REVISION_CONFLICT', 'The queue changed. Refresh player state.', 409)
+      if (request.placement === 'next' && (queue?.currentTrack?.userData?.queueItemId || null) !== request.afterQueueItemId) throw new HistoryError('NEXT_ANCHOR_CHANGED', 'The current song changed. Refresh player state.', 409)
+      if (!resolved.length) { committed([], version, false); return {} }
+      if (!queue) {
+        queue = new MusicQueue(this.musicManager, voiceChannel, { channel: actor.textChannel })
+        this.musicManager.queues.set(this.guildId, queue)
+      }
+      const tracks = resolved.map(({ track }) => ({ ...track, userData: { ...track.userData, requestedBy: actor.member, exactHistoryReplay: true, queueItemId: randomUUID() } }))
+      // No awaits or emitted events between insertion and recording its receipt.
+      queue.tracks.splice(request.placement === 'next' ? 0 : queue.tracks.length, 0, ...tracks)
+      const idle = !queue.currentTrack && !queue.isPlaying && !queue.isPaused
+      this.revision += 1
+      committed(tracks.map((track) => track.userData.queueItemId), this.getQueueVersion(), idle)
+      const admittedQueue = queue
+      return idle ? { start: async () => {
+        if (this.musicManager.getQueue(this.guildId) !== admittedQueue) throw new Error('Queue replaced after admission')
+        if (!admittedQueue.currentTrack && !admittedQueue.isPlaying && !admittedQueue.isPaused) await admittedQueue.play()
+        this.publish()
+      } } : {}
+    })
   }
 
   search(query: string, source?: 'ytsearch' | 'ytmsearch' | 'scsearch'): Promise<SearchResult> {
@@ -181,6 +250,8 @@ export class PlayerController extends EventEmitter {
   async patchQueue(patch: QueuePatch): Promise<void> {
     await this.runMutation(async () => {
       const queue = this.requireQueue()
+      if (patch.expectedQueueId !== undefined && patch.expectedQueueId !== queue.queueId) throw new HistoryError('QUEUE_CHANGED', 'The queue was replaced. Refresh player state.', 409)
+      if (patch.expectedQueueRevision !== undefined && patch.expectedQueueRevision !== queue.queueRevision) throw new HistoryError('QUEUE_REVISION_CONFLICT', 'The queue changed. Refresh player state.', 409)
       if (patch.type === 'clear') return queue.clear()
       if (!queue.reorderQueueItems(patch.queueItemIds)) {
         throw new PlayerControllerError('INVALID_QUEUE_ORDER', 'Queue item IDs must match the current queue exactly.')
@@ -267,9 +338,11 @@ export class PlayerController extends EventEmitter {
 
   private publish(): void {
     const queue = this.musicManager.getQueue(this.guildId)
-    if (queue) scheduleNowPlayingMessage(queue)
     this.revision += 1
-    this.emit('stateChanged', this.revision)
+    try { if (queue) scheduleNowPlayingMessage(queue) } catch { /* A view failure cannot roll back queue admission. */ }
+    for (const listener of this.rawListeners('stateChanged')) {
+      try { listener.call(this, this.revision) } catch { /* Isolate subscribers from the mutation/receipt commit. */ }
+    }
   }
 }
 

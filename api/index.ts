@@ -18,7 +18,11 @@ import {
   originIsAllowed,
 } from '@dashboard/auth'
 import { getDashboardConfig } from '@dashboard/config'
-import { decodeHistoryCursor, filterHistoryPlays, getHistoryContextStrict, getHistoryPageStrict } from '@dashboard/history'
+import { HistoryError, HistorySigner } from '@dashboard/historyIdentity'
+import { HistoryRecall } from '@dashboard/historyRecall'
+import { assertHistoryScope, createHistoryRead } from '@dashboard/historyStore'
+import { EnqueueOperations } from '@dashboard/enqueues'
+import ENV from '@constants/Env'
 import { getHistoryInsightsStrict, getHistoryRoomPicksStrict, type HistoryRange } from '@dashboard/insights'
 import { getDashboardRole, canControlPlayer } from '@dashboard/permissions'
 import { clearSession, consumeOauthState, createOauthState, createSession } from '@dashboard/session'
@@ -68,14 +72,18 @@ const parsePlayerAction = (body: unknown): PlayerAction => {
 const parseQueuePatch = (body: unknown): QueuePatch => {
   const patch = asRecord(body)
   if (!patch || typeof patch.type !== 'string') throw new PlayerControllerError('INVALID_QUEUE_PATCH', 'A valid queue patch is required.')
-  if (patch.type === 'clear') return { type: 'clear' }
+  if (patch.expectedQueueRevision !== undefined && (!Number.isSafeInteger(patch.expectedQueueRevision) || Number(patch.expectedQueueRevision) < 0)) throw new PlayerControllerError('INVALID_QUEUE_PATCH', 'Invalid queue revision.')
+  if (patch.expectedQueueId !== undefined && typeof patch.expectedQueueId !== 'string') throw new PlayerControllerError('INVALID_QUEUE_PATCH', 'Invalid queue ID.')
+  const expected = { expectedQueueRevision: patch.expectedQueueRevision as number | undefined, expectedQueueId: patch.expectedQueueId as string | undefined }
+  if (patch.type === 'clear') return { type: 'clear', ...expected }
   if (patch.type === 'reorder' && Array.isArray(patch.queueItemIds) && patch.queueItemIds.every((id) => typeof id === 'string')) {
-    return { type: 'reorder', queueItemIds: patch.queueItemIds }
+    return { type: 'reorder', queueItemIds: patch.queueItemIds, ...expected }
   }
   throw new PlayerControllerError('INVALID_QUEUE_PATCH', 'Invalid queue patch.')
 }
 
 const statusFor = (error: unknown): number => {
+  if (error instanceof HistoryError) return error.status
   if (error instanceof DashboardAuthError) return error.code === 'UNAUTHENTICATED' ? 401 : 403
   if (error instanceof HistoryUnavailableError) return 503
   if (error instanceof PlayerControllerError) {
@@ -96,6 +104,8 @@ function initApi(client: ClientType): Server {
   }
 
   const controller = client.playerController
+  const history = new HistoryRecall(`${ENV.INFLUX_ORG}/${ENV.INFLUX_BUCKET}/song_play`, new HistorySigner(process.env.HISTORY_ID_SECRET || config.sessionSecret), createHistoryRead(guildId))
+  const enqueues = new EnqueueOperations(controller.getQueueVersion().instanceId)
   const app = express()
   app.set('trust proxy', 1)
   app.use((request: ApiRequest, response, next) => {
@@ -128,12 +138,13 @@ function initApi(client: ClientType): Server {
         await handler(request, response, user)
       } catch (error) {
         if (statusFor(error) === 500) logger.error('Dashboard API request failed', error, { requestId: id })
-        const code = error instanceof DashboardAuthError || error instanceof PlayerControllerError
+        const code = error instanceof DashboardAuthError || error instanceof PlayerControllerError || error instanceof HistoryError
           ? error.code
           : error instanceof HistoryUnavailableError
             ? 'HISTORY_UNAVAILABLE'
             : 'INTERNAL_ERROR'
-        const message = error instanceof Error ? error.message : 'Unexpected server error.'
+        const message = statusFor(error) === 500 ? 'Unexpected server error.' : error instanceof Error ? error.message : 'Unexpected server error.'
+        if (statusFor(error) === 429) response.setHeader('Retry-After', '60')
         respondError(response, statusFor(error), code, message, id)
       }
     }
@@ -185,6 +196,32 @@ function initApi(client: ClientType): Server {
 
   app.get('/api/v1/me', protectedRoute(false, async (_request, response, user) => response.json({ user, contractVersion: DASHBOARD_CONTRACT_VERSION })))
   app.get('/api/v1/state', protectedRoute(false, async (_request, response, user) => response.json({ state: controller.getState(user.role) })))
+  app.use('/api/v1/history', (_request, response, next) => { response.setHeader('Cache-Control', 'private, no-store'); next() })
+  app.use('/api/v1/queue/enqueues', (_request, response, next) => { response.setHeader('Cache-Control', 'private, no-store'); next() })
+  app.get('/api/v1/queue/enqueues/:operationId', protectedRoute(false, async (request, response, user) => {
+    const receipt = enqueues.get(`${guildId}:${user.id}`, request.params.operationId, typeof request.query.instanceId === 'string' ? request.query.instanceId : '')
+    response.status(receipt.status === 'resolving' ? 202 : 200).json(receipt)
+  }))
+  app.post('/api/v1/queue/enqueues', protectedRoute(true, async (request, response, user) => {
+    if (!canControlPlayer(user.role)) throw new DashboardAuthError('FORBIDDEN', 'DJ permission is required.')
+    assertHistoryScope(guildId)
+    const prepareActor = async () => {
+      const currentUser = await getAuthorizedDashboardUser(request, client, guildId, config)
+      if (!canControlPlayer(currentUser.role)) throw new DashboardAuthError('FORBIDDEN', 'DJ permission is required.')
+      const member = await getGuildMemberForUser(user.id, client, guildId)
+      const textChannel = await member.guild.channels.fetch(defaultTextChannelId) as BaseGuildTextChannel | null
+      if (!textChannel) throw new HistoryError('TEXT_CHANNEL_NOT_FOUND', 'The configured text channel is unavailable.', 409)
+      const actor = { member, textChannel }
+      controller.validateHistoryActor(actor)
+      return actor
+    }
+    const receipt = enqueues.register(`${guildId}:${user.id}`, request.body, {
+      validatePlayId: (id) => history.reference(id), readPlay: (id) => history.resolvePlay(id),
+      resolve: (play) => controller.resolveHistoricalTrack(play), prepareActor,
+      commit: (body, voiceChannelId, tracks, committed) => controller.commitHistoryEnqueue(body, voiceChannelId, tracks, prepareActor, committed),
+    })
+    response.status(receipt.status === 'resolving' ? 202 : 200).json(receipt)
+  }))
   app.post('/api/v1/player/actions', protectedRoute(true, async (request, response, user) => {
     if (!canControlPlayer(user.role)) throw new DashboardAuthError('FORBIDDEN', 'DJ permission is required.')
     await controller.performAction(parsePlayerAction(request.body))
@@ -242,6 +279,7 @@ function initApi(client: ClientType): Server {
     response.json({ state: controller.getState(user.role) })
   }))
   app.get('/api/v1/history', protectedRoute(false, async (request, response) => {
+    assertHistoryScope(guildId)
     const range = typeof request.query.range === 'string' ? request.query.range : 'monthly'
     if (!['24h', 'weekly', 'monthly', 'yearly'].includes(range)) throw new PlayerControllerError('INVALID_HISTORY_RANGE', 'Invalid history range.')
     const parsedLimit = Number(request.query.limit || 25)
@@ -249,41 +287,16 @@ function initApi(client: ClientType): Server {
     const history = await getSongsPlayedStrict(range, limit)
     response.json({ items: history.map((item) => ({ playedAt: item._time, title: item.songTitle, uri: item.songUrl, artworkUrl: item.songThumbnail, requester: { id: item.requestedById, username: item.requestedByUsername, avatarUrl: item.requestedByAvatar }, source: item.source })) })
   }))
-  app.get('/api/v1/history/plays', protectedRoute(false, async (request, response) => {
-    const range = typeof request.query.range === 'string' ? request.query.range : 'monthly'
-    if (!['24h', 'weekly', 'monthly', 'yearly'].includes(range)) throw new PlayerControllerError('INVALID_HISTORY_RANGE', 'Invalid history range.')
-    const timezone = typeof request.query.timezone === 'string' ? request.query.timezone : 'America/Toronto'
-    try { new Intl.DateTimeFormat('en-CA', { timeZone: timezone }) } catch { throw new PlayerControllerError('INVALID_TIMEZONE', 'timezone must be a valid IANA timezone.') }
-    const integer = (value: unknown, min: number, max: number) => {
-      if (value === undefined) return undefined
-      const parsed = Number(value)
-      if (!Number.isInteger(parsed) || parsed < min || parsed > max) throw new PlayerControllerError('INVALID_HISTORY_FILTER', 'History filter is invalid.')
-      return parsed
-    }
-    const q = typeof request.query.q === 'string' ? request.query.q.trim() : ''
-    if (q.length > 200) throw new PlayerControllerError('INVALID_HISTORY_FILTER', 'Search text must be at most 200 characters.')
-    const requesterId = typeof request.query.requesterId === 'string' && request.query.requesterId.trim() ? request.query.requesterId.trim() : undefined
-    const limit = integer(request.query.limit, 1, 100) || 50
-    const from = typeof request.query.from === 'string' ? request.query.from : undefined
-    const to = typeof request.query.to === 'string' ? request.query.to : undefined
-    const cursor = typeof request.query.cursor === 'string' ? decodeHistoryCursor(request.query.cursor) : undefined
-    if (typeof request.query.cursor === 'string' && !cursor) throw new PlayerControllerError('INVALID_HISTORY_CURSOR', 'History cursor is invalid.')
-    let page
-    try { page = await getHistoryPageStrict({ range, from, to, before: cursor || undefined, limit: 100 }) } catch (error) {
-      if (error instanceof HistoryUnavailableError) throw error
-      throw new PlayerControllerError('INVALID_HISTORY_RANGE', error instanceof Error ? error.message : 'Invalid history range.')
-    }
-    const items = filterHistoryPlays(page.items, {
-      q, requesterId, timezone,
-      weekday: integer(request.query.weekday, 0, 6),
-      hourFrom: integer(request.query.hourFrom, 0, 23),
-      // An end at 24:00 makes a natural, exclusive end for evening filters.
-      hourTo: integer(request.query.hourTo, 0, 24),
-    }).slice(0, limit)
-    response.setHeader('Cache-Control', 'private, no-store')
-    response.json({ timezone, range, items, nextCursor: page.nextCursor })
+  app.get('/api/v1/history/plays', protectedRoute(false, async (request, response, user) => {
+    assertHistoryScope(guildId)
+    response.json(await history.search(user.id, request.query))
+  }))
+  app.get('/api/v1/history/requesters', protectedRoute(false, async (request, response, user) => {
+    assertHistoryScope(guildId)
+    response.json(await history.search(user.id, request.query, 'requesters'))
   }))
   app.get('/api/v1/history/insights', protectedRoute(false, async (request, response) => {
+    assertHistoryScope(guildId)
     const range = typeof request.query.range === 'string' ? request.query.range : 'monthly'
     if (!['24h', 'weekly', 'monthly', 'yearly'].includes(range)) throw new PlayerControllerError('INVALID_HISTORY_RANGE', 'Invalid history range.')
     const timezone = typeof request.query.timezone === 'string' ? request.query.timezone : 'America/Toronto'
@@ -293,6 +306,7 @@ function initApi(client: ClientType): Server {
     response.json(insights)
   }))
   app.get('/api/v1/history/room-picks', protectedRoute(false, async (request, response, user) => {
+    assertHistoryScope(guildId)
     const range = typeof request.query.range === 'string' ? request.query.range : 'monthly'
     if (!['24h', 'weekly', 'monthly', 'yearly'].includes(range)) throw new PlayerControllerError('INVALID_HISTORY_RANGE', 'Invalid history range.')
     const timezone = typeof request.query.timezone === 'string' ? request.query.timezone : 'America/Toronto'
@@ -303,19 +317,9 @@ function initApi(client: ClientType): Server {
     response.setHeader('Cache-Control', 'private, no-store')
     response.json({ timezone, range, ...picks })
   }))
-  app.get('/api/v1/history/plays/:playId/context', protectedRoute(false, async (request, response) => {
-    const range = typeof request.query.range === 'string' ? request.query.range : 'monthly'
-    if (!['24h', 'weekly', 'monthly', 'yearly'].includes(range)) throw new PlayerControllerError('INVALID_HISTORY_RANGE', 'Invalid history range.')
-    const timezone = typeof request.query.timezone === 'string' ? request.query.timezone : 'America/Toronto'
-    try { new Intl.DateTimeFormat('en-CA', { timeZone: timezone }) } catch { throw new PlayerControllerError('INVALID_TIMEZONE', 'timezone must be a valid IANA timezone.') }
-    const parsedRadius = Number(request.query.radius || 2)
-    if (!Number.isInteger(parsedRadius) || parsedRadius < 1 || parsedRadius > 5) throw new PlayerControllerError('INVALID_HISTORY_CONTEXT', 'radius must be between 1 and 5.')
-    const playedAt = typeof request.query.playedAt === 'string' ? request.query.playedAt : ''
-    if (!playedAt || Number.isNaN(Date.parse(playedAt))) throw new PlayerControllerError('INVALID_HISTORY_CONTEXT', 'playedAt must be a valid recorded-start timestamp.')
-    const items = await getHistoryContextStrict({ range, playedAt, playId: request.params.playId, radius: parsedRadius })
-    if (!items.length) throw new PlayerControllerError('HISTORY_PLAY_NOT_FOUND', 'This recorded start is outside the selected history range.')
-    response.setHeader('Cache-Control', 'private, no-store')
-    response.json({ timezone, range, anchorPlayId: request.params.playId, items })
+  app.get('/api/v1/history/plays/:playId/context', protectedRoute(false, async (request, response, user) => {
+    assertHistoryScope(guildId)
+    response.json(await history.context(user.id, request.params.playId, request.query))
   }))
 
   const playFromRequest = async (request: ApiRequest, response: Response) => {

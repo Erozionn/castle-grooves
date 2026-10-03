@@ -133,8 +133,7 @@ export const getHistoryPageStrict = async ({ range, from, to, before, limit }: {
     |> range(start: ${fluxTime(start)}, stop: ${fluxTime(end)})
     |> filter(fn: (r) => r["_measurement"] == "song_play")
     |> filter(fn: (r) => r["_field"] == "songTitle" or r["_field"] == "artist" or r["_field"] == "title" or r["_field"] == "songUrl" or r["_field"] == "songIdentifier" or r["_field"] == "songThumbnail" or r["_field"] == "requestedByUsername" or r["_field"] == "requestedByAvatar")
-    |> group(columns: ["_time", "songHash", "requestedById"])
-    |> pivot(rowKey:["_time", "songHash", "requestedById"], columnKey: ["_field"], valueColumn: "_value")
+    |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
     |> group()
     |> sort(columns: ["_time"], desc: true)${cursorFilter}
     |> limit(n: ${limit + 1})`

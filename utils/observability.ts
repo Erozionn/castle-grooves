@@ -2,6 +2,7 @@ import { Point } from '@influxdata/influxdb-client'
 
 import ENV from '@constants/Env'
 import { writeApi } from '@hooks/InfluxDb'
+import { databaseWritesEnabled } from './databaseWrites'
 
 type RuntimeSnapshot = {
   guildId: string
@@ -30,7 +31,7 @@ export type PlaybackSnapshot = {
   queueDepth: number
 }
 
-const canWriteTelemetry = () => !(ENV.TS_NODE_DEV && !process.env.ENABLE_DB_WRITES_IN_DEV)
+const canWriteTelemetry = () => databaseWritesEnabled(Boolean(ENV.TS_NODE_DEV))
 
 const writeTelemetryPoint = (point: Point, context: string) => {
   if (!canWriteTelemetry()) return

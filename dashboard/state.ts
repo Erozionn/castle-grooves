@@ -3,7 +3,7 @@ import type { ClientType } from '@types'
 import type { LavalinkTrack, MusicQueue } from '../lib'
 import type { DashboardRole } from './permissions'
 import { canControlPlayer } from './permissions'
-import { DASHBOARD_CONTRACT_VERSION, type DashboardState, type DashboardTrack } from './types'
+import { DASHBOARD_CONTRACT_VERSION, DASHBOARD_INSTANCE_ID, type DashboardState, type DashboardTrack } from './types'
 
 const memberSummary = (member: { id: string; user: { username: string }; displayAvatarURL: () => string }) => ({
   id: member.id,
@@ -54,6 +54,9 @@ export const serializeDashboardState = (
 
   return {
     contractVersion: DASHBOARD_CONTRACT_VERSION,
+    instanceId: DASHBOARD_INSTANCE_ID,
+    queueId: queue?.queueId || null,
+    queueRevision: queue?.queueRevision || 0,
     revision,
     serverTime: new Date().toISOString(),
     guild: {

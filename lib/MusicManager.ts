@@ -56,6 +56,7 @@ export interface LavalinkTrack {
     playlistTitle?: string
     radioStationId?: string
     queueItemId?: string
+    exactHistoryReplay?: boolean
   }
 }
 
