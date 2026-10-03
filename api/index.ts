@@ -22,6 +22,7 @@ import { HistoryError, HistorySigner } from '@dashboard/historyIdentity'
 import { HistoryRecall } from '@dashboard/historyRecall'
 import { assertHistoryScope, createHistoryRead } from '@dashboard/historyStore'
 import { EnqueueOperations } from '@dashboard/enqueues'
+import { listDashboardVoiceChannels, parseVoiceChannelId, resolveDashboardVoiceChannel } from '@dashboard/voiceChannels'
 import ENV from '@constants/Env'
 import { getHistoryInsightsStrict, getHistoryRoomPicksStrict, type HistoryRange } from '@dashboard/insights'
 import { getDashboardRole, canControlPlayer } from '@dashboard/permissions'
@@ -88,7 +89,7 @@ const statusFor = (error: unknown): number => {
   if (error instanceof HistoryUnavailableError) return 503
   if (error instanceof PlayerControllerError) {
     if (['QUEUE_ITEM_NOT_FOUND', 'HISTORY_PLAY_NOT_FOUND'].includes(error.code)) return 404
-    if (['NO_ACTIVE_QUEUE', 'INVALID_PLAYER_STATE', 'VOICE_CHANNEL_MISMATCH'].includes(error.code)) return 409
+    if (['NO_ACTIVE_QUEUE', 'INVALID_PLAYER_STATE', 'VOICE_CHANNEL_MISMATCH', 'VOICE_CHANNEL_REQUIRED', 'VOICE_CHANNEL_UNAVAILABLE', 'VOICE_CHANNEL_NOT_JOINABLE', 'VOICE_CHANNEL_MOVE_FAILED'].includes(error.code)) return 409
     return 400
   }
   return 500
@@ -196,6 +197,10 @@ function initApi(client: ClientType): Server {
 
   app.get('/api/v1/me', protectedRoute(false, async (_request, response, user) => response.json({ user, contractVersion: DASHBOARD_CONTRACT_VERSION })))
   app.get('/api/v1/state', protectedRoute(false, async (_request, response, user) => response.json({ state: controller.getState(user.role) })))
+  app.get('/api/v1/voice-channels', protectedRoute(false, async (_request, response, user) => {
+    const member = await getGuildMemberForUser(user.id, client, guildId)
+    response.json({ channels: await listDashboardVoiceChannels(member) })
+  }))
   app.use('/api/v1/history', (_request, response, next) => { response.setHeader('Cache-Control', 'private, no-store'); next() })
   app.use('/api/v1/queue/enqueues', (_request, response, next) => { response.setHeader('Cache-Control', 'private, no-store'); next() })
   app.get('/api/v1/queue/enqueues/:operationId', protectedRoute(false, async (request, response, user) => {
@@ -205,13 +210,14 @@ function initApi(client: ClientType): Server {
   app.post('/api/v1/queue/enqueues', protectedRoute(true, async (request, response, user) => {
     if (!canControlPlayer(user.role)) throw new DashboardAuthError('FORBIDDEN', 'DJ permission is required.')
     assertHistoryScope(guildId)
+    const voiceChannelId = parseVoiceChannelId(request.body)
     const prepareActor = async () => {
       const currentUser = await getAuthorizedDashboardUser(request, client, guildId, config)
       if (!canControlPlayer(currentUser.role)) throw new DashboardAuthError('FORBIDDEN', 'DJ permission is required.')
       const member = await getGuildMemberForUser(user.id, client, guildId)
       const textChannel = await member.guild.channels.fetch(defaultTextChannelId) as BaseGuildTextChannel | null
       if (!textChannel) throw new HistoryError('TEXT_CHANNEL_NOT_FOUND', 'The configured text channel is unavailable.', 409)
-      const actor = { member, textChannel }
+      const actor = { member, textChannel, voiceChannel: await resolveDashboardVoiceChannel(member, voiceChannelId, controller.getQueue()), channelOverride: Boolean(voiceChannelId) }
       controller.validateHistoryActor(actor)
       return actor
     }
@@ -244,10 +250,9 @@ function initApi(client: ClientType): Server {
       ? ((await guild.channels.fetch(defaultTextChannelId)) as BaseGuildTextChannel | null)
       : null
     if (!textChannel) throw new PlayerControllerError('TEXT_CHANNEL_NOT_FOUND', 'The configured text channel is unavailable.')
-    await controller.enqueueQuery(
-      { member: await getGuildMemberForUser(user.id, client, guildId), textChannel },
-      body.query
-    )
+    const member = await getGuildMemberForUser(user.id, client, guildId)
+    const voiceChannelId = parseVoiceChannelId(body)
+    await controller.enqueueQuery({ member, textChannel, voiceChannel: await resolveDashboardVoiceChannel(member, voiceChannelId, controller.getQueue()), channelOverride: Boolean(voiceChannelId) }, body.query)
     logger.info('Dashboard queue item added', { userId: user.id, requestId: getRequestId(request) })
     response.status(201).json({ state: controller.getState(user.role) })
   }))
@@ -264,7 +269,8 @@ function initApi(client: ClientType): Server {
       : null
     if (!textChannel) throw new PlayerControllerError('TEXT_CHANNEL_NOT_FOUND', 'The configured text channel is unavailable.')
     const member = await getGuildMemberForUser(user.id, client, guildId)
-    await controller.enqueueQueries({ member, textChannel }, queries.map((query) => query.trim()))
+    const voiceChannelId = parseVoiceChannelId(body)
+    await controller.enqueueQueries({ member, textChannel, voiceChannel: await resolveDashboardVoiceChannel(member, voiceChannelId, controller.getQueue()), channelOverride: Boolean(voiceChannelId) }, queries.map((query) => query.trim()))
     logger.info('Dashboard history queue batch added', { userId: user.id, count: queries.length, requestId: getRequestId(request) })
     response.status(201).json({ state: controller.getState(user.role) })
   }))

@@ -6,6 +6,7 @@ import { digest, HistoryError, type RecallPlay } from './historyIdentity'
 export type EnqueueRequest = {
   operationId: string; issuedAt: string; instanceId: string; expectedQueueId: string | null
   placement: 'append' | 'next'; afterQueueItemId?: string | null; expectedQueueRevision?: number
+  voiceChannelId?: string | null
   items: Array<{ clientItemId: string; playId: string }>
 }
 export type QueueVersion = { instanceId: string; queueId: string | null; queueRevision: number; revision: number }
@@ -21,11 +22,12 @@ const object = (value: unknown): Record<string, unknown> | null => value && type
 const invalid = () => new HistoryError('INVALID_ENQUEUE', 'Supply a valid ordered history enqueue operation.')
 export const parseEnqueue = (value: unknown): EnqueueRequest => {
   const body = object(value)
-  if (!body || Buffer.byteLength(JSON.stringify(body)) > 32768 || Object.keys(body).some((key) => !['operationId', 'issuedAt', 'instanceId', 'expectedQueueId', 'placement', 'afterQueueItemId', 'expectedQueueRevision', 'items'].includes(key))) throw invalid()
+  if (!body || Buffer.byteLength(JSON.stringify(body)) > 32768 || Object.keys(body).some((key) => !['operationId', 'issuedAt', 'instanceId', 'expectedQueueId', 'placement', 'afterQueueItemId', 'expectedQueueRevision', 'voiceChannelId', 'items'].includes(key))) throw invalid()
   if (!uuid(body.operationId) || !uuid(body.instanceId) || body.expectedQueueId !== null && !uuid(body.expectedQueueId)) throw invalid()
   if (typeof body.issuedAt !== 'string' || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,9})?(?:Z|[+-]\d\d:\d\d)$/.test(body.issuedAt) || !Number.isFinite(Date.parse(body.issuedAt))) throw invalid()
   if (!['append', 'next'].includes(String(body.placement)) || body.placement === 'next' && body.afterQueueItemId !== null && !uuid(body.afterQueueItemId) || body.placement === 'append' && body.afterQueueItemId !== undefined) throw invalid()
   if (body.expectedQueueRevision !== undefined && (typeof body.expectedQueueRevision !== 'number' || !Number.isSafeInteger(body.expectedQueueRevision) || body.expectedQueueRevision < 0)) throw invalid()
+  if (body.voiceChannelId !== undefined && body.voiceChannelId !== null && (typeof body.voiceChannelId !== 'string' || !/^\d{17,20}$/.test(body.voiceChannelId))) throw invalid()
   if (!Array.isArray(body.items) || !body.items.length || body.items.length > 50) throw invalid()
   const ids = new Set<string>()
   const items = body.items.map((value) => {
@@ -35,7 +37,7 @@ export const parseEnqueue = (value: unknown): EnqueueRequest => {
     return { clientItemId: item.clientItemId, playId: item.playId }
   })
   // Rebuild in a fixed field order, so JSON object key order is not an intent change.
-  return { operationId: body.operationId, issuedAt: body.issuedAt, instanceId: body.instanceId, expectedQueueId: body.expectedQueueId as string | null, placement: body.placement as 'append' | 'next', afterQueueItemId: body.afterQueueItemId as string | null | undefined, expectedQueueRevision: body.expectedQueueRevision as number | undefined, items }
+  return { operationId: body.operationId, issuedAt: body.issuedAt, instanceId: body.instanceId, expectedQueueId: body.expectedQueueId as string | null, placement: body.placement as 'append' | 'next', afterQueueItemId: body.afterQueueItemId as string | null | undefined, expectedQueueRevision: body.expectedQueueRevision as number | undefined, voiceChannelId: body.voiceChannelId as string | null || null, items }
 }
 
 export const withDeadline = <T>(work: Promise<T>, ms: number): Promise<T> => new Promise((resolve, reject) => {
@@ -44,6 +46,8 @@ export const withDeadline = <T>(work: Promise<T>, ms: number): Promise<T> => new
 })
 const safeError = (error: unknown) => error instanceof HistoryError
   ? { code: error.code, message: error.message, retryable: ['TRACK_RESOLUTION_TIMEOUT', 'TRACK_PROVIDER_UNAVAILABLE', 'HISTORY_UNAVAILABLE', 'HISTORY_TIMEOUT'].includes(error.code) }
+  : error instanceof Error && 'code' in error && typeof error.code === 'string' && error.code.startsWith('VOICE_CHANNEL_')
+    ? { code: error.code, message: error.message, retryable: false }
   : { code: 'TRACK_PROVIDER_UNAVAILABLE', message: 'The recording could not be resolved. Try again shortly.', retryable: true }
 
 export type EnqueueDependencies = {
@@ -90,7 +94,7 @@ export class EnqueueOperations {
   private async execute(request: EnqueueRequest, receipt: EnqueueReceipt, dependencies: EnqueueDependencies) {
     try {
       const actor = await withDeadline(dependencies.prepareActor(), 5000)
-      const initialVoiceChannelId = actor.member.voice.channel?.id || null
+      const initialVoiceChannelId = actor.voiceChannel?.id || actor.member.voice.channel?.id || null
       const deadline = this.now() + 30_000
       const results: Array<Record<string, unknown>> = new Array(request.items.length)
       const resolved: ResolvedItem[] = []

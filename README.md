@@ -112,3 +112,10 @@ and WebSocket contracts live in `contracts/openapi.yaml` and
 `contracts/asyncapi.yaml`. Legacy `/play` links remain supported for existing
 Influx/Grafana replay links and use `ADMIN_USER_ID` only as the playback
 identity.
+
+Dashboard DJs can choose a voice channel without joining it. The UI obtains
+channels from `GET /api/v1/voice-channels` and sends `voiceChannelId` with song
+adds and history replay requests. Omitting it selects Auto: the DJ's voice
+channel, or the active bot channel when the DJ is not in voice. An explicit
+choice can move the single active queue to that channel and keeps it playing
+when the room is empty. The bot needs Connect and Speak permissions there.

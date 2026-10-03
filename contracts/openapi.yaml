@@ -34,6 +34,11 @@ paths:
     get:
       operationId: getState
       responses: { '200': { $ref: '#/components/responses/State' }, '401': { $ref: '#/components/responses/Error' } }
+  /api/v1/voice-channels:
+    get:
+      operationId: listVoiceChannels
+      description: Voice channels in the configured guild where the bot can connect and speak.
+      responses: { '200': { description: Available voice channels, content: { application/json: { schema: { type: object, required: [channels], properties: { channels: { type: array, items: { $ref: '#/components/schemas/VoiceChannel' } } } } } } }, '401': { $ref: '#/components/responses/Error' } }
   /api/v1/player/actions:
     post:
       operationId: playerAction
@@ -49,8 +54,14 @@ paths:
   /api/v1/queue/items:
     post:
       operationId: addQueueItem
-      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [query], properties: { query: { type: string, minLength: 1, maxLength: 500 } } }, example: { query: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" } } } }
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [query], properties: { query: { type: string, minLength: 1, maxLength: 500 }, voiceChannelId: { $ref: '#/components/schemas/SelectedVoiceChannelId' } } }, example: { query: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" } } } }
       responses: { '201': { $ref: '#/components/responses/State' }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } }
+  /api/v1/queue/enqueues:
+    post:
+      operationId: enqueueHistoryPlays
+      description: Admit exact history recordings asynchronously. The optional voice channel selection is part of the idempotent intent.
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [operationId, issuedAt, instanceId, expectedQueueId, placement, items], properties: { operationId: { type: string, format: uuid }, issuedAt: { type: string, format: date-time }, instanceId: { type: string, format: uuid }, expectedQueueId: { type: [string, 'null'], format: uuid }, placement: { enum: [append, next] }, afterQueueItemId: { type: [string, 'null'], format: uuid }, expectedQueueRevision: { type: integer, minimum: 0 }, voiceChannelId: { $ref: '#/components/schemas/SelectedVoiceChannelId' }, items: { type: array, minItems: 1, maxItems: 50, items: { type: object, required: [clientItemId, playId], properties: { clientItemId: { type: string, maxLength: 64 }, playId: { type: string } } } } } } } } }
+      responses: { '200': { description: Existing operation receipt }, '202': { description: Resolving operation receipt }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } }
   /api/v1/queue/items/{queueItemId}:
     delete:
       operationId: removeQueueItem
@@ -59,7 +70,7 @@ paths:
   /api/v1/history/queue:
     post:
       operationId: addHistoryQueueBatch
-      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [queries], properties: { queries: { type: array, minItems: 1, maxItems: 25, items: { type: string, minLength: 1, maxLength: 500 } } } } } } }
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [queries], properties: { queries: { type: array, minItems: 1, maxItems: 25, items: { type: string, minLength: 1, maxLength: 500 } }, voiceChannelId: { $ref: '#/components/schemas/SelectedVoiceChannelId' } } } } } }
       responses: { '201': { $ref: '#/components/responses/State' }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } }
   /api/v1/queue:
     patch:
@@ -118,6 +129,8 @@ components:
     Error: { description: Stable error envelope, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' }, example: { error: { code: FORBIDDEN, message: DJ permission is required., requestId: 018fc4d4-9348-7a09-ae12-4c858fd8a2b9 } } } } }
     State: { description: Latest authoritative dashboard state, content: { application/json: { schema: { type: object, required: [state], properties: { state: { $ref: '#/components/schemas/DashboardState' } } } } } }
   schemas:
+    VoiceChannel: { type: object, required: [id, name], properties: { id: { type: string }, name: { type: string } } }
+    SelectedVoiceChannelId: { type: [string, 'null'], pattern: '^\d{17,20}$', description: "Optional voice channel override. Omit or use null for Auto: the user's channel, then the active bot channel. Explicit selection can move the active queue and keeps playback running when the room is empty." }
     ErrorEnvelope: { type: object, required: [error], properties: { error: { type: object, required: [code, message, requestId], properties: { code: { type: string }, message: { type: string }, requestId: { type: string, format: uuid } } } } }
     SessionUser: { type: object, required: [id, username, avatarUrl, role], properties: { id: { type: string }, username: { type: string }, avatarUrl: { type: [string, 'null'], format: uri }, role: { enum: [admin, dj, viewer] } } }
     Requester: { type: object, required: [id, username, avatarUrl], properties: { id: { type: string }, username: { type: string }, avatarUrl: { type: string, format: uri } } }

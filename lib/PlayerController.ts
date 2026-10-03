@@ -18,6 +18,8 @@ import { MusicQueue } from './MusicQueue'
 export type PlaybackActor = {
   member: GuildMember
   textChannel?: TextBasedChannel | BaseGuildTextChannel | null
+  voiceChannel?: VoiceBasedChannel
+  channelOverride?: boolean
 }
 
 export type QueuePatch =
@@ -69,10 +71,10 @@ export class PlayerController extends EventEmitter {
   }
 
   validateHistoryActor(actor: PlaybackActor): void {
-    const channel = actor.member.voice.channel
-    if (!channel) throw new HistoryError('VOICE_CHANNEL_REQUIRED', 'Join a voice channel first.', 409)
+    const channel = actor.voiceChannel || actor.member.voice.channel
+    if (!channel) throw new HistoryError('VOICE_CHANNEL_REQUIRED', 'Join a voice channel or select one in the dashboard.', 409)
     const queue = this.musicManager.getQueue(this.guildId)
-    if (queue && queue.voiceChannel.id !== channel.id) throw new HistoryError('VOICE_CHANNEL_MISMATCH', 'Join the bot voice channel to add music.', 409)
+    if (queue && queue.voiceChannel.id !== channel.id && !actor.channelOverride) throw new HistoryError('VOICE_CHANNEL_MISMATCH', 'Join the bot voice channel to add music.', 409)
   }
 
   async resolveHistoricalTrack(play: RecallPlay): Promise<LavalinkTrack> {
@@ -100,7 +102,7 @@ export class PlayerController extends EventEmitter {
     return this.runMutation(async () => {
       const actor = await withDeadline(freshActor(), 5000)
       this.validateHistoryActor(actor)
-      const voiceChannel = actor.member.voice.channel!
+      const voiceChannel = (actor.voiceChannel || actor.member.voice.channel)!
       if (voiceChannel.id !== initialVoiceChannelId) throw new HistoryError('VOICE_CHANNEL_MISMATCH', 'Your voice channel changed while resolving the recordings.', 409)
       let queue = this.musicManager.getQueue(this.guildId)
       const version = this.getQueueVersion()
@@ -109,8 +111,9 @@ export class PlayerController extends EventEmitter {
       if (request.expectedQueueRevision !== undefined && request.expectedQueueRevision !== version.queueRevision) throw new HistoryError('QUEUE_REVISION_CONFLICT', 'The queue changed. Refresh player state.', 409)
       if (request.placement === 'next' && (queue?.currentTrack?.userData?.queueItemId || null) !== request.afterQueueItemId) throw new HistoryError('NEXT_ANCHOR_CHANGED', 'The current song changed. Refresh player state.', 409)
       if (!resolved.length) { committed([], version, false); return {} }
+      if (queue) await this.alignQueueChannel(queue, voiceChannel, actor)
       if (!queue) {
-        queue = new MusicQueue(this.musicManager, voiceChannel, { channel: actor.textChannel })
+        queue = new MusicQueue(this.musicManager, voiceChannel, { channel: actor.textChannel, keepAliveWhenEmpty: Boolean(actor.channelOverride) })
         this.musicManager.queues.set(this.guildId, queue)
       }
       const tracks = resolved.map(({ track }) => ({ ...track, userData: { ...track.userData, requestedBy: actor.member, exactHistoryReplay: true, queueItemId: randomUUID() } }))
@@ -143,19 +146,17 @@ export class PlayerController extends EventEmitter {
   }
 
   async enqueueTrack(actor: PlaybackActor, track: LavalinkTrack): Promise<MusicQueue> {
-    const voiceChannel = this.requireVoiceChannel(actor.member)
+    const voiceChannel = this.requireVoiceChannel(actor)
     return this.runMutation(async () => {
       const queue = this.musicManager.getQueue(this.guildId)
       if (!queue) {
         const result = await this.musicManager.play(voiceChannel, track.info.uri || `${track.info.author} ${track.info.title}`, {
           requestedBy: actor.member,
-          metadata: { channel: actor.textChannel },
+          metadata: { channel: actor.textChannel, keepAliveWhenEmpty: Boolean(actor.channelOverride) },
         })
         return result.queue
       }
-      if (queue.voiceChannel.id !== voiceChannel.id) {
-        throw new PlayerControllerError('VOICE_CHANNEL_MISMATCH', 'Join the bot voice channel to add music.')
-      }
+      await this.alignQueueChannel(queue, voiceChannel, actor)
       await queue.addTrack({ ...track, userData: { ...track.userData, requestedBy: actor.member } })
       if (!queue.isPlaying && !queue.currentTrack) await queue.play()
       return queue
@@ -164,18 +165,16 @@ export class PlayerController extends EventEmitter {
 
   async enqueueNextQuery(actor: PlaybackActor, query: string): Promise<MusicQueue> {
     return this.runMutation(async () => {
-      const voiceChannel = this.requireVoiceChannel(actor.member)
+      const voiceChannel = this.requireVoiceChannel(actor)
       const queue = this.musicManager.getQueue(this.guildId)
       if (!queue) {
         const result = await this.musicManager.play(voiceChannel, query, {
           requestedBy: actor.member,
-          metadata: { channel: actor.textChannel },
+          metadata: { channel: actor.textChannel, keepAliveWhenEmpty: Boolean(actor.channelOverride) },
         })
         return result.queue
       }
-      if (queue.voiceChannel.id !== voiceChannel.id) {
-        throw new PlayerControllerError('VOICE_CHANNEL_MISMATCH', 'Join the bot voice channel to add music.')
-      }
+      await this.alignQueueChannel(queue, voiceChannel, actor)
       const results = await this.musicManager.search(query, { source: 'spsearch', requester: actor.member })
       if (!results.tracks.length) throw new PlayerControllerError('NO_SEARCH_RESULTS', 'No tracks were found.')
       queue.insertTrack(results.tracks[0], 0)
@@ -273,6 +272,7 @@ export class PlayerController extends EventEmitter {
 
     if (queue.voiceChannel.id === voiceChannel.id) return
     queue.updateVoiceChannel(voiceChannel)
+    queue.metadata.keepAliveWhenEmpty = false
 
     // A separate voice-listener bot cannot safely follow a moderator drag.
     // Disable it rather than leaving a ghost listener in the old channel.
@@ -292,18 +292,16 @@ export class PlayerController extends EventEmitter {
   }
 
   private async enqueueQueriesWithinMutation(actor: PlaybackActor, queries: string[], expandSinglePlaylist: boolean): Promise<MusicQueue> {
-    const voiceChannel = this.requireVoiceChannel(actor.member)
+    const voiceChannel = this.requireVoiceChannel(actor)
     let queue = this.musicManager.getQueue(this.guildId)
     const hadQueue = Boolean(queue)
-    if (queue && queue.voiceChannel.id !== voiceChannel.id) {
-      throw new PlayerControllerError('VOICE_CHANNEL_MISMATCH', 'Join the bot voice channel to add music.')
-    }
+    if (queue) await this.alignQueueChannel(queue, voiceChannel, actor)
 
     const [firstQuery, ...remainingQueries] = queries
     if (!queue) {
       const result = await this.musicManager.play(voiceChannel, firstQuery, {
         requestedBy: actor.member,
-        metadata: { channel: actor.textChannel },
+        metadata: { channel: actor.textChannel, keepAliveWhenEmpty: Boolean(actor.channelOverride) },
       })
       queue = result.queue
     }
@@ -320,10 +318,50 @@ export class PlayerController extends EventEmitter {
     return queue
   }
 
-  private requireVoiceChannel(member: GuildMember): VoiceBasedChannel {
-    const channel = member.voice.channel
-    if (!channel) throw new PlayerControllerError('VOICE_CHANNEL_REQUIRED', 'Join a voice channel first.')
+  private requireVoiceChannel(actor: PlaybackActor): VoiceBasedChannel {
+    const channel = actor.voiceChannel || actor.member.voice.channel
+    if (!channel) throw new PlayerControllerError('VOICE_CHANNEL_REQUIRED', 'Join a voice channel or select one in the dashboard.')
     return channel
+  }
+
+  getQueue(): MusicQueue | undefined {
+    return this.musicManager.getQueue(this.guildId)
+  }
+
+  private async alignQueueChannel(queue: MusicQueue, voiceChannel: VoiceBasedChannel, actor: PlaybackActor): Promise<void> {
+    if (queue.voiceChannel.id !== voiceChannel.id) {
+      if (!actor.channelOverride) throw new PlayerControllerError('VOICE_CHANNEL_MISMATCH', 'Join the bot voice channel to add music.')
+      const connection = this.musicManager.shoukaku.connections.get(this.guildId)
+      if (connection) {
+        await new Promise<void>((resolve, reject) => {
+          const botId = this.client.user?.id
+          const timer = setTimeout(() => {
+            this.client.off('voiceStateUpdate', onVoiceStateUpdate)
+            reject(new PlayerControllerError('VOICE_CHANNEL_MOVE_FAILED', 'The bot could not move to the selected voice channel.'))
+          }, 5000)
+          const onVoiceStateUpdate = (_oldState: unknown, newState: { id: string; guild: { id: string }; channelId: string | null }) => {
+            if (newState.id !== botId || newState.guild.id !== this.guildId || newState.channelId !== voiceChannel.id) return
+            clearTimeout(timer)
+            this.client.off('voiceStateUpdate', onVoiceStateUpdate)
+            resolve()
+          }
+          this.client.on('voiceStateUpdate', onVoiceStateUpdate)
+          try {
+            this.musicManager.shoukaku.connector.sendPacket(voiceChannel.guild.shardId, {
+              op: 4,
+              d: { guild_id: this.guildId, channel_id: voiceChannel.id, self_mute: connection.muted, self_deaf: connection.deafened },
+            }, false)
+          } catch {
+            clearTimeout(timer)
+            this.client.off('voiceStateUpdate', onVoiceStateUpdate)
+            reject(new PlayerControllerError('VOICE_CHANNEL_MOVE_FAILED', 'The bot could not move to the selected voice channel.'))
+          }
+        })
+      }
+      queue.updateVoiceChannel(voiceChannel)
+      this.musicManager.disableVoiceCommands(this.guildId)
+    }
+    queue.metadata.keepAliveWhenEmpty = Boolean(actor.channelOverride)
   }
 
   private async runMutation<T>(operation: () => Promise<T>): Promise<T> {

@@ -20,6 +20,7 @@ export interface QueueMetadata {
   channel?: any
   interaction?: any
   radio?: RadioState
+  keepAliveWhenEmpty?: boolean
   [key: string]: any
 }
 
@@ -330,7 +331,12 @@ export class MusicQueue {
         return
       }
 
-      if (this.isBotAlone()) {
+      if (this.metadata.keepAliveWhenEmpty) {
+        if (this.emptyChannelTimeout) {
+          clearTimeout(this.emptyChannelTimeout)
+          this.emptyChannelTimeout = null
+        }
+      } else if (this.isBotAlone()) {
         // Bot is alone - start countdown if not already started
         if (!this.emptyChannelTimeout) {
           if (ENV.DEBUG_QUEUE)
