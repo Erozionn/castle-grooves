@@ -128,18 +128,40 @@ type Snapshot = { owner: string; kind: string; expires: number; bytes: number; i
 export class HistoryRecall {
   private snapshots = new Map<string, Snapshot>()
   private reservations = new Map<string, number>()
+  private contextReservations = new Map<string, number>()
+  private replacements = new Set<string>()
   constructor(readonly dataset: string, readonly signer: HistorySigner, private readonly read: HistoryRead, private readonly now = Date.now) {}
 
-  private reserve(owner: string) {
+  private pendingSearches() { return [...this.reservations.values()].reduce((sum, value) => sum + value, 0) }
+  private pendingContexts() { return [...this.contextReservations.values()].reduce((sum, value) => sum + value, 0) }
+
+  private reserve(owner: string, replaceSnapshot?: string) {
     for (const [id, snapshot] of this.snapshots) if (snapshot.expires <= this.now()) this.snapshots.delete(id)
     const active = [...this.snapshots.values()]
-    const pending = [...this.reservations.values()].reduce((sum, value) => sum + value, 0)
-    if (active.filter((entry) => entry.owner === owner).length + (this.reservations.get(owner) || 0) >= 3 || active.reduce((sum, entry) => sum + entry.bytes, 0) + (pending + 1) * 8 * 1024 * 1024 > 64 * 1024 * 1024) throw new HistoryError('HISTORY_BUSY', 'Close or let an older search expire before opening another.', 429)
+    const pending = this.pendingSearches()
+    if (active.filter((entry) => entry.owner === owner).length + (this.reservations.get(owner) || 0) - (replaceSnapshot ? 1 : 0) >= 3 ||
+      active.reduce((sum, entry) => sum + entry.bytes, 0) + (pending + 1) * 8 * 1024 * 1024 > 64 * 1024 * 1024 ||
+      pending + this.pendingContexts() >= 8 || replaceSnapshot && this.replacements.has(replaceSnapshot)) throw new HistoryError('HISTORY_BUSY', 'Close or let an older search expire before opening another.', 429)
     this.reservations.set(owner, (this.reservations.get(owner) || 0) + 1)
-    return () => { const count = this.reservations.get(owner)! - 1; if (count) this.reservations.set(owner, count); else this.reservations.delete(owner) }
+    if (replaceSnapshot) this.replacements.add(replaceSnapshot)
+    return () => {
+      const count = this.reservations.get(owner)! - 1
+      if (count) this.reservations.set(owner, count); else this.reservations.delete(owner)
+      if (replaceSnapshot) this.replacements.delete(replaceSnapshot)
+    }
   }
 
-  private freeze(owner: string, kind: string, items: unknown[], envelope: Record<string, unknown>, limit: number) {
+  private reserveContext(owner: string) {
+    const count = this.contextReservations.get(owner) || 0
+    if (count >= 2 || this.pendingSearches() + this.pendingContexts() >= 8) throw new HistoryError('HISTORY_BUSY', 'Too many history reads are in progress. Try again shortly.', 429)
+    this.contextReservations.set(owner, count + 1)
+    return () => {
+      const remaining = this.contextReservations.get(owner)! - 1
+      if (remaining) this.contextReservations.set(owner, remaining); else this.contextReservations.delete(owner)
+    }
+  }
+
+  private freeze(owner: string, kind: string, items: unknown[], envelope: Record<string, unknown>, limit: number, replaceSnapshot?: string) {
     const id = randomUUID()
     const capturedAt = this.now()
     const expires = capturedAt + 600_000
@@ -148,6 +170,7 @@ export class HistoryRecall {
     const bytes = Buffer.byteLength(serialized)
     if (bytes > 8 * 1024 * 1024) throw new HistoryError('HISTORY_QUERY_TOO_BROAD', 'Narrow the history search.', 422)
     const copy = JSON.parse(serialized)
+    if (replaceSnapshot) this.snapshots.delete(replaceSnapshot)
     this.snapshots.set(id, { owner, kind, expires, bytes, ...copy, limit })
     return this.page(id, 0)
   }
@@ -170,8 +193,15 @@ export class HistoryRecall {
       if (!Number.isInteger(cursor.offset) || cursor.offset < 0 || cursor.offset >= snapshot.items.length) throw new HistoryError('INVALID_CURSOR', 'Invalid history cursor.')
       return this.page(cursor.id, cursor.offset)
     }
-    const filters = parseRecallFilters(query, this.now(), kind === 'requesters')
-    const release = this.reserve(owner)
+    const { replaceSnapshot, ...filtersQuery } = query
+    const filters = parseRecallFilters(filtersQuery, this.now(), kind === 'requesters')
+    if (replaceSnapshot !== undefined) {
+      if (typeof replaceSnapshot !== 'string' || !/^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i.test(replaceSnapshot)) throw invalid()
+      const previous = this.snapshots.get(replaceSnapshot)
+      if (!previous || previous.expires <= this.now()) throw new HistoryError('HISTORY_SNAPSHOT_EXPIRED', 'This search expired. Run a fresh search.', 410)
+      if (previous.owner !== owner || previous.kind !== kind) throw new HistoryError('HISTORY_PLAY_NOT_FOUND', 'History snapshot not found.', 404)
+    }
+    const release = this.reserve(owner, replaceSnapshot as string | undefined)
     try {
       const plays: Array<RecallPlay & { local: ReturnType<typeof localCalendar> }> = []
       const requesters = new Map<string, { id: string; username: string | null; avatarUrl: string | null; lastPlayedAt: string; playCount: number; aliases: Set<string> }>()
@@ -201,10 +231,10 @@ export class HistoryRecall {
       if (kind === 'requesters') {
         const terms = fold(filters.q).split(/\s+/).filter(Boolean)
         const items = [...requesters.values()].filter((entry) => terms.every((term) => fold([...entry.aliases].join(' ')).includes(term))).sort((a, b) => a.id < b.id ? -1 : 1).map((entry) => ({ ...entry, aliases: [...entry.aliases].sort() }))
-        return this.freeze(owner, kind, items, { timezone: filters.timezone, filters, counts: { totalMatchedRequesters: items.length, exact: true } }, filters.limit)
+        return this.freeze(owner, kind, items, { timezone: filters.timezone, filters, counts: { totalMatchedRequesters: items.length, exact: true } }, filters.limit, replaceSnapshot as string | undefined)
       }
       plays.sort((a, b) => comparePlays(a, b) * (filters.order === 'asc' ? 1 : -1))
-      return this.freeze(owner, kind, plays, { timezone: filters.timezone, range: filters.range, filters, counts: { totalMatchedPlays: plays.length, exact: true } }, filters.limit)
+      return this.freeze(owner, kind, plays, { timezone: filters.timezone, range: filters.range, filters, counts: { totalMatchedPlays: plays.length, exact: true } }, filters.limit, replaceSnapshot as string | undefined)
     } finally { release() }
   }
 
@@ -232,7 +262,7 @@ export class HistoryRecall {
     const after = integerFilter(query.after ?? query.radius, 5, 0, 20)
     const radiusMinutes = integerFilter(query.radiusMinutes, 360, 1, 360)
     const reference = this.reference(playId)
-    const release = this.reserve(owner)
+    const release = this.reserveContext(owner)
     try {
       const earlier: RecallPlay[] = []
       const later: RecallPlay[] = []
@@ -250,7 +280,19 @@ export class HistoryRecall {
       if (!anchor) throw new HistoryError('HISTORY_PLAY_NOT_FOUND', 'This recorded start was not found.', 404)
       const items = [...(before ? earlier.slice(-before) : []), anchor, ...later.slice(0, after)].map((play) => ({ ...play, local: localCalendar(play.playedAt, timezone) }))
       const gaps = items.slice(1).map((play, index) => ({ fromPlayId: items[index].playId, toPlayId: play.playId, elapsedMs: Date.parse(play.playedAt) - Date.parse(items[index].playedAt), showBreak: Date.parse(play.playedAt) - Date.parse(items[index].playedAt) >= 1_800_000 }))
-      return this.freeze(owner, 'context', items, { timezone, anchorPlayId: playId, radiusMinutes, counts: { beforeReturned: Math.min(before, earlier.length), afterReturned: Math.min(after, later.length) }, truncated: { before: earlier.length > before, after: later.length > after }, orderedPlayIds: items.map((play) => play.playId), gaps }, items.length)
+      const capturedAt = this.now()
+      const nextCursor = null
+      const response = {
+        timezone, anchorPlayId: playId, radiusMinutes,
+        counts: { beforeReturned: Math.min(before, earlier.length), afterReturned: Math.min(after, later.length) },
+        truncated: { before: earlier.length > before, after: later.length > after },
+        orderedPlayIds: items.map((play) => play.playId), gaps,
+        snapshot: { id: randomUUID(), capturedAt: new Date(capturedAt).toISOString(), expiresAt: new Date(capturedAt + 600_000).toISOString() },
+        coverage: historyCoverage, contractVersion: '1.1.0', items, nextCursor,
+        page: { limit: items.length, returned: items.length, hasMore: false, nextCursor },
+      }
+      if (Buffer.byteLength(JSON.stringify(response)) > 8 * 1024 * 1024) throw new HistoryError('HISTORY_QUERY_TOO_BROAD', 'Narrow the history context.', 422)
+      return response
     } finally { release() }
   }
 }

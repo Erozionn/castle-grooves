@@ -125,6 +125,116 @@ test('snapshot capacity does not evict valid pages; overflow never claims an exa
   await assert.rejects(overfull.search(userId, { timezone }), code('HISTORY_QUERY_TOO_BROAD'))
 })
 
+test('repeated context lookups retain the response shape without consuming search slots', async () => {
+  const rows = Array.from({ length: 5 }, (_, index) => row(new Date(Date.parse('2026-09-01T01:00:00Z') + index * 40 * 60_000).toISOString(), {}, { songHash: `${index}` }))
+  const service = new HistoryRecall('test', signer, fakeRead(rows), () => now)
+  const searches = await Promise.all(Array.from({ length: 3 }, () => service.search(userId, { timezone, limit: '1' })))
+  const anchor = normalizeStoredPlay(rows[2], 'test', signer)
+  for (let index = 0; index < 12; index += 1) {
+    const result = await service.context(userId, anchor.playId, { timezone, before: '2', after: '2' })
+    assert.deepEqual(result.orderedPlayIds, result.items.map((item: { playId: string }) => item.playId))
+    assert.equal(result.items.length, 5)
+    assert.deepEqual(result.gaps.map((gap: { showBreak: boolean }) => gap.showBreak), [true, true, true, true])
+    assert.equal(result.page.hasMore, false)
+    assert.equal(result.nextCursor, null)
+    assert.equal(result.coverage.completeness, 'unknown')
+    assert.equal(result.contractVersion, '1.1.0')
+  }
+  assert.equal((await service.search(userId, { cursor: searches[0].nextCursor })).items.length, 1)
+  await assert.rejects(service.search(userId, { timezone }), code('HISTORY_BUSY'))
+})
+
+test('refresh replaces only the selected search after a successful read', async () => {
+  const rows = [row('2026-09-01T01:00:00Z'), row('2026-09-01T02:00:00Z', {}, { songHash: 'second' })]
+  const service = new HistoryRecall('test', signer, fakeRead(rows), () => now)
+  const original = await service.search(userId, { timezone, limit: '1' })
+  const retained = await service.search(userId, { timezone, limit: '1' })
+  await service.search(userId, { timezone, limit: '1' })
+  rows.push(row('2026-09-01T03:00:00Z', {}, { songHash: 'third' }))
+  const refreshed = await service.search(userId, { timezone, limit: '1', replaceSnapshot: original.snapshot.id })
+  assert.equal(refreshed.counts.totalMatchedPlays, 3)
+  assert.notEqual(refreshed.snapshot.id, original.snapshot.id)
+  await assert.rejects(service.search(userId, { cursor: original.nextCursor }), code('HISTORY_SNAPSHOT_EXPIRED'))
+  assert.equal((await service.search(userId, { cursor: retained.nextCursor })).counts.totalMatchedPlays, 2)
+  await assert.rejects(service.search('another-user', { timezone, replaceSnapshot: retained.snapshot.id }), code('HISTORY_PLAY_NOT_FOUND'))
+  await assert.rejects(service.search(userId, { timezone, replaceSnapshot: retained.snapshot.id }, 'requesters'), code('HISTORY_PLAY_NOT_FOUND'))
+  await assert.rejects(service.search(userId, { timezone, replaceSnapshot: 'not-an-id' }), code('INVALID_HISTORY_FILTER'))
+  await assert.rejects(service.search(userId, { timezone, replaceSnapshot: original.snapshot.id }), code('HISTORY_SNAPSHOT_EXPIRED'))
+  const next = await service.search(userId, { timezone, limit: '1', replaceSnapshot: refreshed.snapshot.id })
+  assert.equal(next.counts.totalMatchedPlays, 3)
+})
+
+test('failed refresh preserves the old cursor and expiry still releases capacity', async () => {
+  let clock = now
+  let fail = false
+  const rows = [row('2026-09-01T01:00:00Z'), row('2026-09-01T02:00:00Z', {}, { songHash: 'second' })]
+  const read: HistoryRead = async (from, to, consume) => {
+    if (fail) throw new Error('read failed')
+    await fakeRead(rows)(from, to, consume)
+  }
+  const service = new HistoryRecall('test', signer, read, () => clock)
+  const original = await service.search(userId, { timezone, limit: '1' })
+  fail = true
+  await assert.rejects(service.search(userId, { timezone, replaceSnapshot: original.snapshot.id }))
+  assert.equal((await service.search(userId, { cursor: original.nextCursor })).items.length, 1)
+  clock += 600_001
+  await assert.rejects(service.search(userId, { cursor: original.nextCursor }), code('HISTORY_SNAPSHOT_EXPIRED'))
+  await assert.rejects(service.search(userId, { timezone, replaceSnapshot: original.snapshot.id }), code('HISTORY_SNAPSHOT_EXPIRED'))
+  fail = false
+  assert.equal((await service.search(userId, { timezone })).counts.totalMatchedPlays, 2)
+})
+
+test('concurrent refreshes cannot claim the same replacement slot', async () => {
+  const rows = [row('2026-09-01T01:00:00Z'), row('2026-09-01T02:00:00Z', {}, { songHash: 'second' })]
+  let releaseRead: (() => void) | undefined
+  let hold = false
+  const read: HistoryRead = async (from, to, consume) => {
+    if (hold) await new Promise<void>((resolve) => { releaseRead = resolve })
+    await fakeRead(rows)(from, to, consume)
+  }
+  const service = new HistoryRecall('test', signer, read, () => now)
+  const original = await service.search(userId, { timezone, limit: '1' })
+  await service.search(userId, { timezone })
+  await service.search(userId, { timezone })
+  hold = true
+  const refresh = service.search(userId, { timezone, limit: '1', replaceSnapshot: original.snapshot.id })
+  await assert.rejects(service.search(userId, { timezone, replaceSnapshot: original.snapshot.id }), code('HISTORY_BUSY'))
+  await assert.rejects(service.search(userId, { timezone }), code('HISTORY_BUSY'))
+  releaseRead!()
+  const updated = await refresh
+  await assert.rejects(service.search(userId, { cursor: original.nextCursor }), code('HISTORY_SNAPSHOT_EXPIRED'))
+  assert.equal((await service.search(userId, { cursor: updated.nextCursor })).items.length, 1)
+})
+
+test('context response size is bounded', async () => {
+  const oversized = row('2026-09-01T01:00:00Z', { title: 'x'.repeat(9 * 1024 * 1024) })
+  const anchor = normalizeStoredPlay(oversized, 'test', signer)
+  const service = new HistoryRecall('test', signer, fakeRead([oversized]), () => now)
+  await assert.rejects(service.context(userId, anchor.playId, { timezone }), code('HISTORY_QUERY_TOO_BROAD'))
+})
+
+test('context in-flight reads are bounded per user and globally', async () => {
+  const anchor = play('2026-09-01T01:00:00Z')
+  const waiting: Array<() => void> = []
+  const read: HistoryRead = async (_from, _to, consume) => {
+    await new Promise<void>((resolve) => waiting.push(resolve))
+    consume(row(anchor.playedAt))
+  }
+  const service = new HistoryRecall('test', signer, read, () => now)
+  const first = service.context(userId, anchor.playId, { timezone })
+  const second = service.context(userId, anchor.playId, { timezone })
+  await assert.rejects(service.context(userId, anchor.playId, { timezone }), code('HISTORY_BUSY'))
+  const others = Array.from({ length: 6 }, (_, index) => service.context(`user-${index}`, anchor.playId, { timezone }))
+  await assert.rejects(service.context('extra-user', anchor.playId, { timezone }), code('HISTORY_BUSY'))
+  await assert.rejects(service.search('search-user', { timezone }), code('HISTORY_BUSY'))
+  assert.equal(waiting.length, 8)
+  waiting.forEach((release) => release())
+  await Promise.all([first, second, ...others])
+  const next = service.context(userId, anchor.playId, { timezone })
+  waiting.pop()!()
+  assert.equal((await next).items.length, 1)
+})
+
 test('historical requester aliases and context work independently of the original search', async () => {
   const rows = [row('2026-01-01T12:00:00Z', { requestedByUsername: 'Old name' }), row('2026-09-01T00:00:00Z'), row('2026-09-01T00:40:00Z', { title: 'Other song' }, { requestedById: '100000000000000002' })]
   const service = new HistoryRecall('test', signer, fakeRead(rows), () => now)
