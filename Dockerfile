@@ -23,7 +23,7 @@ WORKDIR /usr/src/app
 COPY package.json yarn.lock .yarnrc.yml ./
 # COPY patches ./patches
 
-RUN yarn install --immutable && node -e "require('vosk'); require('@discordjs/opus'); require('@discordjs/voice'); require('@snazzah/davey')"
+RUN YARN_ENABLE_SCRIPTS=true yarn install --immutable && node -e "require('vosk'); require('@discordjs/opus'); require('@discordjs/voice'); require('@snazzah/davey')"
 
 FROM base AS dev
 ARG PORT
