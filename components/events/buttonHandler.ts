@@ -16,6 +16,12 @@ import {
   RADIO_STATION_SELECT_ID,
 } from '@components/interactions'
 import type { ClientType } from '@types'
+import { beginPlayerToolsActivity } from '@utils/playerToolsIdle'
+import {
+  handlePlayerMore,
+  isPrivatePlayerTool,
+  refreshPlayerTools,
+} from '@components/interactions/playerTools'
 
 export default async (interaction: Interaction<CacheType>) => {
   if (!interaction.isButton() && !interaction.isStringSelectMenu()) return
@@ -36,7 +42,13 @@ export default async (interaction: Interaction<CacheType>) => {
 
   if (!interaction.guild) return
 
+  const finishActivity = isPrivatePlayerTool(interaction)
+    ? beginPlayerToolsActivity(interaction.message.id, () => interaction.deleteReply())
+    : undefined
+
   try {
+    if (await handlePlayerMore(interaction)) return
+
     // An interaction must be acknowledged in three seconds. Some handlers
     // build components from Influx history and can legitimately take longer.
     await interaction.deferUpdate()
@@ -59,12 +71,13 @@ export default async (interaction: Interaction<CacheType>) => {
         break
       case 'stop_button':
         await stopButtonInteractionHandler(queue)
+        if (isPrivatePlayerTool(interaction)) await refreshPlayerTools(interaction)
         break
       case 'recommended_button':
-        recommendedButtonInteractionHandler(queue, interaction as ButtonInteraction)
+        await recommendedButtonInteractionHandler(queue, interaction as ButtonInteraction)
         break
       case 'dislike_button':
-        dislikeButtonInteractionHandler(queue, interaction as ButtonInteraction)
+        await dislikeButtonInteractionHandler(queue, interaction as ButtonInteraction)
         break
       case 'voice_button':
         await voiceButtonInteractionHandler(queue, interaction as ButtonInteraction)
@@ -88,5 +101,10 @@ export default async (interaction: Interaction<CacheType>) => {
       return
     }
     console.error('[buttonHandler]', error)
+    if (interaction.deferred && (interaction.ephemeral || isPrivatePlayerTool(interaction))) {
+      await interaction.editReply({ content: 'Something went wrong. Please try again.' }).catch(() => {})
+    }
+  } finally {
+    finishActivity?.()
   }
 }

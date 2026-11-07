@@ -4,7 +4,9 @@ import { useComponents } from '@constants/messageComponents'
 import { sendMessage } from '@utils/mainMessage'
 import { addSongDislike } from '@utils/songHistoryV2'
 import { generateNowPlayingCanvas } from '@utils/nowPlayingCanvas'
+import { sendPlayerToolFeedback } from '@utils/playerToolFeedback'
 
+import { isPrivatePlayerTool, refreshPlayerTools } from './playerTools'
 import { MusicQueue } from '../../lib'
 
 export default async (queue: MusicQueue | null, interaction: ButtonInteraction) => {
@@ -13,7 +15,7 @@ export default async (queue: MusicQueue | null, interaction: ButtonInteraction) 
 
   if (!currentTrack) {
     if (channel && channel.isTextBased() && 'guild' in channel) {
-      await sendMessage(channel, {
+      await sendPlayerToolFeedback(interaction, channel, {
         content: 'No active track found for thumbs-down.',
         components: await useComponents(queue || undefined),
       })
@@ -44,6 +46,9 @@ export default async (queue: MusicQueue | null, interaction: ButtonInteraction) 
           files: [buffer],
           components: await useComponents(queue || undefined),
         })
+        if (isPrivatePlayerTool(interaction)) {
+          await refreshPlayerTools(interaction, '👎 | Thumbs-down saved.')
+        }
       } catch (renderError) {
         console.warn('[dislikeButton] Failed to refresh player artwork:', renderError)
         await sendMessage(channel, {
@@ -51,13 +56,16 @@ export default async (queue: MusicQueue | null, interaction: ButtonInteraction) 
           files: [],
           components: await useComponents(queue || undefined),
         })
+        if (isPrivatePlayerTool(interaction)) {
+          await refreshPlayerTools(interaction, '👎 | Thumbs-down saved.')
+        }
       }
     }
   } catch (error) {
     console.error('[dislikeButton]', error)
 
     if (channel && channel.isTextBased() && 'guild' in channel) {
-      await sendMessage(channel, {
+      await sendPlayerToolFeedback(interaction, channel, {
         content: 'Failed to save thumbs-down. Please try again.',
         components: await useComponents(queue || undefined),
       })

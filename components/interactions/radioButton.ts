@@ -12,6 +12,7 @@ import type { ClientType } from '@types'
 import { startRadio } from '@utils/radio'
 
 import type { MusicQueue } from '../../lib'
+import { getPlayerToolsPayload, isPrivatePlayerTool, refreshPlayerTools } from './playerTools'
 
 export const RADIO_STATION_SELECT_ID = 'radio_station_select'
 
@@ -32,6 +33,13 @@ const radioStationPickerRow = () => {
 }
 
 export const showRadioPicker = async (queue: MusicQueue | null, interaction: ButtonInteraction) => {
+  if (isPrivatePlayerTool(interaction)) {
+    await interaction.editReply({
+      ...getPlayerToolsPayload(queue || undefined),
+      components: [...getPlayerToolsPayload(queue || undefined).components, radioStationPickerRow()],
+    })
+    return
+  }
   const components = await useComponents(queue || undefined)
   await interaction.editReply({ components: [...components, radioStationPickerRow()] })
 }
@@ -45,12 +53,19 @@ export const selectRadioStation = async (
   const stationId = interaction.values[0]
 
   if (!voiceChannel || !stationId) {
+    if (isPrivatePlayerTool(interaction)) {
+      await refreshPlayerTools(interaction, 'Join a voice channel before choosing a radio station.')
+    }
     return
   }
 
   // Collapse the public picker before loading any Mixes. It can be opened
   // again with the Radio button whenever a listener wants to switch stations.
-  await interaction.editReply({ components: await useComponents(queue || undefined) })
+  if (isPrivatePlayerTool(interaction)) {
+    await refreshPlayerTools(interaction, 'Starting radio…')
+  } else {
+    await interaction.editReply({ components: await useComponents(queue || undefined) })
+  }
 
   try {
     const manager = (interaction.client as ClientType).musicManager
@@ -63,9 +78,21 @@ export const selectRadioStation = async (
       requestedBy: member,
     })
 
-    await interaction.editReply({ components: await useComponents(activeQueue) })
+    if (isPrivatePlayerTool(interaction)) {
+      await refreshPlayerTools(interaction, 'Radio started.')
+    } else {
+      await interaction.editReply({ components: await useComponents(activeQueue) })
+    }
   } catch (error) {
     console.error('[radioButton]', error)
+    if (isPrivatePlayerTool(interaction)) {
+      await interaction.editReply({
+        ...getPlayerToolsPayload(queue || undefined),
+        content: 'Could not start radio. Choose a station to try again.',
+        components: [...getPlayerToolsPayload(queue || undefined).components, radioStationPickerRow()],
+      })
+      return
+    }
     // Restore the picker on failure without adding a second, noisy message.
     const components = await useComponents(queue || undefined)
     await interaction.editReply({ components: [...components, radioStationPickerRow()] })

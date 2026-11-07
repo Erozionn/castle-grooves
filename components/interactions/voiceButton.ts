@@ -4,6 +4,7 @@ import { useComponents } from '@constants/messageComponents'
 import type { ClientType } from '@types'
 
 import type { MusicQueue } from '../../lib'
+import { isPrivatePlayerTool, refreshPlayerTools } from './playerTools'
 
 export default async (queue: MusicQueue | null, interaction: ButtonInteraction) => {
   if (!interaction.guild) return
@@ -20,6 +21,9 @@ export default async (queue: MusicQueue | null, interaction: ButtonInteraction) 
 
       if (!voiceChannel) {
         console.warn('[voiceButton] User must be in a voice channel before enabling voice commands.')
+        if (isPrivatePlayerTool(interaction)) {
+          await refreshPlayerTools(interaction, 'Join a voice channel to enable voice commands.')
+        }
         return
       }
 
@@ -27,11 +31,18 @@ export default async (queue: MusicQueue | null, interaction: ButtonInteraction) 
       await voiceCommandManager.enable(voiceChannel, textChannel)
     } catch (error) {
       console.warn('[voiceButton] Failed to toggle voice commands:', error)
+      if (isPrivatePlayerTool(interaction)) {
+        await refreshPlayerTools(interaction, 'Could not enable voice commands. Please try again.')
+        return
+      }
     }
   }
 
-  const voiceCommandsEnabled = Boolean(voiceCommandManager.getStatus(interaction.guild.id))
+  if (isPrivatePlayerTool(interaction)) {
+    await refreshPlayerTools(interaction)
+    return
+  }
   await interaction.message.edit({
-    components: await useComponents(queue || undefined, voiceCommandsEnabled),
+    components: await useComponents(queue || undefined),
   })
 }
