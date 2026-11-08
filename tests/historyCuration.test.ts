@@ -16,7 +16,7 @@ const row = (day: number, id: string, title: string, requester = memberA): Store
   fields: { songIdentifier: id, title, artist: 'Artist', requestedByUsername: requester === memberA ? 'Alex' : 'Mira' },
 })
 const play = (item: StoredPlay) => { const normalized = normalizeStoredPlay(item, 'test', signer); return { ...normalized, local: localCalendar(normalized.playedAt, timezone) } }
-const yearWindows = 13
+const defaultWindows = 3
 const readRows = (rows: StoredPlay[]): HistoryRead => async (from, to, consume) => {
   for (const item of rows) if (Date.parse(item.time) >= Date.parse(from) && Date.parse(item.time) < Date.parse(to)) consume(item)
 }
@@ -48,15 +48,16 @@ test('summary scans stay bounded and expose truncation', async () => {
 })
 
 test('summaries find older subjects beyond the newest 10,000 server plays', async () => {
-  const older = row(200, 'lmnopqrstuv', 'Older', memberB)
+  const older = row(60, 'lmnopqrstuv', 'Older', memberB)
   older.fields.artist = 'Older Artist'
-  const rows = [...Array.from({ length: 10_000 }, (_, index) => row(1 + index / 100_000, 'abcdefghijk', 'Repeated')), older]
+  const rows = [...Array.from({ length: 10_000 }, (_, index) => row(1 + index / 100_000, 'abcdefghijk', 'Repeated')), older, { ...older, time: row(91, 'lmnopqrstuv', 'Outside', memberB).time }]
   const service = new HistoryCuration('test', signer, readRows(rows), () => now)
   const track = await service.trackSummary(play(older).track.trackId, timezone)
   const requester = await service.requesterSummary(memberB, timezone)
   const artist = await service.artistSummary('older artist', timezone)
   for (const summary of [track, requester, artist]) {
     assert.equal(summary.totalStarts, 1)
+    assert.equal(summary.horizonFrom, new Date(now - 90 * 86_400_000).toISOString())
     assert.equal(summary.isTruncated, false)
     assert.equal(summary.recentPlays[0].track.title, 'Older')
   }
@@ -64,7 +65,7 @@ test('summaries find older subjects beyond the newest 10,000 server plays', asyn
 })
 
 test('oversized windows are split without counting partially delivered rows twice', async () => {
-  const rows = [row(1, 'abcdefghijk', 'Song'), row(100, 'abcdefghijk', 'Song'), row(200, 'abcdefghijk', 'Song'), row(300, 'abcdefghijk', 'Song')]
+  const rows = [row(1, 'abcdefghijk', 'Song'), row(20, 'abcdefghijk', 'Song'), row(40, 'abcdefghijk', 'Song'), row(80, 'abcdefghijk', 'Song')]
   let reads = 0
   const read: HistoryRead = async (from, to, consume) => {
     reads += 1
@@ -74,7 +75,7 @@ test('oversized windows are split without counting partially delivered rows twic
   }
   const service = new HistoryCuration('test', signer, read, () => now)
   const result = await service.trackSummary(play(rows[0]).track.trackId, timezone)
-  assert.ok(reads > yearWindows)
+  assert.ok(reads > defaultWindows)
   assert.equal(result.totalStarts, 4)
   assert.equal(result.isTruncated, false)
   assert.deepEqual(result.recentPlays.map((item) => item.playedAt), rows.map((item) => play(item).playedAt))
@@ -89,8 +90,8 @@ test('retains the newest records when series arrive out of order', async () => {
   assert.equal(result.items[0].lastPlayedAt, play(rows[rows.length - 1]).playedAt)
 })
 
-test('people curation scans contiguous monthly windows across the full year', async () => {
-  const rows = [row(0, 'abcdefghijk', 'At capture'), row(1, 'abcdefghijk', 'Recent'), row(30, 'abcdefghijk', 'Boundary'), row(365, 'lmnopqrstuv', 'At horizon', memberB), row(366, 'wxyzABCDEFG', 'Outside')]
+test('people curation defaults to contiguous monthly windows over the last 90 days', async () => {
+  const rows = [row(0, 'abcdefghijk', 'At capture'), row(1, 'abcdefghijk', 'Recent'), row(30, 'abcdefghijk', 'Boundary'), row(90, 'lmnopqrstuv', 'At horizon', memberB), row(91, 'wxyzABCDEFG', 'Outside')]
   const ranges: Array<[number, number]> = []
   const read: HistoryRead = async (from, to, consume) => {
     ranges.push([Date.parse(from), Date.parse(to)])
@@ -102,9 +103,10 @@ test('people curation scans contiguous monthly windows across the full year', as
   assert.equal(result.scope, 'people')
   assert.equal(result.isTruncated, false)
   assert.deepEqual(result.items.map((item) => item.playCount), [2, 1])
-  assert.equal(ranges.length, yearWindows)
+  assert.equal(ranges.length, defaultWindows)
   assert.equal(ranges[0][1], now)
-  assert.equal(ranges[ranges.length - 1][0], now - 365 * 86_400_000)
+  assert.equal(ranges[ranges.length - 1][0], now - 90 * 86_400_000)
+  assert.equal(result.horizonFrom, new Date(now - 90 * 86_400_000).toISOString())
   for (let index = 1; index < ranges.length; index++) assert.equal(ranges[index][1], ranges[index - 1][0])
 })
 
@@ -153,7 +155,7 @@ test('cache shares timezone records, expires, and has a fixed subject capacity',
   const service = new HistoryCuration('test', signer, read, () => clock)
   const utc = await service.curation('recent', 'UTC', [], [])
   const local = await service.curation('recent', timezone, [], [])
-  assert.equal(reads, yearWindows)
+  assert.equal(reads, defaultWindows)
   assert.notEqual(utc.items[0].play.local.time, local.items[0].play.local.time)
   for (let index = 0; index < 6; index++) {
     await assert.rejects(service.artistSummary(`Missing ${index}`, timezone), { code: 'HISTORY_ARTIST_NOT_FOUND' })
@@ -163,7 +165,7 @@ test('cache shares timezone records, expires, and has a fixed subject capacity',
   clock += 30_001
   await service.curation('recent', timezone, [], [])
   assert.equal(cache.size, 1)
-  assert.equal(reads, 8 * yearWindows)
+  assert.equal(reads, 8 * defaultWindows)
 })
 
 test('concurrent summaries cannot evict pending reads or exceed capacity', async () => {
@@ -211,7 +213,7 @@ test('provider failures are not retried as overflow and do not poison the cache'
   const service = new HistoryCuration('test', signer, read, () => now)
   await assert.rejects(service.curation('recent', timezone, [], []), { code: 'HISTORY_UNAVAILABLE' })
   assert.equal((await service.curation('recent', timezone, [], [])).items.length, 1)
-  assert.equal(reads, 1 + yearWindows)
+  assert.equal(reads, 1 + defaultWindows)
 })
 
 test('oversized history retries stop at the summary time budget', async () => {
