@@ -103,15 +103,10 @@ export default async (queue: MusicQueue | null, interaction: ButtonInteraction) 
 
     const controller = musicManager.playerController
     if (!controller) return
-    let activeQueue = queue
-    for (const track of uniqueRecommendations) {
-      activeQueue = await controller.enqueueTrack(
-        { member: member as GuildMember, textChannel: channel },
-        track
-      )
-    }
-
-    if (!activeQueue) return
+    const activeQueue = await controller.enqueueTracks(
+      { member: member as GuildMember, textChannel: channel },
+      uniqueRecommendations
+    )
 
     console.log(`[recommendedButton] Added ${uniqueRecommendations.length} tracks to queue`)
 

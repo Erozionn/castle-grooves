@@ -93,6 +93,21 @@ Docker retains at most three 10 MB `json-file` log files per service. Dozzle vie
 
 ## Building Images
 
+The bot uses Node.js 22.23.4 on Debian Bookworm, Corepack 0.36.0, and the
+integrity-pinned Yarn release from `package.json`. Node 22.23.4 includes the
+[October 2026 security fixes and eMudhra CA protection](https://nodejs.org/en/blog/vulnerability/october-2026-security-releases).
+The Docker build also requires Debian `ca-certificates` 20250419~deb12u2 or
+newer and refreshes the system trust store, covering programs that use the OS
+CA bundle rather than Node's TLS verifier. See [Debian's incident report](https://bugs.debian.org/1151413).
+
+The native Opus installer still requests an unpatched tar major. Scoped Yarn
+`resolutions` select patched tar for that installer, plus patched minimatch
+and glob for the affected development tools. The patch in `patches/` updates
+Babel's resolver to use Glob's named exports. Remove these overrides and the
+patch when their upstream dependencies support patched versions directly. Express stays
+on 4.x; its body-parser and qs dependencies and both Undici majors are updated
+in `yarn.lock`. Sharp is updated to 0.35.5 and Rimraf to 6.1.4.
+
 Build the production image locally:
 
 ```bash
@@ -102,9 +117,13 @@ yarn docker:build
 Build specific Dockerfile targets manually:
 
 ```bash
-docker build --target dev -t castle-grooves:dev-test .
-docker build --target production -t castle-grooves:prod-test .
+docker build --pull --target dev -t castle-grooves:dev-test .
+docker build --pull --target production -t castle-grooves:prod-test .
 ```
+
+For a security rebuild, add `--no-cache` to refresh package-install layers too.
+Publishing a rebuilt image and recreating the bot container is required to
+update a running deployment; changing this checkout alone does not update it.
 
 ## Volumes
 

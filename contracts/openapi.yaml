@@ -61,7 +61,14 @@ paths:
       operationId: enqueueHistoryPlays
       description: Admit exact history recordings asynchronously. The optional voice channel selection is part of the idempotent intent.
       requestBody: { required: true, content: { application/json: { schema: { type: object, required: [operationId, issuedAt, instanceId, expectedQueueId, placement, items], properties: { operationId: { type: string, format: uuid }, issuedAt: { type: string, format: date-time }, instanceId: { type: string, format: uuid }, expectedQueueId: { type: [string, 'null'], format: uuid }, placement: { enum: [append, next] }, afterQueueItemId: { type: [string, 'null'], format: uuid }, expectedQueueRevision: { type: integer, minimum: 0 }, voiceChannelId: { $ref: '#/components/schemas/SelectedVoiceChannelId' }, items: { type: array, minItems: 1, maxItems: 50, items: { type: object, required: [clientItemId, playId], properties: { clientItemId: { type: string, maxLength: 64 }, playId: { type: string } } } } } } } } }
-      responses: { '200': { description: Existing operation receipt }, '202': { description: Resolving operation receipt }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } }
+      responses: { '200': { description: Existing operation receipt, content: { application/json: { schema: { $ref: '#/components/schemas/EnqueueReceipt' } } } }, '202': { description: Resolving operation receipt, content: { application/json: { schema: { $ref: '#/components/schemas/EnqueueReceipt' } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } }
+  /api/v1/queue/enqueues/{operationId}:
+    get:
+      operationId: getEnqueueReceipt
+      parameters:
+        - { name: operationId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: instanceId, in: query, required: true, schema: { type: string, format: uuid } }
+      responses: { '200': { description: Current enqueue result, content: { application/json: { schema: { $ref: '#/components/schemas/EnqueueReceipt' } } } }, '404': { $ref: '#/components/responses/Error' } }
   /api/v1/queue/items/{queueItemId}:
     delete:
       operationId: removeQueueItem
@@ -95,11 +102,58 @@ paths:
         - { name: cursor, in: query, schema: { type: string } }
         - { name: q, in: query, schema: { type: string, maxLength: 200 } }
         - { name: requesterId, in: query, schema: { type: string } }
+        - { name: requesterIds, in: query, schema: { type: string, description: Comma-separated requester IDs } }
+        - { name: requesterUnknown, in: query, schema: { type: boolean } }
+        - { name: sources, in: query, schema: { type: string, description: Comma-separated source names } }
+        - { name: dateFrom, in: query, schema: { type: string, format: date } }
+        - { name: dateTo, in: query, schema: { type: string, format: date } }
+        - { name: weekdays, in: query, schema: { type: string, description: Comma-separated ISO weekdays } }
+        - { name: timeFrom, in: query, schema: { type: string } }
+        - { name: timeTo, in: query, schema: { type: string } }
+        - { name: order, in: query, schema: { enum: [asc, desc] } }
+        - { name: replaceSnapshot, in: query, schema: { type: string, format: uuid } }
         - { name: weekday, in: query, schema: { type: integer, minimum: 0, maximum: 6 } }
         - { name: hourFrom, in: query, schema: { type: integer, minimum: 0, maximum: 23 } }
         - { name: hourTo, in: query, schema: { type: integer, minimum: 0, maximum: 24 }, description: Exclusive local end hour; 24 means midnight. }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
-      responses: { '200': { description: Filtered recorded track starts in a bounded page, content: { application/json: { schema: { type: object, required: [timezone, range, items, nextCursor], properties: { timezone: { type: string }, range: { type: string }, nextCursor: { type: [string, 'null'] }, items: { type: array, items: { $ref: '#/components/schemas/HistoryPlay' } } } } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '503': { $ref: '#/components/responses/Error' } }
+      responses: { '200': { description: Filtered recorded track starts in a bounded snapshot, content: { application/json: { schema: { $ref: '#/components/schemas/HistoryPlaysPage' } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '503': { $ref: '#/components/responses/Error' } }
+  /api/v1/history/requesters:
+    get:
+      operationId: historyRequesters
+      parameters:
+        - { name: timezone, in: query, required: true, schema: { type: string } }
+        - { name: q, in: query, schema: { type: string } }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses: { '200': { description: Historical requester aliases and counts, content: { application/json: { schema: { $ref: '#/components/schemas/HistoryRequestersPage' } } } } }
+  /api/v1/history/curation:
+    get:
+      operationId: historyCuration
+      parameters:
+        - { name: mode, in: query, schema: { enum: [people, rediscover, recent], default: people } }
+        - { name: timezone, in: query, schema: { type: string, default: America/Toronto } }
+        - { name: voiceChannelId, in: query, schema: { type: string } }
+      responses: { '200': { description: Bounded ranked recorded songs, content: { application/json: { schema: { $ref: '#/components/schemas/HistoryCuration' } } } } }
+  /api/v1/history/requesters/{id}/summary:
+    get:
+      operationId: requesterSummary
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: timezone, in: query, schema: { type: string } }
+      responses: { '200': { description: Bounded history for a requester, content: { application/json: { schema: { $ref: '#/components/schemas/RequesterSummary' } } } }, '404': { $ref: '#/components/responses/Error' } }
+  /api/v1/history/tracks/{trackId}/summary:
+    get:
+      operationId: trackSummary
+      parameters:
+        - { name: trackId, in: path, required: true, schema: { type: string } }
+        - { name: timezone, in: query, schema: { type: string } }
+      responses: { '200': { description: Bounded history for an exact source track, content: { application/json: { schema: { $ref: '#/components/schemas/TrackSummary' } } } }, '404': { $ref: '#/components/responses/Error' } }
+  /api/v1/history/artists/summary:
+    get:
+      operationId: artistSummary
+      parameters:
+        - { name: name, in: query, required: true, schema: { type: string } }
+        - { name: timezone, in: query, schema: { type: string } }
+      responses: { '200': { description: Bounded history for an exact artist name, content: { application/json: { schema: { $ref: '#/components/schemas/ArtistSummary' } } } }, '404': { $ref: '#/components/responses/Error' } }
   /api/v1/history/insights:
     get:
       operationId: historyInsights
@@ -121,8 +175,9 @@ paths:
         - { name: playId, in: path, required: true, schema: { type: string } }
         - { name: range, in: query, schema: { enum: [24h, weekly, monthly, yearly], default: monthly } }
         - { name: timezone, in: query, schema: { type: string, default: America/Toronto } }
-        - { name: playedAt, in: query, required: true, schema: { type: string, format: date-time } }
-        - { name: radius, in: query, schema: { type: integer, minimum: 1, maximum: 5, default: 2 } }
+        - { name: before, in: query, schema: { type: integer, minimum: 0, maximum: 20, default: 5 } }
+        - { name: after, in: query, schema: { type: integer, minimum: 0, maximum: 20, default: 5 } }
+        - { name: radiusMinutes, in: query, schema: { type: integer, minimum: 1, maximum: 360, default: 360 } }
       responses: { '200': { description: "Recorded starts around an anchor, in chronological order", content: { application/json: { schema: { $ref: '#/components/schemas/HistoryPlayContext' } } } }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' }, '503': { $ref: '#/components/responses/Error' } }
 components:
   responses:
@@ -152,6 +207,149 @@ components:
         - { type: object, required: [type], properties: { type: { const: clear } } }
     HistoryItem: { type: object, required: [playedAt, title, uri, artworkUrl, requester, source], properties: { playedAt: { type: string, format: date-time }, title: { type: string }, uri: { type: string }, artworkUrl: { type: string }, requester: { $ref: '#/components/schemas/Requester' }, source: { type: string } } }
     HistoryPlay: { type: object, required: [playId, playedAt, eventKind, track, requester], properties: { playId: { type: string }, playedAt: { type: string, format: date-time }, eventKind: { const: track_start }, track: { type: object, required: [title, artist, durationMs, uri, artworkUrl, source, sourceIdentifier], properties: { title: { type: [string, 'null'] }, artist: { type: [string, 'null'] }, durationMs: { type: [integer, 'null'], minimum: 0 }, uri: { type: [string, 'null'], format: uri }, artworkUrl: { type: [string, 'null'], format: uri }, source: { type: string }, sourceIdentifier: { type: [string, 'null'] } } }, requester: { anyOf: [ { type: object, required: [id, usernameAtPlay, avatarUrlAtPlay], properties: { id: { type: string }, usernameAtPlay: { type: [string, 'null'] }, avatarUrlAtPlay: { type: [string, 'null'], format: uri } } }, { type: 'null' } ] } } }
-    HistoryPlayContext: { type: object, required: [timezone, range, anchorPlayId, items], properties: { timezone: { type: string }, range: { enum: [24h, weekly, monthly, yearly] }, anchorPlayId: { type: string }, items: { type: array, items: { $ref: '#/components/schemas/HistoryPlay' } } } }
+    HistoryPlayContext:
+      type: object
+      required: [timezone, anchorPlayId, radiusMinutes, items, orderedPlayIds, gaps, counts, truncated]
+      properties:
+        timezone: { type: string }
+        anchorPlayId: { type: string }
+        radiusMinutes: { type: integer }
+        items: { type: array, items: { $ref: '#/components/schemas/RecordedPlay' } }
+        orderedPlayIds: { type: array, items: { type: string } }
+        gaps: { type: array, items: { type: object, required: [fromPlayId, toPlayId, elapsedMs, showBreak], properties: { fromPlayId: { type: string }, toPlayId: { type: string }, elapsedMs: { type: integer }, showBreak: { type: boolean } } } }
+        counts: { type: object, required: [beforeReturned, afterReturned], properties: { beforeReturned: { type: integer }, afterReturned: { type: integer } } }
+        truncated: { type: object, required: [before, after], properties: { before: { type: boolean }, after: { type: boolean } } }
     HistoryRoomPicks: { type: object, required: [timezone, range, isTruncated, members], properties: { timezone: { type: string }, range: { enum: [24h, weekly, monthly, yearly] }, isTruncated: { type: boolean, description: "True when more than 1,000 plays matched the selected range." }, members: { type: array, items: { type: object, required: [member, picks], properties: { member: { $ref: '#/components/schemas/Requester' }, picks: { type: array, maxItems: 3, items: { type: object, required: [play, playCount, lastPlayedAt], properties: { play: { $ref: '#/components/schemas/HistoryPlay' }, playCount: { type: integer, minimum: 1 }, lastPlayedAt: { type: string, format: date-time } } } } } } } } }
     HistoryInsights: { type: object, required: [timezone, range, totalStarts, isTruncated, daily, weekdayHours, topArtists, topTracks, risingTracks, topRequesters], properties: { timezone: { type: string }, range: { enum: [24h, weekly, monthly, yearly] }, totalStarts: { type: integer, minimum: 0 }, isTruncated: { type: boolean, description: "True when more than 1,000 records matched the range." }, daily: { type: array, items: { type: object, required: [date, starts], properties: { date: { type: string, pattern: '^\\d{4}-\\d{2}-\\d{2}$' }, starts: { type: integer, minimum: 0 } } } }, weekdayHours: { type: array, items: { type: object, required: [weekday, hour, starts], properties: { weekday: { type: integer, minimum: 0, maximum: 6 }, hour: { type: integer, minimum: 0, maximum: 23 }, starts: { type: integer, minimum: 0 } } } }, topArtists: { type: array, items: { type: object, required: [artist, starts], properties: { artist: { type: string }, starts: { type: integer, minimum: 0 } } } }, topTracks: { type: array, items: { type: object, required: [title, artist, uri, lastPlayedAt, starts], properties: { title: { type: string }, artist: { type: [string, 'null'] }, uri: { type: [string, 'null'], format: uri }, lastPlayedAt: { type: string, format: date-time }, starts: { type: integer, minimum: 0 } } } }, risingTracks: { type: array, items: { type: object, required: [title, artist, uri, recentStarts, previousStarts], properties: { title: { type: string }, artist: { type: [string, 'null'] }, uri: { type: [string, 'null'], format: uri }, recentStarts: { type: integer, minimum: 0 }, previousStarts: { type: integer, minimum: 0 } } } }, topRequesters: { type: array, items: { type: object, required: [id, username, starts], properties: { id: { type: string }, username: { type: string }, starts: { type: integer, minimum: 0 } } } } } }
+    HistoryCoverage:
+      type: object
+      required: [datasets, legacySongIncluded, completeness, earliestVerifiedPlayAt, latestVerifiedPlayAt]
+      properties:
+        datasets: { type: array, items: { type: string } }
+        legacySongIncluded: { type: boolean }
+        completeness: { type: string }
+        earliestVerifiedPlayAt: { type: [string, 'null'], format: date-time }
+        latestVerifiedPlayAt: { type: [string, 'null'], format: date-time }
+    RecordedPlay:
+      type: object
+      required: [playId, playedAt, eventKind, dataset, track, metadataIssues, requester, local]
+      properties:
+        playId: { type: string }
+        playedAt: { type: string, format: date-time }
+        eventKind: { const: track_start }
+        dataset: { const: song_play }
+        track:
+          type: object
+          required: [trackId, identityKind, title, artist, durationMs, uri, artworkUrl, source, sourceIdentifier, replay]
+          properties:
+            trackId: { type: string }
+            identityKind: { enum: [source_identifier, source_url, unresolved] }
+            title: { type: [string, 'null'] }
+            artist: { type: [string, 'null'] }
+            durationMs: { type: [integer, 'null'] }
+            uri: { type: [string, 'null'] }
+            artworkUrl: { type: [string, 'null'] }
+            source: { type: string }
+            sourceIdentifier: { type: [string, 'null'] }
+            replay:
+              type: object
+              required: [status, reason]
+              properties:
+                status: { enum: [unchecked, metadata_incomplete, unsupported] }
+                reason: { type: [string, 'null'] }
+        metadataIssues: { type: array, items: { type: string } }
+        requester:
+          anyOf:
+            - { type: object, required: [id, usernameAtPlay, avatarUrlAtPlay], properties: { id: { type: string }, usernameAtPlay: { type: [string, 'null'] }, avatarUrlAtPlay: { type: [string, 'null'] } } }
+            - { type: 'null' }
+        local: { type: object, required: [date, time, utcOffset, weekday, filterDate], properties: { date: { type: string }, time: { type: string }, utcOffset: { type: string }, weekday: { type: integer }, filterDate: { type: string } } }
+    CuratedItem:
+      type: object
+      required: [trackId, play, playCount, lastPlayedAt, requesterIds, reasons]
+      properties:
+        trackId: { type: string }
+        play: { $ref: '#/components/schemas/RecordedPlay' }
+        playCount: { type: integer }
+        lastPlayedAt: { type: string, format: date-time }
+        requesterIds: { type: array, items: { type: string } }
+        reasons: { type: array, items: { type: string } }
+    HistoryCuration:
+      type: object
+      required: [mode, scope, capturedAt, horizonFrom, isTruncated, coverage, items]
+      properties:
+        mode: { enum: [people, rediscover, recent] }
+        scope: { enum: [people, server] }
+        capturedAt: { type: string, format: date-time }
+        horizonFrom: { type: string, format: date-time }
+        isTruncated: { type: boolean }
+        coverage: { $ref: '#/components/schemas/HistoryCoverage' }
+        items: { type: array, items: { $ref: '#/components/schemas/CuratedItem' } }
+    HistoryRequestersPage:
+      type: object
+      required: [timezone, items, nextCursor, snapshot, counts]
+      properties:
+        timezone: { type: string }
+        items: { type: array, items: { type: object, required: [id, username, avatarUrl, lastPlayedAt, playCount, aliases], properties: { id: { type: string }, username: { type: [string, 'null'] }, avatarUrl: { type: [string, 'null'] }, lastPlayedAt: { type: string, format: date-time }, playCount: { type: integer }, aliases: { type: array, items: { type: string } } } } }
+        nextCursor: { type: [string, 'null'] }
+        snapshot: { type: object }
+        counts: { type: object }
+    EnqueueReceipt:
+      type: object
+      required: [operationId, instanceId, status, statusUrl, receiptExpiresAt]
+      properties:
+        operationId: { type: string, format: uuid }
+        instanceId: { type: string, format: uuid }
+        status: { enum: [resolving, completed, failed] }
+        statusUrl: { type: string }
+        receiptExpiresAt: { type: string, format: date-time }
+        outcome: { enum: [all_queued, partial, none_queued] }
+        counts: { type: object, properties: { requested: { type: integer }, queued: { type: integer }, failed: { type: integer } } }
+        results: { type: array, items: { type: object } }
+        error: { type: object }
+        playbackStart: { enum: [pending, requested, failed, not_needed] }
+    RequesterSummary:
+      type: object
+      required: [capturedAt, horizonFrom, isTruncated, coverage, requester, totalStarts, topTracks, topArtists, recentPlays]
+      properties:
+        capturedAt: { type: string, format: date-time }
+        horizonFrom: { type: string, format: date-time }
+        isTruncated: { type: boolean }
+        coverage: { $ref: '#/components/schemas/HistoryCoverage' }
+        requester: { type: object, required: [id, username, aliases, avatarUrl], properties: { id: { type: string }, username: { type: [string, 'null'] }, aliases: { type: array, items: { type: string } }, avatarUrl: { type: [string, 'null'] } } }
+        totalStarts: { type: integer }
+        topTracks: { type: array, items: { $ref: '#/components/schemas/CuratedItem' } }
+        topArtists: { type: array, items: { type: object, required: [artist, starts], properties: { artist: { type: string }, starts: { type: integer } } } }
+        recentPlays: { type: array, items: { $ref: '#/components/schemas/RecordedPlay' } }
+    TrackSummary:
+      type: object
+      required: [capturedAt, horizonFrom, isTruncated, coverage, track, totalStarts, recentPlays, requesters]
+      properties:
+        capturedAt: { type: string, format: date-time }
+        horizonFrom: { type: string, format: date-time }
+        isTruncated: { type: boolean }
+        coverage: { $ref: '#/components/schemas/HistoryCoverage' }
+        track: { $ref: '#/components/schemas/RecordedPlay/properties/track' }
+        totalStarts: { type: integer }
+        recentPlays: { type: array, items: { $ref: '#/components/schemas/RecordedPlay' } }
+        requesters: { type: array, items: { type: object, required: [id, username, starts], properties: { id: { type: string }, username: { type: [string, 'null'] }, starts: { type: integer } } } }
+    ArtistSummary:
+      type: object
+      required: [capturedAt, horizonFrom, isTruncated, coverage, artist, totalStarts, tracks, recentPlays]
+      properties:
+        capturedAt: { type: string, format: date-time }
+        horizonFrom: { type: string, format: date-time }
+        isTruncated: { type: boolean }
+        coverage: { $ref: '#/components/schemas/HistoryCoverage' }
+        artist: { type: string }
+        totalStarts: { type: integer }
+        tracks: { type: array, items: { $ref: '#/components/schemas/CuratedItem' } }
+        recentPlays: { type: array, items: { $ref: '#/components/schemas/RecordedPlay' } }
+    HistoryPlaysPage:
+      type: object
+      required: [timezone, items, nextCursor, snapshot, counts]
+      properties:
+        timezone: { type: string }
+        items: { type: array, items: { $ref: '#/components/schemas/RecordedPlay' } }
+        nextCursor: { type: [string, 'null'] }
+        snapshot: { type: object, required: [id, capturedAt, expiresAt], properties: { id: { type: string }, capturedAt: { type: string, format: date-time }, expiresAt: { type: string, format: date-time } } }
+        counts: { type: object, required: [totalMatchedPlays, exact], properties: { totalMatchedPlays: { type: integer }, exact: { type: boolean } } }

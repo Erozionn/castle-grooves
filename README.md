@@ -35,6 +35,19 @@
 
 ### Manually
 
+Use Node.js 22.23.4 or a newer 22.x patch (the pinned version is in `.nvmrc`).
+This is the October 2026 security baseline, including the eMudhra CA fix.
+CI and Docker use the same Node version. After cloning and entering this
+directory (steps 2–3 below), set up Corepack before installing dependencies:
+
+```bash
+npm install --global corepack@0.36.0
+corepack enable
+corepack install
+```
+
+Corepack selects the integrity-pinned Yarn 4.18.1 release in `package.json`.
+
 1. Install FFMPEG and InfluxDB.
 2. Clone the repository: `git clone https://github.com/Erozionn/castle-grooves`.
 3. `cd castle-grooves`.
@@ -74,7 +87,7 @@ Voice commands are disabled by default. Set `VOICE_COMMANDS_ENABLED=true`, join 
 
 Hello replies are an opt-in joke feature. Set `VOICE_HELLO_RESPONSES_ENABLED=true` to respond to a standalone `hello` with a random sound (15-second per-user cooldown). Docker deployments download and persist the ignored `assets/audio/hello-responses/` files automatically; non-Docker setups can run `yarn download:hello-sounds`. Use only sounds you are permitted to download and use.
 
-Vosk model files are not committed to this repository. Download an English small Vosk model and place or mount it at `./models/vosk-model-small-en-us`, or set `VOSK_MODEL_PATH` to another Vosk-compatible model directory. The Docker image uses Debian `node:lts-slim` with native build/runtime packages for Vosk plus ffmpeg.
+Vosk model files are not committed to this repository. Download an English small Vosk model and place or mount it at `./models/vosk-model-small-en-us`, or set `VOSK_MODEL_PATH` to another Vosk-compatible model directory. The Docker image uses Debian `node:22.23.4-bookworm-slim` with native build/runtime packages for Vosk plus ffmpeg.
 
 ## Environment Variables
 

@@ -2,27 +2,17 @@ import path from 'node:path'
 
 import { Canvas, GlobalFonts, loadImage } from '@napi-rs/canvas'
 
-import {
-  capitalize,
-  getYoutubeVideoId,
-  splitAtClosestSpace,
-  truncateString,
-} from '@utils/utilities'
+import { getYoutubeVideoId } from '@utils/utilities'
 import { getSongDislikeCount } from '@utils/songHistoryV2'
 
-import { LavalinkTrack } from '../lib'
+import type { LavalinkTrack } from '../lib'
 
-GlobalFonts.registerFromPath(path.resolve('./assets/fonts/Poppins-Thin.ttf'), 'Poppins-Thin')
-GlobalFonts.registerFromPath(path.resolve('./assets/fonts/Poppins-Light.ttf'), 'Poppins-Light')
-GlobalFonts.registerFromPath(path.resolve('./assets/fonts/Poppins-Regular.ttf'), 'Poppins-Regular')
-GlobalFonts.registerFromPath(path.resolve('./assets/fonts/Poppins-Medium.ttf'), 'Poppins-Medium')
-GlobalFonts.registerFromPath(
-  path.resolve('./assets/fonts/Poppins-SemiBold.ttf'),
-  'Poppins-SemiBold'
-)
-GlobalFonts.registerFromPath(path.resolve('./assets/fonts/Poppins-Bold.ttf'), 'Poppins-Bold')
+if (!GlobalFonts.registerFromPath(path.resolve('assets/fonts/Inter-Variable.ttf'), 'Inter')) {
+  throw new Error('Could not load the bundled Inter font')
+}
 
 type CanvasOptions = {
+  isPaused?: boolean
   currentTrackDislikes?: number
   playlistTitle?: string
   radioStationName?: string
@@ -30,561 +20,413 @@ type CanvasOptions = {
 }
 
 type LoadedImage = Awaited<ReturnType<typeof loadImage>>
+type Context = ReturnType<Canvas['getContext']>
+type TrackAssets = { artwork: LoadedImage | null; avatar: LoadedImage | null; requester: string }
 
-let thumbsDownIconPromise: Promise<Awaited<ReturnType<typeof loadImage>>> | null = null
-const imageCache = new Map<string, Promise<LoadedImage>>()
-const IMAGE_CACHE_LIMIT = 200
+const WIDTH = 700
+const PADDING = 24
+const ART_SIZE = 156
+const ROW_HEIGHT = 68
+const MAX_UP_NEXT = 5
+const REQUESTER_NAME_WIDTH = 190
+const imageCache = new Map<string, Promise<LoadedImage | null>>()
+let thumbsDownIcon: Promise<LoadedImage | null> | undefined
 
-// Artwork and avatar URLs are immutable/versioned in normal Discord and YouTube
-// usage. Caching them avoids a new HTTP request for every dashboard refresh.
-const loadCachedImage = (source: string): Promise<LoadedImage> => {
+export const getNowPlayingLayout = (trackCount: number, hasPlaylist = false) => {
+  const queueCount = Math.max(0, trackCount - 1)
+  const visibleCount = Math.min(queueCount, MAX_UP_NEXT)
+  const remainingCount = queueCount - visibleCount
+  const headerHeight = 208 + (hasPlaylist ? 28 : 0)
+  const rowsTop = headerHeight + 48
+  const footerTop = rowsTop + visibleCount * ROW_HEIGHT
+  return {
+    width: WIDTH,
+    height: queueCount ? footerTop + (remainingCount ? 48 : 0) + 16 : headerHeight,
+    headerHeight,
+    rowsTop,
+    footerTop,
+    visibleCount,
+    remainingCount,
+    queueCount,
+  }
+}
+
+const loadCachedImage = (source?: string | null): Promise<LoadedImage | null> => {
+  if (!source) return Promise.resolve(null)
   const cached = imageCache.get(source)
   if (cached) return cached
-
-  const imagePromise = loadImage(source).catch((error) => {
+  const pending = loadImage(source).catch(() => {
+    // Missing covers and avatars should never hide the rest of the player.
     imageCache.delete(source)
-    throw error
+    return null
   })
-  imageCache.set(source, imagePromise)
-
-  if (imageCache.size > IMAGE_CACHE_LIMIT) {
-    const oldestKey = imageCache.keys().next().value
-    if (oldestKey) imageCache.delete(oldestKey)
-  }
-
-  return imagePromise
+  imageCache.set(source, pending)
+  if (imageCache.size > 200) imageCache.delete(imageCache.keys().next().value!)
+  return pending
 }
 
-const renderCircularImage = async (
-  canvas: Canvas,
-  source: string,
-  x: number,
-  y: number,
-  errorLabel: string
-) => {
-  const canv = canvas.getContext('2d')
-  canv.save()
-  canv.beginPath()
-  canv.arc(x + 16, y + 16, 16, 0, Math.PI * 2)
-  canv.closePath()
-  canv.clip()
-
-  try {
-    const image = await loadCachedImage(source)
-    canv.drawImage(image, x, y, 32, 32)
-  } catch (error) {
-    console.warn(`[${errorLabel}]`, error)
+const thumbnailSource = (track: LavalinkTrack) => {
+  if (track.info.artworkUrl) return track.info.artworkUrl
+  if (track.userData?.thumbnail) return track.userData.thumbnail
+  if (track.info.sourceName === 'youtube' && track.info.uri) {
+    const id = getYoutubeVideoId(track.info.uri)
+    if (id) return `https://img.youtube.com/vi/${id}/mqdefault.jpg`
   }
-
-  canv.restore()
-}
-
-const getThumbsDownIcon = () => {
-  thumbsDownIconPromise ??= loadImage('./assets/icons/thumbs-down.svg')
-  return thumbsDownIconPromise
-}
-
-const renderDislikeBadge = async (canvas: Canvas, dislikeCount = 0, anchorX = 26, anchorY = 26) => {
-  if (dislikeCount <= 0) return
-
-  const canv = canvas.getContext('2d')
-
-  canv.save()
-  canv.shadowColor = 'rgba(0, 0, 0, 0.45)'
-  canv.shadowBlur = 14
-
-  // Main emoji badge
-  canv.beginPath()
-  canv.arc(anchorX, anchorY, 18, 0, Math.PI * 2)
-  canv.closePath()
-  canv.fillStyle = '#DC2626'
-  canv.fill()
-
-  canv.shadowBlur = 0
-  canv.fillStyle = '#ffffff'
-  try {
-    const icon = await getThumbsDownIcon()
-    const iconSize = 20
-    canv.drawImage(icon, anchorX - iconSize / 2, anchorY - iconSize / 2, iconSize, iconSize)
-  } catch {
-    // Keep the red badge without icon if asset loading fails.
-  }
-
-  // Small count chip when more than one dislike exists
-  if (dislikeCount > 1) {
-    const label = `x${dislikeCount}`
-    canv.font = '600 14px Poppins'
-    const chipWidth = Math.max(30, canv.measureText(label).width + 12)
-    const chipHeight = 22
-    const chipX = anchorX + 12
-    const chipY = anchorY + 10
-
-    canv.fillStyle = '#7F1D1D'
-    canv.fillRect(chipX, chipY, chipWidth, chipHeight)
-
-    canv.fillStyle = '#FEE2E2'
-    canv.textAlign = 'center'
-    canv.textBaseline = 'middle'
-    canv.fillText(label, chipX + chipWidth / 2, chipY + chipHeight / 2 + 0.5)
-  }
-
-  canv.restore()
-}
-
-const playlistTitleCharsPerLine = 21
-const playlistTitleLineHeight = 24
-const playlistTitleTopPadding = 5
-const playlistTitleBottomPadding = 5
-
-const getPlaylistBannerHeight = (playlistTitle: string | undefined) => {
-  if (!playlistTitle) return 0
-
-  const lineCount = Math.min(
-    splitAtClosestSpace(playlistTitle, playlistTitleCharsPerLine).length,
-    2
-  )
-  return playlistTitleTopPadding + lineCount * playlistTitleLineHeight + playlistTitleBottomPadding
-}
-
-const renderPlaylistTitle = (
-  canvas: Canvas,
-  playlistTitle: string | undefined,
-  x: number,
-  y: number,
-  width: number,
-  height: number
-) => {
-  if (!playlistTitle) return
-
-  const canv = canvas.getContext('2d')
-  const lines = splitAtClosestSpace(playlistTitle, playlistTitleCharsPerLine).slice(0, 2)
-  const maxTextWidth = Math.max(width - 16, 1)
-
-  canv.font = '600 22px Poppins'
-  const widestLine = Math.max(...lines.map((line) => canv.measureText(line).width))
-  const fontSize = Math.max(10, Math.min(22, Math.floor((22 * maxTextWidth) / widestLine)))
-
-  canv.fillStyle = 'rgba(0, 0, 0, 0.45)'
-  canv.fillRect(x, y, width, height)
-
-  renderMultiLineTitle(canvas, playlistTitle, {
-    fillStyle: '#ffffff',
-    y: y + playlistTitleTopPadding + 22,
-    font: `600 ${fontSize}px Poppins`,
-    charsPerLine: playlistTitleCharsPerLine,
-    lineHeight: playlistTitleLineHeight,
-    maxLines: 2,
-    centerX: x,
-    centerWidth: width,
-  })
-}
-
-const getThumbnailUrl = (song: LavalinkTrack) => {
-  // Check if artworkUrl is provided by Lavalink
-  if (song.info.artworkUrl) {
-    return song.info.artworkUrl
-  }
-
-  // Fallback: check userData for thumbnail
-  if (song.userData?.thumbnail) {
-    return song.userData.thumbnail
-  }
-
-  // For YouTube videos, extract ID from URI and construct thumbnail URL
-  if (song.info.sourceName === 'youtube' && song.info.uri) {
-    const videoId = getYoutubeVideoId(song.info.uri)
-    if (videoId) {
-      return `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`
-    }
-  }
-
   return null
 }
 
-const renderMultiLineTitle = (
-  canvas: Canvas,
-  str: string,
-  options: {
-    x?: number
-    y?: number
-    textAlign?: CanvasTextAlign
-    charsPerLine?: number
-    lineHeight?: number
-    maxLines?: number
-    centerX?: number
-    centerWidth?: number
-    font: string
-    fillStyle: CanvasFillStrokeStyles['fillStyle']
-  }
+const loadTrackAssets = async (
+  track: LavalinkTrack,
+  options: CanvasOptions
+): Promise<TrackAssets> => {
+  const member = track.userData?.requestedBy
+  const requester =
+    options.radioStationName ||
+    member?.displayName ||
+    member?.user.globalName ||
+    member?.user.username ||
+    ''
+  const avatarSource = options.radioStationName
+    ? options.radioStationImage
+    : member?.displayAvatarURL({ extension: 'png', size: 64 })
+  const [artwork, avatar] = await Promise.all([
+    loadCachedImage(thumbnailSource(track)),
+    loadCachedImage(avatarSource),
+  ])
+  return { artwork, avatar, requester }
+}
+
+const roundedRect = (
+  ctx: Context,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number
 ) => {
-  const canvas2D = canvas.getContext('2d')
-  canvas2D.font = options.font || '28px Poppins'
-  canvas2D.fillStyle = options.fillStyle || '#ffffff'
-  canvas2D.textAlign = options.textAlign || 'center'
-  const charsPerLine = options.charsPerLine || 10
-  const y = options.y || 30
-  const x = options.x || 30
-  const lineHeight = options.lineHeight || 30
+  ctx.beginPath()
+  ctx.roundRect(x, y, width, height, radius)
+}
 
-  const multiLineArray = splitAtClosestSpace(str, charsPerLine).slice(0, options.maxLines)
-
-  let textBoxWidth = 0
-
-  // measure the line width then set textBoxWidth to the highest value of the line widths
-  for (let i = 0; i < multiLineArray.length; i++) {
-    const lineWidth = canvas2D.measureText(multiLineArray[i]).width
-    textBoxWidth = lineWidth > textBoxWidth ? lineWidth : textBoxWidth
-  }
-
-  const centerX = options.centerX || 0
-  const centerWidth = options.centerWidth || 320
-  const xCentered = centerX + (centerWidth - textBoxWidth) / 2 + textBoxWidth / 2
-
-  // render the text
-  for (let i = 0; i < multiLineArray.length; i++) {
-    canvas2D.fillText(
-      multiLineArray[i],
-      canvas2D.textAlign === 'center' ? xCentered : x,
-      y + i * lineHeight
+const drawArtwork = (
+  context: Context,
+  image: LoadedImage | null,
+  x: number,
+  y: number,
+  size: number
+) => {
+  const ctx = context
+  ctx.save()
+  roundedRect(ctx, x, y, size, size, Math.min(8, size / 8))
+  ctx.clip()
+  ctx.fillStyle = '#34363f'
+  ctx.fillRect(x, y, size, size)
+  if (image) {
+    // Center-crop rectangular provider thumbnails instead of stretching the cover.
+    const crop = Math.min(image.width, image.height)
+    ctx.drawImage(
+      image,
+      (image.width - crop) / 2,
+      (image.height - crop) / 2,
+      crop,
+      crop,
+      x,
+      y,
+      size,
+      size
     )
+  } else {
+    ctx.strokeStyle = '#777b88'
+    ctx.lineWidth = Math.max(1.5, size / 60)
+    ctx.beginPath()
+    ctx.arc(x + size / 2, y + size / 2, size / 5, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.arc(x + size / 2, y + size / 2, size / 18, 0, Math.PI * 2)
+    ctx.stroke()
   }
-  return lineHeight * multiLineArray.length
+  ctx.restore()
 }
 
-export const nowPlayingCanvasWithUpNext = async (
-  songs: LavalinkTrack[],
-  options?: CanvasOptions
-): Promise<Buffer> => {
-  const canvas = new Canvas(700, 394)
-  const canv = canvas.getContext('2d')
-
-  const song = songs[0]
-  const { requestedBy } = song.userData || {}
-  const attributionName =
-    options?.radioStationName || (requestedBy ? capitalize(requestedBy.user.username) : null)
-  const thumbnailUrl = getThumbnailUrl(song)
-  const isLocal = false // Local file detection not implemented for Lavalink yet
-  let thumbnailX = 25
-  const thumbnailY = 25
-  let thumbnailWidth = 270
-  const playlistBannerHeight = getPlaylistBannerHeight(options?.playlistTitle)
-  const artworkHeight = 169 - playlistBannerHeight
-
-  try {
-    if (thumbnailUrl) {
-      const thumbnail = await loadCachedImage(thumbnailUrl)
-
-      // Blur thumbnail for background
-      canv.filter = 'blur(32px)'
-      canv.drawImage(thumbnail, -10, -10, 720, 405)
-      canv.filter = 'none'
-
-      // Render vertical divider
-      canv.fillStyle = 'rgba(0, 0, 0, 0.4)'
-      canv.fillRect(0, 0, 700, 394)
-      canv.fillStyle = 'rgba(255, 255, 255, 1)'
-      canv.fillRect(320, thumbnailY, 1, 344)
-
-      // Render Thumbnail
-      const _width = Math.min(artworkHeight * (thumbnail.width / thumbnail.height), 270)
-      thumbnailX = 160 - _width / 2
-      thumbnailWidth = _width
-      canv.drawImage(
-        thumbnail,
-        thumbnailX,
-        thumbnailY + playlistBannerHeight,
-        _width,
-        artworkHeight
-      )
-    }
-  } catch (e) {
-    console.warn('[ThumbnailError] ', e)
-  }
-
-  renderPlaylistTitle(
-    canvas,
-    options?.playlistTitle,
-    thumbnailX,
-    thumbnailY,
-    thumbnailWidth,
-    playlistBannerHeight
-  )
-
-  // Use the same track metadata as the web dashboard, without parsing the title.
-  const { author: artist, title } = song.info
-
-  // Render title
-  const songTitleHeight = renderMultiLineTitle(canvas, truncateString(title || artist, 42), {
-    fillStyle: '#ffffff',
-    y: 235,
-    x: 10,
-    font: '600 24px Poppins',
-    charsPerLine: 15,
-  })
-
-  // Render artist
-  if (title) {
-    renderMultiLineTitle(canvas, truncateString(artist, 20), {
-      fillStyle: '#ffffff',
-      y: 235 + songTitleHeight,
-      x: 10,
-      font: '300 20px Poppins',
-    })
-  }
-
-  // Radio tracks do not have a requesting user, but their queue should still
-  // receive the same Up Next heading as manually requested tracks.
-  canv.textAlign = 'left'
-  canv.fillStyle = '#ffffff'
-  canv.font = '18px Poppins'
-  canv.fillText('UP NEXT:', 345, 40)
-
-  if (attributionName) {
-    // Radio playback uses its optional station cover in place of an avatar.
-    if (requestedBy && !options?.radioStationName) {
-      await renderCircularImage(
-        canvas,
-        requestedBy.displayAvatarURL({ extension: 'png', size: 64 }),
-        25,
-        343,
-        'AvatarError'
-      )
-    } else if (options?.radioStationImage) {
-      await renderCircularImage(
-        canvas,
-        options.radioStationImage,
-        25,
-        343,
-        'RadioStationImageError'
-      )
-    }
-
-    if (isLocal) {
-      const isLocalIcon = await loadImage('./assets/icons/downloaded.png')
-      canv.drawImage(isLocalIcon, 320 - 32 - 20, 343)
-    }
-
-    // Render the requester or active radio station name.
-    canv.fillStyle = '#ffffff'
-    canv.textAlign = 'left'
-    canv.font = '600 18px Poppins'
-    canv.fillText(attributionName, 70, 364)
-    canv.fillStyle = '#ffffff'
-
-    try {
-      const pics = await Promise.all(
-        songs.slice(1, 7).map((s) => {
-          return s.userData?.requestedBy
-            ? loadCachedImage(
-                s.userData.requestedBy.displayAvatarURL({ extension: 'png', size: 64 })
-              )
-            : null
-        })
-      )
-
-      pics.forEach((p, index) => {
-        if (!p) return
-
-        const i = index + 1
-        canv.save()
-
-        canv.beginPath()
-        canv.arc(664, 30 + 65 * i, 16, 0, Math.PI * 2)
-        canv.closePath()
-        canv.clip()
-        canv.drawImage(p, 648, 14 + 65 * i, 32, 32)
-        canv.restore()
-      })
-    } catch (e) {
-      console.warn('[UpNextAvatarError] ', e)
-    }
-  }
-
-  for (const [index, songObj] of songs.slice(1, 6).entries()) {
-    const i = index + 1
-    canv.fillStyle = `#ffffff`
-    canv.font = '300 22px Poppins'
-    canv.textAlign = 'left'
-    const { author: artist, title } = songObj.info
-
-    canv.fillText(`${i}`, 345, 36 + 65 * i)
-
-    // Fade out long titles
-    const gradient = canv.createLinearGradient(550, 0, 638, 0)
-    gradient.addColorStop(0, '#ffffff')
-    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)')
-    canv.fillStyle = gradient
-
-    if (title !== null) {
-      canv.font = '600 22px Poppins'
-      canv.fillText(title, 375, 26 + 65 * i)
-      canv.font = '300 22px Poppins'
-      canv.fillText(artist, 375, 51 + 65 * i)
-    } else {
-      canv.font = '600 22px Poppins'
-      canv.fillText(artist, 375, 30 + 65 * i)
-    }
-
-    // if (i < 5 && songs.length > 2) {
-    //   canv.fillStyle = 'rgba(255, 255, 255, 0.3)'
-    //   canv.fillRect(345, 60 + 66 * i, 325, 1)
-    //   canv.fillStyle = `#ffffff`
-    // }
-  }
-
-  await renderDislikeBadge(
-    canvas,
-    options?.currentTrackDislikes || 0,
-    thumbnailX + thumbnailWidth - 16,
-    thumbnailY + playlistBannerHeight + 16
-  )
-
-  // Buffer canvas
-  return await canvas.toBuffer('image/png')
+const drawAvatar = (
+  ctx: Context,
+  image: LoadedImage | null,
+  x: number,
+  y: number,
+  size: number
+) => {
+  ctx.save()
+  ctx.beginPath()
+  ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2)
+  ctx.clip()
+  drawArtwork(ctx, image, x, y, size)
+  ctx.restore()
 }
 
-export const nowPlayingCanvas = async (
-  song: LavalinkTrack,
-  options?: CanvasOptions
-): Promise<Buffer> => {
-  const canvas = new Canvas(700, 169)
-  const canv = canvas.getContext('2d')
-  const { requestedBy } = song.userData || {}
-  const attributionName =
-    options?.radioStationName || (requestedBy ? capitalize(requestedBy.user.username) : null)
-  const thumbnailUrl = getThumbnailUrl(song)
-  const isLocal = false // Local file detection not implemented for Lavalink yet
+const ellipsize = (ctx: Context, text: string, maxWidth: number) => {
+  if (ctx.measureText(text).width <= maxWidth) return text
+  const characters = Array.from(text)
+  let low = 0
+  let high = characters.length
+  while (low < high) {
+    const middle = Math.ceil((low + high) / 2)
+    if (ctx.measureText(characters.slice(0, middle).join('') + '…').width <= maxWidth) low = middle
+    else high = middle - 1
+  }
+  return characters.slice(0, low).join('') + '…'
+}
 
-  let _width = 0
-  const thumbnailY = 0
-  const playlistBannerHeight = getPlaylistBannerHeight(options?.playlistTitle)
-  const artworkHeight = 169 - playlistBannerHeight
+const titleLines = (ctx: Context, text: string, maxWidth: number) => {
+  const normalized = text.replace(/\s+/g, ' ').trim()
+  if (ctx.measureText(normalized).width <= maxWidth) return [normalized]
+  const characters = Array.from(normalized)
+  let end = 0
+  while (
+    end < characters.length &&
+    ctx.measureText(characters.slice(0, end + 1).join('')).width <= maxWidth
+  )
+    end += 1
+  const prefix = characters.slice(0, end).join('')
+  const space = prefix.lastIndexOf(' ')
+  const split = space > 0 ? space : Math.max(1, end)
+  return [
+    characters.slice(0, split).join('').trim(),
+    ellipsize(ctx, characters.slice(split).join('').trim(), maxWidth),
+  ]
+}
 
-  try {
-    if (thumbnailUrl) {
-      const thumbnail = await loadCachedImage(thumbnailUrl)
-      _width = artworkHeight * (thumbnail.width / thumbnail.height)
+const drawBackground = (context: Context, image: LoadedImage | null, height: number) => {
+  const ctx = context
+  ctx.save()
+  roundedRect(ctx, 0, 0, WIDTH, height, 16)
+  ctx.clip()
+  ctx.fillStyle = '#1c1d22'
+  ctx.fillRect(0, 0, WIDTH, height)
+  if (image) {
+    ctx.filter = 'blur(40px) saturate(0.8)'
+    ctx.drawImage(image, -80, -80, WIDTH + 160, height + 160)
+    ctx.filter = 'none'
+    ctx.fillStyle = 'rgba(22, 23, 28, 0.78)'
+    ctx.fillRect(0, 0, WIDTH, height)
+    const shade = ctx.createLinearGradient(0, 0, 0, height)
+    shade.addColorStop(0, 'rgba(28,29,34,0)')
+    shade.addColorStop(1, 'rgba(28,29,34,0.62)')
+    ctx.fillStyle = shade
+    ctx.fillRect(0, 0, WIDTH, height)
+  }
+  // Fade the background layer, keeping all foreground artwork and type opaque.
+  ctx.globalCompositeOperation = 'destination-in'
+  const horizontal = ctx.createLinearGradient(0, 0, WIDTH, 0)
+  horizontal.addColorStop(0, 'rgba(0,0,0,0.76)')
+  horizontal.addColorStop(0.04, 'rgba(0,0,0,0.98)')
+  horizontal.addColorStop(0.96, 'rgba(0,0,0,0.98)')
+  horizontal.addColorStop(1, 'rgba(0,0,0,0.76)')
+  ctx.fillStyle = horizontal
+  ctx.fillRect(0, 0, WIDTH, height)
+  const vertical = ctx.createLinearGradient(0, 0, 0, height)
+  vertical.addColorStop(0, 'rgba(0,0,0,0.84)')
+  vertical.addColorStop(Math.min(0.25, 20 / height), 'rgba(0,0,0,0.98)')
+  vertical.addColorStop(1 - Math.min(0.25, 20 / height), 'rgba(0,0,0,0.98)')
+  vertical.addColorStop(1, 'rgba(0,0,0,0.76)')
+  ctx.fillStyle = vertical
+  ctx.fillRect(0, 0, WIDTH, height)
+  ctx.restore()
+}
 
-      // Blur thumbnail for background
-      canv.filter = 'blur(32px)'
-      canv.drawImage(thumbnail, -10, -10, 720, 245)
-      canv.filter = 'none'
+const drawDislikes = async (context: Context, count: number) => {
+  const ctx = context
+  if (count <= 0) return
+  const x = PADDING + ART_SIZE - 12
+  const y = PADDING + 12
+  ctx.fillStyle = '#b83240'
+  ctx.beginPath()
+  ctx.arc(x, y, 18, 0, Math.PI * 2)
+  ctx.fill()
+  thumbsDownIcon ??= loadCachedImage(path.resolve('assets/icons/thumbs-down.svg'))
+  const icon = await thumbsDownIcon
+  if (icon) ctx.drawImage(icon, x - 10, y - 10, 20, 20)
+  if (count > 1 || !icon) {
+    ctx.font = '600 12px Inter'
+    const text = String(count)
+    const width = Math.max(22, ctx.measureText(text).width + 10)
+    ctx.fillStyle = '#7f1d2a'
+    roundedRect(ctx, x - width / 2, y + 12, width, 18, 8)
+    ctx.fill()
+    ctx.fillStyle = '#ffffff'
+    ctx.textAlign = 'center'
+    ctx.fillText(text, x, y + 25)
+    ctx.textAlign = 'left'
+  }
+}
 
-      // Generate gradient background
-      canv.fillStyle = 'rgba(0, 0, 0, 0.4)'
-      canv.fillRect(0, 0, 700, 169)
-      // Render Thumbnail
-      canv.drawImage(thumbnail, 0, thumbnailY + playlistBannerHeight, _width, artworkHeight)
-    }
-  } catch (e) {
-    console.warn('[ThumbnailError]', e)
+const renderNowPlayingCanvas = async (
+  tracks: LavalinkTrack[],
+  options: CanvasOptions = {}
+): Promise<Canvas> => {
+  if (!tracks?.length) throw new Error('Cannot generate now playing canvas without songs')
+  const current = tracks[0]
+  const playlistTitle = options.playlistTitle ?? current.userData?.playlistTitle
+  const layout = getNowPlayingLayout(tracks.length, Boolean(playlistTitle))
+  // Invisible queued tracks do not trigger image downloads or affect render time.
+  const visible = tracks.slice(0, 1 + MAX_UP_NEXT)
+  const [assets, dislikes] = await Promise.all([
+    Promise.all(
+      visible.map((track, index) =>
+        loadTrackAssets(track, index === 0 || !track.userData?.requestedBy ? options : {})
+      )
+    ),
+    options.currentTrackDislikes ?? getSongDislikeCount(current.info.identifier),
+  ])
+  const canvas = new Canvas(WIDTH, layout.height)
+  const ctx = canvas.getContext('2d')
+  drawBackground(ctx, assets[0].artwork, layout.headerHeight)
+  drawArtwork(ctx, assets[0].artwork, PADDING, PADDING, ART_SIZE)
+  if (options.isPaused) {
+    ctx.save()
+    roundedRect(ctx, PADDING, PADDING, ART_SIZE, ART_SIZE, 8)
+    ctx.clip()
+    ctx.fillStyle = 'rgba(0,0,0,0.38)'
+    ctx.fillRect(PADDING, PADDING, ART_SIZE, ART_SIZE)
+    ctx.fillStyle = '#f2f3f5'
+    const center = PADDING + ART_SIZE / 2
+    roundedRect(ctx, center - 12, center - 16, 8, 32, 2)
+    ctx.fill()
+    roundedRect(ctx, center + 4, center - 16, 8, 32, 2)
+    ctx.fill()
+    ctx.restore()
   }
 
-  const visibleThumbnailWidth = _width > 0 ? _width : 169
-  renderPlaylistTitle(
-    canvas,
-    options?.playlistTitle,
-    0,
-    thumbnailY,
-    visibleThumbnailWidth,
-    playlistBannerHeight
+  const textX = PADDING + ART_SIZE + 24
+  const textWidth = WIDTH - textX - PADDING
+  ctx.fillStyle = options.isPaused ? '#c4c6ff' : '#b5bac1'
+  ctx.font = '600 13px Inter'
+  const status = options.isPaused ? 'PAUSED' : 'NOW PLAYING'
+  ctx.fillText(options.radioStationName ? `${status} · RADIO` : status, textX, 43)
+  ctx.font = '600 28px Inter'
+  ctx.fillStyle = '#f2f3f5'
+  const lines = titleLines(
+    ctx,
+    current.info.title || current.info.author || 'Unknown track',
+    textWidth
   )
+  lines.forEach((line, index) => ctx.fillText(line, textX, 77 + index * 33))
+  ctx.font = '400 20px Inter'
+  ctx.fillStyle = '#b5bac1'
+  ctx.fillText(
+    ellipsize(ctx, current.info.author || 'Unknown artist', textWidth),
+    textX,
+    107 + (lines.length - 1) * 33
+  )
+  if (assets[0].requester) {
+    drawAvatar(ctx, assets[0].avatar, textX, 154, 28)
+    ctx.font = '600 17px Inter'
+    ctx.fillStyle = '#f2f3f5'
+    ctx.fillText(ellipsize(ctx, assets[0].requester, textWidth - 40), textX + 40, 174)
+  }
+  if (playlistTitle) {
+    ctx.font = '400 13px Inter'
+    ctx.fillStyle = '#b5bac1'
+    ctx.fillText(ellipsize(ctx, `FROM · ${playlistTitle}`, WIDTH - PADDING * 2), PADDING, 211)
+  }
+  await drawDislikes(ctx, dislikes)
 
-  // Use the same track metadata as the web dashboard, without parsing the title.
-  const { author: artist, title } = song.info
-
-  // Render title
-  const songTitleHeight = renderMultiLineTitle(canvas, truncateString(title || artist, 42), {
-    fillStyle: '#ffffff',
-    y: 44,
-    x: _width + 25,
-    font: '600 28px Poppins',
-    textAlign: 'start',
-    charsPerLine: 20,
-  })
-
-  // Render artist
-  if (title) {
-    renderMultiLineTitle(canvas, truncateString(artist, 20), {
-      fillStyle: '#ffffff',
-      y: 48 + songTitleHeight,
-      x: _width + 25,
-      font: '300 24px Poppins',
-      textAlign: 'start',
-      charsPerLine: 20,
+  if (layout.queueCount) {
+    ctx.fillStyle = '#b5bac1'
+    ctx.font = '600 16px Inter'
+    ctx.fillText(`UP NEXT · ${layout.queueCount}`, PADDING, layout.headerHeight + 29)
+    visible.slice(1).forEach((track, index) => {
+      const y = layout.rowsTop + index * ROW_HEIGHT
+      const row = assets[index + 1]
+      if (index === 0) {
+        ctx.fillStyle = 'rgba(181,186,193,0.07)'
+        roundedRect(ctx, 16, y, WIDTH - 32, ROW_HEIGHT, 9)
+        ctx.fill()
+      } else {
+        ctx.fillStyle = 'rgba(181,186,193,0.16)'
+        ctx.fillRect(PADDING, y, WIDTH - PADDING * 2, 1)
+      }
+      ctx.fillStyle = '#b5bac1'
+      ctx.font = '400 16px Inter'
+      ctx.textAlign = 'center'
+      ctx.fillText(String(index + 1), 39, y + 40)
+      ctx.textAlign = 'left'
+      drawArtwork(ctx, row.artwork, 64, y + 12, 44)
+      const requesterTextX = WIDTH - PADDING - REQUESTER_NAME_WIDTH
+      const requesterAvatarX = requesterTextX - 32
+      const songWidth = row.requester ? requesterAvatarX - 26 - 124 : WIDTH - 124 - PADDING
+      ctx.fillStyle = '#f2f3f5'
+      ctx.font = '600 20px Inter'
+      ctx.fillText(
+        ellipsize(ctx, track.info.title || track.info.author || 'Unknown track', songWidth),
+        124,
+        y + 30
+      )
+      ctx.fillStyle = '#b5bac1'
+      ctx.font = '400 16px Inter'
+      ctx.fillText(ellipsize(ctx, track.info.author || 'Unknown artist', songWidth), 124, y + 52)
+      if (row.requester) {
+        drawAvatar(ctx, row.avatar, requesterAvatarX, y + 22, 24)
+        ctx.fillStyle = '#d6d9df'
+        ctx.font = '600 14px Inter'
+        ctx.fillText(ellipsize(ctx, row.requester, REQUESTER_NAME_WIDTH), requesterTextX, y + 39)
+      }
     })
-  }
-
-  if (attributionName) {
-    // Radio playback uses its optional station cover in place of an avatar.
-    if (requestedBy && !options?.radioStationName) {
-      await renderCircularImage(
-        canvas,
-        requestedBy.displayAvatarURL({ extension: 'png', size: 64 }),
-        _width + 25,
-        117,
-        'AvatarError'
-      )
-    } else if (options?.radioStationImage) {
-      await renderCircularImage(
-        canvas,
-        options.radioStationImage,
-        _width + 25,
-        117,
-        'RadioStationImageError'
+    if (layout.remainingCount) {
+      ctx.fillStyle = 'rgba(181,186,193,0.16)'
+      ctx.fillRect(PADDING, layout.footerTop, WIDTH - PADDING * 2, 1)
+      ctx.font = '400 16px Inter'
+      ctx.fillStyle = '#b5bac1'
+      ctx.textAlign = 'center'
+      const label = layout.remainingCount === 1 ? 'song' : 'songs'
+      ctx.fillText(
+        `… ${layout.remainingCount} more ${label} in queue`,
+        WIDTH / 2,
+        layout.footerTop + 32
       )
     }
-
-    // Render the requester or active radio station name.
-    canv.fillStyle = '#ffffff'
-    canv.textAlign = 'left'
-    canv.font = '600 18px Poppins'
-    canv.fillText(attributionName, _width + 25 + 32 + 12, 139)
-
-    if (isLocal) {
-      const isLocalIcon = await loadImage('./assets/icons/downloaded.png')
-      canv.drawImage(isLocalIcon, 700 - 32 - 20, 117)
-    }
   }
-
-  await renderDislikeBadge(
-    canvas,
-    options?.currentTrackDislikes || 0,
-    visibleThumbnailWidth - 16,
-    thumbnailY + playlistBannerHeight + 16
-  )
-
-  // Buffer canvas
-  return await canvas.toBuffer('image/png')
+  return canvas
 }
 
 export const generateNowPlayingCanvas = async (
   tracks: LavalinkTrack[],
-  options?: CanvasOptions
-): Promise<Buffer> => processTracks(tracks, options)
+  options: CanvasOptions = {}
+): Promise<Buffer> => (await renderNowPlayingCanvas(tracks, options)).toBuffer('image/png')
 
-const processTracks = async (tracks: LavalinkTrack[], options?: CanvasOptions): Promise<Buffer> => {
-  if (!tracks || tracks.length < 1)
-    throw Error('Error: Cannot generate now playing canvas without songs')
-
-  console.log(`[Canvas] Processing ${tracks.length} track(s)`)
-
-  const resolvedOptions: CanvasOptions = {
-    currentTrackDislikes:
-      options?.currentTrackDislikes ?? (await getSongDislikeCount(tracks[0].info.identifier)),
-    playlistTitle:
-      tracks.length > 1 ? (options?.playlistTitle ?? tracks[0].userData?.playlistTitle) : undefined,
-    radioStationName: options?.radioStationName,
-    radioStationImage: options?.radioStationImage,
+export const generateNowPlayingImages = async (
+  tracks: LavalinkTrack[],
+  options: CanvasOptions = {}
+) => {
+  const canvas = await renderNowPlayingCanvas(tracks, options)
+  const playlist = options.playlistTitle ?? tracks[0].userData?.playlistTitle
+  const layout = getNowPlayingLayout(tracks.length, Boolean(playlist))
+  const sections = [
+    {
+      top: 0,
+      height: layout.headerHeight,
+      description: options.isPaused ? 'Paused' : 'Now playing',
+    },
+  ]
+  // A single queue panel avoids Discord's gallery gaps between groups of songs.
+  // Keeping it separate from the header still bounds its height to 452px.
+  if (layout.visibleCount) {
+    sections.push({
+      top: layout.headerHeight,
+      height: layout.height - layout.headerHeight,
+      description: `Up next: ${layout.visibleCount} songs shown, ${layout.queueCount} queued`,
+    })
   }
-
-  if (tracks.length > 1) {
-    console.log(`[Canvas] Using nowPlayingCanvasWithUpNext`)
-    return await nowPlayingCanvasWithUpNext(tracks, resolvedOptions)
-  }
-
-  console.log(`[Canvas] Using nowPlayingCanvas (single track)`)
-  return await nowPlayingCanvas(tracks[0], resolvedOptions)
+  return sections.map((section, index) => {
+    const strip = new Canvas(WIDTH, section.height)
+    strip
+      .getContext('2d')
+      .drawImage(canvas, 0, section.top, WIDTH, section.height, 0, 0, WIDTH, section.height)
+    return {
+      attachment: strip.toBuffer('image/png'),
+      name: `player-${index}.png`,
+      description: section.description,
+    }
+  })
 }
 
 export default generateNowPlayingCanvas

@@ -2,10 +2,14 @@ import { ButtonInteraction, GuildMember } from 'discord.js'
 
 import { useComponents } from '@constants/messageComponents'
 import type { ClientType } from '@types'
-import { sendMessage } from '@utils/mainMessage'
-import { deserializeLavalinkTrack, getTimeRangeDescription, getUserTopSongs } from '@utils/songHistoryV2'
+import { sendPlayerToolFeedback } from '@utils/playerToolFeedback'
+import {
+  deserializeLavalinkTrack,
+  getTimeRangeDescription,
+  getUserTopSongs,
+} from '@utils/songHistoryV2'
 
-import { MusicQueue } from '../../lib'
+import type { MusicQueue, LavalinkTrack } from '../../lib'
 
 const timeRanges = ['monthly', '3-months', '6-months', 'yearly'] as const
 
@@ -19,7 +23,7 @@ export default async (queue: MusicQueue | null, interaction: ButtonInteraction) 
 
   if (!guildId || !voiceChannel) {
     if (channel && channel.isTextBased() && 'guild' in channel) {
-      await sendMessage(channel, {
+      await sendPlayerToolFeedback(interaction, channel, {
         content: '❌ | You need to be in a voice channel to play your top songs!',
         components: await useComponents(queue || undefined),
       })
@@ -39,7 +43,7 @@ export default async (queue: MusicQueue | null, interaction: ButtonInteraction) 
 
     if (historyTracks.length === 0) {
       if (channel && channel.isTextBased() && 'guild' in channel) {
-        await sendMessage(channel, {
+        await sendPlayerToolFeedback(interaction, channel, {
           content: `❌ | I couldn't find any of your top songs from ${timeRangeDescription}.`,
           components: await useComponents(queue || undefined),
         })
@@ -49,8 +53,7 @@ export default async (queue: MusicQueue | null, interaction: ButtonInteraction) 
 
     const controller = musicManager.playerController
     if (!controller) return
-    let activeQueue = queue || musicManager.getQueue(guildId) || null
-    let addedCount = 0
+    const tracks: LavalinkTrack[] = []
 
     for (const historyTrack of historyTracks) {
       const searchQuery =
@@ -63,19 +66,18 @@ export default async (queue: MusicQueue | null, interaction: ButtonInteraction) 
         const track = searchResult.tracks[0]
         if (!track) continue
 
-        activeQueue = await controller.enqueueTrack(
-          { member, textChannel: interaction.channel },
-          { ...track, userData: { ...track.userData, requestedBy: member, playlistTitle } }
-        )
-        addedCount += 1
+        tracks.push({
+          ...track,
+          userData: { ...track.userData, requestedBy: member, playlistTitle },
+        })
       } catch (error) {
         console.warn(`[topSongsButton] Could not queue "${historyTrack.info.title}":`, error)
       }
     }
 
-    if (!activeQueue || addedCount === 0) {
+    if (!tracks.length) {
       if (channel && channel.isTextBased() && 'guild' in channel) {
-        await sendMessage(channel, {
+        await sendPlayerToolFeedback(interaction, channel, {
           content: '❌ | I could not find playable versions of your top songs.',
           components: await useComponents(queue || undefined),
         })
@@ -83,8 +85,14 @@ export default async (queue: MusicQueue | null, interaction: ButtonInteraction) 
       return
     }
 
+    const activeQueue = await controller.enqueueTracks(
+      { member, textChannel: interaction.channel },
+      tracks
+    )
+    const addedCount = tracks.length
+
     if (channel && channel.isTextBased() && 'guild' in channel) {
-      await sendMessage(channel, {
+      await sendPlayerToolFeedback(interaction, channel, {
         content: `✅ | Added ${addedCount} of your top songs from ${timeRangeDescription}.`,
         components: await useComponents(activeQueue),
       })
@@ -93,7 +101,7 @@ export default async (queue: MusicQueue | null, interaction: ButtonInteraction) 
     console.error('[topSongsButton]', error)
 
     if (channel && channel.isTextBased() && 'guild' in channel) {
-      await sendMessage(channel, {
+      await sendPlayerToolFeedback(interaction, channel, {
         content: '❌ | Failed to load your top songs. Please try again.',
         components: await useComponents(queue || undefined),
       })

@@ -20,6 +20,7 @@ import {
 import { getDashboardConfig } from '@dashboard/config'
 import { HistoryError, HistorySigner } from '@dashboard/historyIdentity'
 import { HistoryRecall } from '@dashboard/historyRecall'
+import { HistoryCuration, type CurationMode } from '@dashboard/historyCuration'
 import { assertHistoryScope, createHistoryRead } from '@dashboard/historyStore'
 import { EnqueueOperations } from '@dashboard/enqueues'
 import { listDashboardVoiceChannels, parseVoiceChannelId, resolveDashboardVoiceChannel } from '@dashboard/voiceChannels'
@@ -105,7 +106,11 @@ function initApi(client: ClientType): Server {
   }
 
   const controller = client.playerController
-  const history = new HistoryRecall(`${ENV.INFLUX_ORG}/${ENV.INFLUX_BUCKET}/song_play`, new HistorySigner(process.env.HISTORY_ID_SECRET || config.sessionSecret), createHistoryRead(guildId))
+  const historyDataset = `${ENV.INFLUX_ORG}/${ENV.INFLUX_BUCKET}/song_play`
+  const historySigner = new HistorySigner(process.env.HISTORY_ID_SECRET || config.sessionSecret)
+  const historyRead = createHistoryRead(guildId)
+  const history = new HistoryRecall(historyDataset, historySigner, historyRead)
+  const curation = new HistoryCuration(historyDataset, historySigner, historyRead)
   const enqueues = new EnqueueOperations(controller.getQueueVersion().instanceId)
   const app = express()
   app.set('trust proxy', 1)
@@ -296,6 +301,35 @@ function initApi(client: ClientType): Server {
   app.get('/api/v1/history/plays', protectedRoute(false, async (request, response, user) => {
     assertHistoryScope(guildId)
     response.json(await history.search(user.id, request.query))
+  }))
+  app.get('/api/v1/history/curation', protectedRoute(false, async (request, response, user) => {
+    assertHistoryScope(guildId)
+    const mode = typeof request.query.mode === 'string' ? request.query.mode : 'people'
+    const timezone = typeof request.query.timezone === 'string' ? request.query.timezone : 'America/Toronto'
+    const selectedId = parseVoiceChannelId(request.query)
+    const state = controller.getState(user.role)
+    const member = await getGuildMemberForUser(user.id, client, guildId)
+    const channel = selectedId ? await resolveDashboardVoiceChannel(member, selectedId, controller.getQueue()) : member.voice.channel || controller.getQueue()?.voiceChannel
+    const members = channel ? [...channel.members.values()].filter(person => !person.user.bot).map(person => ({ id: person.id, username: person.displayName })) : []
+    const queuedUris = [state.currentTrack, ...state.queueItems].flatMap(track => track?.uri ? [track.uri] : [])
+    response.setHeader('Cache-Control', 'private, no-store')
+    response.json(await curation.curation(mode as CurationMode, timezone, members, queuedUris))
+  }))
+  app.get('/api/v1/history/requesters/:id/summary', protectedRoute(false, async (request, response) => {
+    assertHistoryScope(guildId)
+    response.setHeader('Cache-Control', 'private, no-store')
+    response.json(await curation.requesterSummary(request.params.id, typeof request.query.timezone === 'string' ? request.query.timezone : 'America/Toronto'))
+  }))
+  app.get('/api/v1/history/tracks/:trackId/summary', protectedRoute(false, async (request, response) => {
+    assertHistoryScope(guildId)
+    response.setHeader('Cache-Control', 'private, no-store')
+    response.json(await curation.trackSummary(request.params.trackId, typeof request.query.timezone === 'string' ? request.query.timezone : 'America/Toronto'))
+  }))
+  app.get('/api/v1/history/artists/summary', protectedRoute(false, async (request, response) => {
+    assertHistoryScope(guildId)
+    const name = typeof request.query.name === 'string' ? request.query.name : ''
+    response.setHeader('Cache-Control', 'private, no-store')
+    response.json(await curation.artistSummary(name, typeof request.query.timezone === 'string' ? request.query.timezone : 'America/Toronto'))
   }))
   app.get('/api/v1/history/requesters', protectedRoute(false, async (request, response, user) => {
     assertHistoryScope(guildId)
