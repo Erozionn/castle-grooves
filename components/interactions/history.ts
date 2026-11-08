@@ -2,6 +2,7 @@ import { GuildMember, StringSelectMenuInteraction } from 'discord.js'
 
 import type { ClientType, LavalinkTrack } from '@types'
 import { generateHistoryOptions } from '@utils/songHistoryV2'
+import { preparePlayerMessageOptions } from '@utils/playerMessageLayout'
 
 import { MusicQueue } from '../../lib'
 
@@ -9,23 +10,25 @@ export default async (queue: MusicQueue | null, interaction: StringSelectMenuInt
   const client = interaction.client as ClientType
   const controller = client.playerController
   const { member, message, values } = interaction
+  const showError = (content: string) =>
+    interaction.editReply(preparePlayerMessageOptions({ content }, message))
   const {
     voice: { channel: voiceChannel },
   } = member as GuildMember
 
   if (!voiceChannel) {
-    message.edit('❌ | You need to be in a voice channel!')
+    await showError('❌ | You need to be in a voice channel!')
     return
   }
 
   if (values.length === 0) {
-    message.edit('❌ | You need to select at least one song!')
+    await showError('❌ | You need to select at least one song!')
     return
   }
 
   const { songs } = await generateHistoryOptions()
 
-  const playSong = async (value: string | LavalinkTrack) => {
+  const resolveSong = async (value: string | LavalinkTrack) => {
     let historyTrack: LavalinkTrack
     if (typeof value === 'string') {
       const song = songs[parseInt(value)]
@@ -47,37 +50,41 @@ export default async (queue: MusicQueue | null, interaction: StringSelectMenuInt
 
       if (searchResult.tracks.length === 0) {
         console.warn(`[history] Could not find track: ${searchQuery}`)
-        message.edit(`❌ | Could not find track: ${historyTrack.info.title}`)
+        await showError(`❌ | Could not find track: ${historyTrack.info.title}`)
         return
       }
 
       // Use the first search result (should be the same song)
-      const track = searchResult.tracks[0]
-
-      await controller.enqueueTrack({ member: member as GuildMember, textChannel: interaction.channel }, track)
+      return searchResult.tracks[0]
     } catch (e: any) {
       // Handle Lavalink connection errors specifically
       if (e?.status === 400 || e?.message?.includes('Bad Request')) {
         console.warn('[history] Lavalink connection error:', e?.message || e)
-        message
-          .edit('⚠️ | Music server reconnecting. Please try again in a moment.')
-          .catch(() => {})
+        await showError('⚠️ | Music server reconnecting. Please try again in a moment.').catch(
+          () => {}
+        )
         return
       }
 
       console.warn('[history]', e)
-      message.edit('❌ | An error occurred while playing the song!')
+      await showError('❌ | An error occurred while playing the song!')
       return
     }
   }
 
   try {
-    // Add all selected songs
+    const tracks: LavalinkTrack[] = []
     for (const value of values) {
-      await playSong(value)
+      const track = await resolveSong(value)
+      if (track) tracks.push(track)
+    }
+    if (tracks.length) {
+      await controller.enqueueTracks(
+        { member: member as GuildMember, textChannel: interaction.channel },
+        tracks
+      )
     }
   } catch (e) {
     console.warn('[history]', e)
   }
-
 }

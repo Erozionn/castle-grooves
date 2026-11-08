@@ -1,8 +1,12 @@
+import { MessageFlags } from 'discord.js'
+import type { MessageCreateOptions } from 'discord.js'
+
 import { useComponents } from '@constants/messageComponents'
 import { getRadioStation } from '@constants/radioStations'
 import { logLatency, startLatencyTimer } from '@utils/latency'
 import { sendMessage } from '@utils/mainMessage'
-import { generateNowPlayingCanvas } from '@utils/nowPlayingCanvas'
+import { generateNowPlayingImages } from '@utils/nowPlayingCanvas'
+import { createPlayerMediaComponents } from '@utils/playerMessageLayout'
 
 import type { MusicQueue } from '../lib'
 
@@ -14,10 +18,41 @@ type UpdateState = {
 }
 
 const updates = new Map<string, UpdateState>()
+const batches = new Map<string, { depth: number; queue?: MusicQueue }>()
 const COALESCE_WINDOW_MS = 150
+
+/** Hold image updates until an entire player mutation has finished. */
+export const withNowPlayingMessageBatch = async <T>(
+  guildId: string,
+  operation: () => Promise<T>
+): Promise<T> => {
+  const state = updates.get(guildId)
+  const batch = batches.get(guildId) || { depth: 0, queue: undefined }
+  batch.depth += 1
+  if (state?.timer) {
+    clearTimeout(state.timer)
+    state.timer = null
+    batch.queue = state.queue
+  }
+  batches.set(guildId, batch)
+  try {
+    return await operation()
+  } finally {
+    batch.depth -= 1
+    if (!batch.depth) {
+      batches.delete(guildId)
+      if (batch.queue) scheduleNowPlayingMessage(batch.queue)
+    }
+  }
+}
 
 /** Coalesces bursty queue/player events into one dashboard render per guild. */
 export const scheduleNowPlayingMessage = (queue: MusicQueue) => {
+  const batch = batches.get(queue.guildId)
+  if (batch) {
+    batch.queue = queue
+    return
+  }
   const state = updates.get(queue.guildId) || {
     queue,
     timer: null,
@@ -48,18 +83,47 @@ const refreshNowPlayingMessage = async (state: UpdateState) => {
     const { channel } = queue.metadata
     if (!channel || !channel.isTextBased() || !('guild' in channel)) return
 
-    const tracks = [...queue.tracks]
-    if (queue.currentTrack) tracks.unshift(queue.currentTrack)
+    const currentTrack = queue.currentTrack
+    const queuedTracks = [...queue.tracks]
+    const isPaused = queue.isPaused
+    const radioStationId = queue.metadata.radio?.stationId
+
+    const sendToCurrentChannel = (options: MessageCreateOptions) => {
+      if (state.queue !== queue) return null
+      const batch = batches.get(queue.guildId)
+      if (batch) {
+        batch.queue ??= queue
+        return null
+      }
+      // Artwork can take longer than a skip, pause or stop. Never publish a
+      // snapshot that was superseded while its assets were loading.
+      if (
+        queue.currentTrack !== currentTrack ||
+        queue.isPaused !== isPaused ||
+        queue.metadata.radio?.stationId !== radioStationId ||
+        queue.tracks.length !== queuedTracks.length ||
+        queue.tracks.some((track, index) => track !== queuedTracks[index])
+      ) {
+        scheduleNowPlayingMessage(queue)
+        return null
+      }
+      // /channel can move the player while artwork is still rendering.
+      const target = queue.metadata.channel
+      if (!target || !target.isTextBased() || !('guild' in target)) return null
+      return sendMessage(target, options)
+    }
+
+    const tracks = [...queuedTracks]
+    if (currentTrack) tracks.unshift(currentTrack)
     if (tracks.length === 0) return
 
     const components = await useComponents(queue)
     const canvasStartedAt = startLatencyTimer()
     const sendStartedAt = startLatencyTimer()
     try {
-      const radioStation = queue.metadata.radio
-        ? getRadioStation(queue.metadata.radio.stationId)
-        : undefined
-      const buffer = await generateNowPlayingCanvas(tracks, {
+      const radioStation = radioStationId ? getRadioStation(radioStationId) : undefined
+      const images = await generateNowPlayingImages(tracks, {
+        isPaused,
         radioStationName: radioStation ? `${radioStation.label} Radio` : undefined,
         radioStationImage: radioStation?.coverImage,
       })
@@ -67,12 +131,16 @@ const refreshNowPlayingMessage = async (state: UpdateState) => {
         guildId: queue.guildId,
         tracks: tracks.length,
       })
-      await sendMessage(channel, { files: [buffer], components })
+      await sendToCurrentChannel({
+        files: images,
+        flags: MessageFlags.IsComponentsV2,
+        components: [...createPlayerMediaComponents(images), ...components],
+      })
     } catch (error) {
       console.warn('[nowPlayingMessage] Canvas failed; sending text fallback:', error)
-      const currentTrack = queue.currentTrack || tracks[0]
-      await sendMessage(channel, {
-        content: `Now playing: ${currentTrack.info.title} — ${currentTrack.info.author}`,
+      const fallbackTrack = currentTrack || tracks[0]
+      await sendToCurrentChannel({
+        content: `${isPaused ? 'Paused' : 'Now playing'}: ${fallbackTrack.info.title} — ${fallbackTrack.info.author}`,
         files: [],
         components,
       })

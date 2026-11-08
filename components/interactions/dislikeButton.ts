@@ -1,9 +1,11 @@
-import { ButtonInteraction } from 'discord.js'
+import { ButtonInteraction, MessageFlags } from 'discord.js'
 
 import { useComponents } from '@constants/messageComponents'
+import { getRadioStation } from '@constants/radioStations'
 import { sendMessage } from '@utils/mainMessage'
 import { addSongDislike } from '@utils/songHistoryV2'
-import { generateNowPlayingCanvas } from '@utils/nowPlayingCanvas'
+import { generateNowPlayingImages } from '@utils/nowPlayingCanvas'
+import { createPlayerMediaComponents } from '@utils/playerMessageLayout'
 import { sendPlayerToolFeedback } from '@utils/playerToolFeedback'
 
 import { isPrivatePlayerTool, refreshPlayerTools } from './playerTools'
@@ -37,14 +39,24 @@ export default async (queue: MusicQueue | null, interaction: ButtonInteraction) 
       }
 
       try {
-        const buffer = await generateNowPlayingCanvas(tracks, {
+        const radioStation = queue?.metadata.radio
+          ? getRadioStation(queue.metadata.radio.stationId)
+          : undefined
+        const images = await generateNowPlayingImages(tracks, {
+          isPaused: queue?.isPaused,
           currentTrackDislikes: dislikeCount,
+          radioStationName: radioStation ? `${radioStation.label} Radio` : undefined,
+          radioStationImage: radioStation?.coverImage,
         })
 
         await sendMessage(channel, {
           content: '',
-          files: [buffer],
-          components: await useComponents(queue || undefined),
+          files: images,
+          flags: MessageFlags.IsComponentsV2,
+          components: [
+            ...createPlayerMediaComponents(images),
+            ...(await useComponents(queue || undefined)),
+          ],
         })
         if (isPrivatePlayerTool(interaction)) {
           await refreshPlayerTools(interaction, '👎 | Thumbs-down saved.')

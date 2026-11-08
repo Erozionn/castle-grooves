@@ -10,7 +10,7 @@ import type { DashboardState, PlayerAction } from '@dashboard/types'
 import { DASHBOARD_INSTANCE_ID } from '@dashboard/types'
 import { HistoryError, trackIdentity, type RecallPlay } from '@dashboard/historyIdentity'
 import { withDeadline, type EnqueueRequest, type QueueVersion, type ResolvedItem } from '@dashboard/enqueues'
-import { scheduleNowPlayingMessage } from '@utils/nowPlayingMessage'
+import { scheduleNowPlayingMessage, withNowPlayingMessageBatch } from '@utils/nowPlayingMessage'
 
 import { MusicManager, type LavalinkTrack, type SearchResult } from './MusicManager'
 import { MusicQueue } from './MusicQueue'
@@ -163,6 +163,31 @@ export class PlayerController extends EventEmitter {
     })
   }
 
+  /** Adds resolved playlist tracks together, preserving their order and metadata. */
+  async enqueueTracks(actor: PlaybackActor, tracks: LavalinkTrack[]): Promise<MusicQueue> {
+    if (!tracks.length) throw new PlayerControllerError('INVALID_QUEUE_ITEM', 'At least one track is required.')
+    const voiceChannel = this.requireVoiceChannel(actor)
+    return this.runMutation(async () => {
+      let queue = this.musicManager.getQueue(this.guildId)
+      if (queue) {
+        await this.alignQueueChannel(queue, voiceChannel, actor)
+      } else {
+        queue = new MusicQueue(this.musicManager, voiceChannel, {
+          channel: actor.textChannel,
+          keepAliveWhenEmpty: Boolean(actor.channelOverride),
+        })
+        this.musicManager.queues.set(this.guildId, queue)
+        this.musicManager.emit('queueCreate', queue)
+      }
+      await queue.addTracks(tracks.map((track) => ({
+        ...track,
+        userData: { ...track.userData, requestedBy: actor.member },
+      })))
+      if (!queue.isPlaying && !queue.currentTrack) await queue.play()
+      return queue
+    })
+  }
+
   async enqueueNextQuery(actor: PlaybackActor, query: string): Promise<MusicQueue> {
     return this.runMutation(async () => {
       const voiceChannel = this.requireVoiceChannel(actor)
@@ -189,14 +214,13 @@ export class PlayerController extends EventEmitter {
   async goBack(): Promise<void> {
     await this.runMutation(async () => {
       const queue = this.requireQueue()
-      const position = (queue.player as unknown as { position?: number } | null)?.position || 0
       if (!queue.currentTrack) throw new PlayerControllerError('INVALID_PLAYER_STATE', 'There is no current track.')
-      if (!queue.history.length || position > 3000) {
+      if (!queue.history.length) {
         await queue.seek(0)
         return
       }
       const previousTrack = queue.history.shift()!
-      queue.tracks.unshift(queue.currentTrack, previousTrack)
+      queue.tracks.unshift(previousTrack, queue.currentTrack)
       await queue.play()
     })
   }
@@ -361,11 +385,13 @@ export class PlayerController extends EventEmitter {
       queue.updateVoiceChannel(voiceChannel)
       this.musicManager.disableVoiceCommands(this.guildId)
     }
-    queue.metadata.keepAliveWhenEmpty = Boolean(actor.channelOverride)
+    Object.assign(queue.metadata, { keepAliveWhenEmpty: Boolean(actor.channelOverride) })
   }
 
   private async runMutation<T>(operation: () => Promise<T>): Promise<T> {
-    const result = this.mutationChain.catch(() => undefined).then(operation)
+    const result = this.mutationChain.catch(() => undefined).then(() =>
+      withNowPlayingMessageBatch(this.guildId, operation)
+    )
     const completed = result.then((value) => {
       this.publish()
       return value

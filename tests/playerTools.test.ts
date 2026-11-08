@@ -13,12 +13,14 @@ import buttonHandler from '@components/events/buttonHandler'
 import { getPlayerToolsPayload } from '@components/interactions/playerTools'
 import { selectRadioStation, showRadioPicker } from '@components/interactions/radioButton'
 import voiceButton from '@components/interactions/voiceButton'
+import dislikeButton from '@components/interactions/dislikeButton'
 import { useComponents } from '@constants/messageComponents'
 import { createPlayerButtonRow, createPlayerToolsRows } from '@constants/playerControls'
 import ENV from '@constants/Env'
 import * as history from '@utils/songHistoryV2'
 import * as radio from '@utils/radio'
 import * as mainMessage from '@utils/mainMessage'
+import * as renderer from '@utils/nowPlayingCanvas'
 import { sendPlayerToolFeedback } from '@utils/playerToolFeedback'
 import { PLAYER_TOOLS_IDLE_MS } from '@utils/playerToolsIdle'
 
@@ -302,4 +304,24 @@ test('personal action feedback never replaces the shared player', async (t) => {
   assert.equal(publicSend.mock.callCount(), 0)
   assert.equal(panel.edits[0].content, 'Thumbs-down saved.')
   assert.equal(panel.edits[0].components?.length, getPlayerToolsPayload().components.length)
+})
+
+test('disliking a paused radio track preserves station attribution on the updated images', async (t) => {
+  const queue = makeQueue()
+  queue.isPaused = true
+  queue.metadata.radio = { stationId: 'rap_heat' } as NonNullable<MusicQueue['metadata']['radio']>
+  const panel = makeInteraction('dislike_button', queue, true)
+  queue.metadata.channel = panel.interaction.channel
+  t.mock.method(history, 'addSongDislike', async () => 2)
+  t.mock.method(history, 'generateHistoryOptions', async () => ({ options: [], songs: [] }))
+  t.mock.method(mainMessage, 'sendMessage', async () => null)
+  const render = t.mock.method(renderer, 'generateNowPlayingImages', async () => [
+    { name: 'player-0.png', attachment: Buffer.from('image'), description: 'Player' },
+  ])
+  await dislikeButton(queue, panel.interaction)
+  assert.equal(render.mock.callCount(), 1)
+  const options = render.mock.calls[0].arguments[1]
+  assert.equal(options?.isPaused, true)
+  assert.equal(options?.currentTrackDislikes, 2)
+  assert.equal(options?.radioStationName, 'Rap Heat Radio')
 })

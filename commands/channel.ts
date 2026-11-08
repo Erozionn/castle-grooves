@@ -2,6 +2,7 @@ import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js'
 
 import { moveMainMessage, sendMessage } from '@utils/mainMessage'
 import { useComponents } from '@constants/messageComponents'
+import { scheduleNowPlayingMessage } from '@utils/nowPlayingMessage'
 import type { ClientType } from '@types'
 
 export default {
@@ -14,7 +15,6 @@ export default {
     const { channel } = interaction
     const queue =
       (interaction.client as ClientType).musicManager.getQueue(interaction.guild.id) || undefined
-    const components = await useComponents(queue)
     await interaction.deferReply()
 
     if (!channel || !channel.isTextBased()) {
@@ -30,6 +30,17 @@ export default {
 
     if (!channel || !channel.isTextBased() || !('guild' in channel)) return
 
-    moveMainMessage(channel, queue)
+    if (queue) queue.metadata.channel = channel
+    await moveMainMessage(channel, queue)
+
+    if (queue && (queue.currentTrack || queue.tracks.length)) {
+      scheduleNowPlayingMessage(queue)
+    } else {
+      await sendMessage(channel, {
+        content: '🎶 | Pick a song below or use </play:991566063068250134>',
+        files: [],
+        components: await useComponents(queue),
+      })
+    }
   },
 }

@@ -24,13 +24,13 @@ import {
 } from '@components/events'
 import { ClientType, CommandObject } from '@types'
 import { useComponents } from '@constants/messageComponents'
-import { getMainMessage, sendMessage, deleteMessage } from '@utils/mainMessage'
+import { getMainMessage, sendMessage, moveMainMessage } from '@utils/mainMessage'
 import { addBotStateChange, preloadSongData } from '@utils/songHistoryV2'
 import initApi from '@api'
 import ENV from '@constants/Env'
 import { recordVoiceStateChange } from '@utils/recordActivity'
 import { commandInteractionHandler } from '@components/interactions'
-import { nowPlayingCanvas, nowPlayingCanvasWithUpNext } from '@utils/nowPlayingCanvas'
+import { generateNowPlayingCanvas } from '@utils/nowPlayingCanvas'
 import useMockTracks from '@data/dummies/songArray'
 import { refillRadio } from '@utils/radio'
 import { createLogger, installLegacyConsoleBridge } from '@utils/logger'
@@ -134,11 +134,11 @@ if (NOW_PLAYING_MOCK_DATA) {
   const mockTracks = useMockTracks()
 
   if (mockTracks && mockTracks.length > 0) {
-    nowPlayingCanvasWithUpNext(mockTracks).then((buffer) => {
+    generateNowPlayingCanvas(mockTracks, { currentTrackDislikes: 0 }).then((buffer) => {
       fs.writeFileSync('mockNowPlayingMulti.png', buffer)
     })
 
-    nowPlayingCanvas(mockTracks[0]).then((buffer) => {
+    generateNowPlayingCanvas([mockTracks[0]], { currentTrackDislikes: 0 }).then((buffer) => {
       fs.writeFileSync('mockNowPlaying.png', buffer)
     })
   } else {
@@ -243,7 +243,9 @@ client.once('ready', async () => {
 
   const recordHeartbeat = () => {
     const queues = [...musicManager.queues.values()]
-    const lavalinkConnected = [...musicManager.shoukaku.nodes.values()].some((node) => node.state === 2)
+    const lavalinkConnected = [...musicManager.shoukaku.nodes.values()].some(
+      (node) => node.state === 2
+    )
 
     recordRuntimeHeartbeat({
       guildId: mainGuild.id,
@@ -374,25 +376,15 @@ process.on('SIGTERM', () => {
 // })
 
 // Resets main message if many messages have since been sent in the channel
-let msgResetCount = 0
-client.on('messageCreate', (msg) => {
+client.on('messageCreate', async (msg) => {
   const botMsg = getMainMessage()
 
   if (!botMsg) return
 
-  const { channel, content, components, attachments } = botMsg
-
-  if (msg.channel.id === botMsg.channel.id && msg.author.id !== botMsg.author.id) {
-    msgResetCount += 1
-  }
-
-  if (msgResetCount > 0) {
-    deleteMessage()
-
-    if (!channel || !channel.isTextBased() || !('guild' in channel)) return
-    sendMessage(channel, { content, components, files: attachments.map((a) => a.url) })
-    msgResetCount = 0
-  }
+  if (msg.channel.id !== botMsg.channel.id || msg.author.id === botMsg.author.id) return
+  const { channel } = botMsg
+  if (!channel.isTextBased() || !('guild' in channel)) return
+  await moveMainMessage(channel)
 })
 
 if (voiceListenerClient) {

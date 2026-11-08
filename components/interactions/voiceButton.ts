@@ -2,6 +2,7 @@ import { ButtonInteraction } from 'discord.js'
 
 import { useComponents } from '@constants/messageComponents'
 import type { ClientType } from '@types'
+import { preparePlayerMessageOptions } from '@utils/playerMessageLayout'
 
 import type { MusicQueue } from '../../lib'
 import { isPrivatePlayerTool, refreshPlayerTools } from './playerTools'
@@ -20,7 +21,9 @@ export default async (queue: MusicQueue | null, interaction: ButtonInteraction) 
       const voiceChannel = member.voice.channel
 
       if (!voiceChannel) {
-        console.warn('[voiceButton] User must be in a voice channel before enabling voice commands.')
+        console.warn(
+          '[voiceButton] User must be in a voice channel before enabling voice commands.'
+        )
         if (isPrivatePlayerTool(interaction)) {
           await refreshPlayerTools(interaction, 'Join a voice channel to enable voice commands.')
         }
@@ -42,7 +45,12 @@ export default async (queue: MusicQueue | null, interaction: ButtonInteraction) 
     await refreshPlayerTools(interaction)
     return
   }
-  await interaction.message.edit({
-    components: await useComponents(queue || undefined),
-  })
+  await interaction.message.edit(
+    preparePlayerMessageOptions(
+      {
+        components: await useComponents(queue || undefined),
+      },
+      interaction.message
+    )
+  )
 }

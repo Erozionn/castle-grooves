@@ -122,7 +122,7 @@ export class EnqueueOperations {
         Object.assign(receipt, { status: 'completed', outcome: resolved.length === request.items.length ? 'all_queued' : resolved.length ? 'partial' : 'none_queued', results, counts: { requested: request.items.length, queued: resolved.length, failed: request.items.length - resolved.length }, playbackStart: idle ? 'pending' : 'not_needed', stateVersion })
       })
       if (effect.start) {
-        try { await withDeadline(effect.start(), 15_000); receipt.playbackStart = 'requested' } catch { receipt.playbackStart = 'failed' }
+        try { await withDeadline(effect.start(), 15_000); Object.assign(receipt, { playbackStart: 'requested' }) } catch { Object.assign(receipt, { playbackStart: 'failed' }) }
       }
     } catch (error) {
       if (receipt.status === 'completed') return
