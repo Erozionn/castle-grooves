@@ -3,7 +3,7 @@ import path from 'node:path'
 import type { Server } from 'node:http'
 
 import express, { type Request, type Response } from 'express'
-import { BaseGuildTextChannel } from 'discord.js'
+import { BaseGuildTextChannel, type GuildMember } from 'discord.js'
 
 import type { ClientType } from '@types'
 import { getSongsPlayedStrict, HistoryUnavailableError } from '@utils/songHistoryV2'
@@ -13,7 +13,7 @@ import {
   DashboardAuthError,
   assertMutationOrigin,
   exchangeDiscordCode,
-  getAuthorizedDashboardUser,
+  getAuthorizedDashboardActor,
   getGuildMemberForUser,
   originIsAllowed,
 } from '@dashboard/auth'
@@ -30,6 +30,7 @@ import { getDashboardRole, canControlPlayer } from '@dashboard/permissions'
 import { clearSession, consumeOauthState, createOauthState, createSession } from '@dashboard/session'
 import { DASHBOARD_CONTRACT_VERSION, type PlayerAction } from '@dashboard/types'
 import { attachDashboardWebSocket } from '@dashboard/websocket'
+import { startRequestTiming } from '@dashboard/requestTiming'
 
 const logger = createLogger('api')
 
@@ -135,14 +136,17 @@ function initApi(client: ClientType): Server {
   app.use(express.json({ limit: '32kb' }))
   app.use('/static', express.static(path.resolve('public')))
 
-  const protectedRoute = (mutation: boolean, handler: (request: ApiRequest, response: Response, user: Awaited<ReturnType<typeof getAuthorizedDashboardUser>>) => Promise<unknown>) =>
+  const protectedRoute = (mutation: boolean, handler: (request: ApiRequest, response: Response, user: Awaited<ReturnType<typeof getAuthorizedDashboardActor>>['user'], member: GuildMember) => Promise<unknown>) =>
     async (request: ApiRequest, response: Response) => {
       const id = getRequestId(request)
+      const timing = startRequestTiming(request, response, id)
       try {
         if (mutation) assertMutationOrigin(request, config)
-        const user = await getAuthorizedDashboardUser(request, client, guildId, config)
-        await handler(request, response, user)
+        const { user, member } = await getAuthorizedDashboardActor(request, client, guildId, config)
+        timing.authComplete()
+        await handler(request, response, user, member)
       } catch (error) {
+        timing.authComplete()
         if (statusFor(error) === 500) logger.error('Dashboard API request failed', error, { requestId: id })
         const code = error instanceof DashboardAuthError || error instanceof PlayerControllerError || error instanceof HistoryError
           ? error.code
@@ -202,8 +206,7 @@ function initApi(client: ClientType): Server {
 
   app.get('/api/v1/me', protectedRoute(false, async (_request, response, user) => response.json({ user, contractVersion: DASHBOARD_CONTRACT_VERSION })))
   app.get('/api/v1/state', protectedRoute(false, async (_request, response, user) => response.json({ state: controller.getState(user.role) })))
-  app.get('/api/v1/voice-channels', protectedRoute(false, async (_request, response, user) => {
-    const member = await getGuildMemberForUser(user.id, client, guildId)
+  app.get('/api/v1/voice-channels', protectedRoute(false, async (_request, response, _user, member) => {
     response.json({ channels: await listDashboardVoiceChannels(member) })
   }))
   app.use('/api/v1/history', (_request, response, next) => { response.setHeader('Cache-Control', 'private, no-store'); next() })
@@ -217,9 +220,8 @@ function initApi(client: ClientType): Server {
     assertHistoryScope(guildId)
     const voiceChannelId = parseVoiceChannelId(request.body)
     const prepareActor = async () => {
-      const currentUser = await getAuthorizedDashboardUser(request, client, guildId, config)
+      const { user: currentUser, member } = await getAuthorizedDashboardActor(request, client, guildId, config)
       if (!canControlPlayer(currentUser.role)) throw new DashboardAuthError('FORBIDDEN', 'DJ permission is required.')
-      const member = await getGuildMemberForUser(user.id, client, guildId)
       const textChannel = await member.guild.channels.fetch(defaultTextChannelId) as BaseGuildTextChannel | null
       if (!textChannel) throw new HistoryError('TEXT_CHANNEL_NOT_FOUND', 'The configured text channel is unavailable.', 409)
       const actor = { member, textChannel, voiceChannel: await resolveDashboardVoiceChannel(member, voiceChannelId, controller.getQueue()), channelOverride: Boolean(voiceChannelId) }
@@ -246,7 +248,7 @@ function initApi(client: ClientType): Server {
     const result = await controller.search(query, source)
     response.json({ results: result.tracks.slice(0, 25).map((track) => ({ title: track.info.title, artist: track.info.author, durationMs: track.info.length, uri: track.info.uri, artworkUrl: track.info.artworkUrl, source: track.info.sourceName })) })
   }))
-  app.post('/api/v1/queue/items', protectedRoute(true, async (request, response, user) => {
+  app.post('/api/v1/queue/items', protectedRoute(true, async (request, response, user, member) => {
     if (!canControlPlayer(user.role)) throw new DashboardAuthError('FORBIDDEN', 'DJ permission is required.')
     const body = asRecord(request.body)
     if (!body || typeof body.query !== 'string' || !body.query.trim() || body.query.length > 500) throw new PlayerControllerError('INVALID_QUEUE_ITEM', 'query must be between 1 and 500 characters.')
@@ -255,13 +257,12 @@ function initApi(client: ClientType): Server {
       ? ((await guild.channels.fetch(defaultTextChannelId)) as BaseGuildTextChannel | null)
       : null
     if (!textChannel) throw new PlayerControllerError('TEXT_CHANNEL_NOT_FOUND', 'The configured text channel is unavailable.')
-    const member = await getGuildMemberForUser(user.id, client, guildId)
     const voiceChannelId = parseVoiceChannelId(body)
     await controller.enqueueQuery({ member, textChannel, voiceChannel: await resolveDashboardVoiceChannel(member, voiceChannelId, controller.getQueue()), channelOverride: Boolean(voiceChannelId) }, body.query)
     logger.info('Dashboard queue item added', { userId: user.id, requestId: getRequestId(request) })
     response.status(201).json({ state: controller.getState(user.role) })
   }))
-  app.post('/api/v1/history/queue', protectedRoute(true, async (request, response, user) => {
+  app.post('/api/v1/history/queue', protectedRoute(true, async (request, response, user, member) => {
     if (!canControlPlayer(user.role)) throw new DashboardAuthError('FORBIDDEN', 'DJ permission is required.')
     const body = asRecord(request.body)
     const queries = body?.queries
@@ -273,7 +274,6 @@ function initApi(client: ClientType): Server {
       ? ((await guild.channels.fetch(defaultTextChannelId)) as BaseGuildTextChannel | null)
       : null
     if (!textChannel) throw new PlayerControllerError('TEXT_CHANNEL_NOT_FOUND', 'The configured text channel is unavailable.')
-    const member = await getGuildMemberForUser(user.id, client, guildId)
     const voiceChannelId = parseVoiceChannelId(body)
     await controller.enqueueQueries({ member, textChannel, voiceChannel: await resolveDashboardVoiceChannel(member, voiceChannelId, controller.getQueue()), channelOverride: Boolean(voiceChannelId) }, queries.map((query) => query.trim()))
     logger.info('Dashboard history queue batch added', { userId: user.id, count: queries.length, requestId: getRequestId(request) })
@@ -302,13 +302,12 @@ function initApi(client: ClientType): Server {
     assertHistoryScope(guildId)
     response.json(await history.search(user.id, request.query))
   }))
-  app.get('/api/v1/history/curation', protectedRoute(false, async (request, response, user) => {
+  app.get('/api/v1/history/curation', protectedRoute(false, async (request, response, user, member) => {
     assertHistoryScope(guildId)
     const mode = typeof request.query.mode === 'string' ? request.query.mode : 'people'
     const timezone = typeof request.query.timezone === 'string' ? request.query.timezone : 'America/Toronto'
     const selectedId = parseVoiceChannelId(request.query)
     const state = controller.getState(user.role)
-    const member = await getGuildMemberForUser(user.id, client, guildId)
     const channel = selectedId ? await resolveDashboardVoiceChannel(member, selectedId, controller.getQueue()) : member.voice.channel || controller.getQueue()?.voiceChannel
     const members = channel ? [...channel.members.values()].filter(person => !person.user.bot).map(person => ({ id: person.id, username: person.displayName })) : []
     const queuedUris = [state.currentTrack, ...state.queueItems].flatMap(track => track?.uri ? [track.uri] : [])

@@ -128,6 +128,7 @@ paths:
   /api/v1/history/curation:
     get:
       operationId: historyCuration
+      description: Ranks recorded songs from the last 90 days in bounded 30-day scan windows.
       parameters:
         - { name: mode, in: query, schema: { enum: [people, rediscover, recent], default: people } }
         - { name: timezone, in: query, schema: { type: string, default: America/Toronto } }
@@ -136,6 +137,7 @@ paths:
   /api/v1/history/requesters/{id}/summary:
     get:
       operationId: requesterSummary
+      description: Summarizes recorded requests from the last 90 days.
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }
         - { name: timezone, in: query, schema: { type: string } }
@@ -143,6 +145,7 @@ paths:
   /api/v1/history/tracks/{trackId}/summary:
     get:
       operationId: trackSummary
+      description: Summarizes recorded starts for this track from the last 90 days.
       parameters:
         - { name: trackId, in: path, required: true, schema: { type: string } }
         - { name: timezone, in: query, schema: { type: string } }
@@ -150,6 +153,7 @@ paths:
   /api/v1/history/artists/summary:
     get:
       operationId: artistSummary
+      description: Summarizes recorded starts for this artist from the last 90 days.
       parameters:
         - { name: name, in: query, required: true, schema: { type: string } }
         - { name: timezone, in: query, schema: { type: string } }
