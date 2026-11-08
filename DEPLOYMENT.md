@@ -129,6 +129,21 @@ docker run --rm -v castle-grooves_influxdb-data:/data -v ${PWD}:/backup alpine t
 
 ## Troubleshooting
 
+Slow dashboard API requests:
+
+Authenticated responses include `Server-Timing: auth;dur=...`, visible in browser
+DevTools, showing milliseconds spent checking the session, allowlist, and Discord
+membership. Requests taking at least one second emit a `Slow dashboard API
+request` warning with `requestId`, route template, status, `durationMs`, `authMs`,
+and `handlerMs`. Match the log to the response's `X-Request-Id`.
+
+A high `authMs` points to Discord member lookup latency or rate-limit waits.
+A high `handlerMs` points to work after authorization, such as InfluxDB queries
+on history routes or Lavalink on search routes; it also includes serialization
+and response flushing. Compare `/healthz` with authenticated `/api/v1/state` to
+help distinguish shared server/proxy delays from authorization delays. Route
+logs omit query text and actual URL parameter values.
+
 Watchtower not updating:
 
 ```bash

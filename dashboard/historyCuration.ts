@@ -2,6 +2,7 @@ import { comparePlays, HistoryError, normalizeStoredPlay, type HistorySigner, ty
 import { historyCoverage, localCalendar, validateTimezone, type HistoryRead } from './historyRecall'
 
 const YEAR_MS = 365 * 86_400_000
+const SCAN_WINDOW_MS = 30 * 86_400_000
 const MAX_PLAYS = 10_000
 const MAX_BYTES = 8 * 1024 * 1024
 const MAX_SNAPSHOTS = 4
@@ -141,7 +142,7 @@ export class HistoryCuration {
           if (matches(play)) window.add(play)
         })
       } catch (error) {
-        if (!(error instanceof HistoryError) || error.code !== 'HISTORY_QUERY_TOO_BROAD' || to - from <= 1) throw error
+        if (!(error instanceof HistoryError) || !['HISTORY_QUERY_TOO_BROAD', 'HISTORY_TIMEOUT'].includes(error.code) || to - from <= 1) throw error
         window.clear()
         const middle = Math.floor((from + to) / 2)
         await readRange(middle, to)
@@ -151,7 +152,12 @@ export class HistoryCuration {
       for (const play of window.values()) plays.add(play)
       plays.isTruncated ||= window.isTruncated
     }
-    await readRange(capturedAt - YEAR_MS, capturedAt)
+    // Avoid spending the query timeout pivoting an entire year's series before
+    // discovering that the range needs splitting. Still examine the full year.
+    const horizonFrom = capturedAt - YEAR_MS
+    for (let to = capturedAt; to > horizonFrom; to -= SCAN_WINDOW_MS) {
+      await readRange(Math.max(horizonFrom, to - SCAN_WINDOW_MS), to)
+    }
     return { plays: plays.values().sort((a, b) => comparePlays(b, a)), capturedAt: new Date(capturedAt).toISOString(), horizonFrom: new Date(capturedAt - YEAR_MS).toISOString(), isTruncated: plays.isTruncated, coverage: historyCoverage }
   }
 

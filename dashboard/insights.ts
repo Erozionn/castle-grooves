@@ -70,8 +70,9 @@ export const getHistoryInsightsStrict = async (range: HistoryRange, timezone: st
   const tracks = new Map<string, { title: string; artist: string | null; uri: string | null; lastPlayedAt: string; starts: number; recentStarts: number; previousStarts: number }>()
   const requesters = new Map<string, { id: string; username: string; starts: number }>()
   const splitAt = Date.now() - ({ '24h': 86_400_000, weekly: 7 * 86_400_000, monthly: 30 * 86_400_000, yearly: 365 * 86_400_000 }[range] / 2)
+  const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short', hour: '2-digit', hourCycle: 'h23' })
   for (const play of page.items) {
-    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short', hour: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(play.playedAt))
+    const parts = formatter.formatToParts(new Date(play.playedAt))
     const value = (type: string) => parts.find((part) => part.type === type)?.value || ''
     const day = `${value('year')}-${value('month')}-${value('day')}`
     const weekday = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(value('weekday'))

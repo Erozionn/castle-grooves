@@ -1,4 +1,5 @@
 import type { Request } from 'express'
+import type { Guild, GuildMember } from 'discord.js'
 
 import type { ClientType } from '@types'
 import { createLogger } from '@utils/logger'
@@ -9,6 +10,19 @@ import { readSession } from './session'
 import type { DashboardSessionUser } from './types'
 
 const logger = createLogger('dashboard-auth')
+// Share only in-flight reads. Once resolved, the next authorization still
+// verifies membership with Discord instead of trusting an older cached result.
+const pendingMembers = new WeakMap<Guild, Map<string, Promise<GuildMember>>>()
+
+const fetchMember = (guild: Guild, userId: string): Promise<GuildMember> => {
+  let pending = pendingMembers.get(guild)
+  if (!pending) { pending = new Map(); pendingMembers.set(guild, pending) }
+  const existing = pending.get(userId)
+  if (existing) return existing
+  const read = guild.members.fetch({ user: userId, force: true }).finally(() => { pending.delete(userId) })
+  pending.set(userId, read)
+  return read
+}
 
 export class DashboardAuthError extends Error {
   constructor(public readonly code: 'UNAUTHENTICATED' | 'FORBIDDEN', message: string) {
@@ -17,12 +31,12 @@ export class DashboardAuthError extends Error {
   }
 }
 
-export const getAuthorizedDashboardUser = async (
+export const getAuthorizedDashboardActor = async (
   request: Pick<Request, 'headers'>,
   client: ClientType,
   guildId: string,
   config: DashboardConfig
-): Promise<DashboardSessionUser> => {
+): Promise<{ user: DashboardSessionUser; member: GuildMember }> => {
   const session = readSession(request, config)
   if (!session) throw new DashboardAuthError('UNAUTHENTICATED', 'Log in with Discord to continue.')
 
@@ -33,18 +47,25 @@ export const getAuthorizedDashboardUser = async (
   if (!guild) throw new DashboardAuthError('FORBIDDEN', 'The configured Discord guild is unavailable.')
 
   try {
-    const member = await guild.members.fetch({ user: session.userId, force: true })
-    return {
+    const member = await fetchMember(guild, session.userId)
+    return { member, user: {
       id: member.id,
       username: member.user.username,
       avatarUrl: member.displayAvatarURL(),
       role,
-    }
+    } }
   } catch {
     logger.warn('Dashboard user is not a guild member', { userId: session.userId, guildId })
     throw new DashboardAuthError('FORBIDDEN', 'You must be a member of the configured Discord guild.')
   }
 }
+
+export const getAuthorizedDashboardUser = async (
+  request: Pick<Request, 'headers'>,
+  client: ClientType,
+  guildId: string,
+  config: DashboardConfig
+): Promise<DashboardSessionUser> => (await getAuthorizedDashboardActor(request, client, guildId, config)).user
 
 export const getGuildMemberForUser = async (
   userId: string,
@@ -53,7 +74,7 @@ export const getGuildMemberForUser = async (
 ) => {
   const guild = client.guilds.cache.get(guildId)
   if (!guild) throw new DashboardAuthError('FORBIDDEN', 'The configured Discord guild is unavailable.')
-  return guild.members.fetch({ user: userId, force: true })
+  return fetchMember(guild, userId)
 }
 
 export const originIsAllowed = (origin: string | undefined, config: DashboardConfig): boolean =>
